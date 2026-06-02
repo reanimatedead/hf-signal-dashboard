@@ -198,6 +198,102 @@ def calc_cci(high, low, close, period):
     )
     return (tp - sma) / (0.015 * mad.replace(0, np.nan))
 
+# ─── CHART DETAIL (v2.3) ─────────────────────────────────
+# Symbols that carry a computed charts.1d block in data.json. Kept small to
+# limit payload; other rows have no charts key and fall back gracefully.
+CHART_SYMBOLS = {"USDJPY=X", "EURUSD=X", "XAUUSD=X"}
+OHLC_MAX_BARS = 120
+
+
+def _bb_block(close, period, dev, dp):
+    """One Bollinger Band (period, deviation). Volatility context, not a signal."""
+    if len(close) < period:
+        return {"basis": None, "upper": None, "lower": None, "width": None,
+                "state": "insufficient_data",
+                "comment": f"{period}-period Bollinger Band with {dev} standard deviations. Not enough OHLC data for this period."}
+    sma = close.rolling(period).mean()
+    std = close.rolling(period).std(ddof=0)
+    basis = float(sma.iloc[-1]); sd = float(std.iloc[-1])
+    upper = basis + dev * sd; lower = basis - dev * sd
+    last = float(close.iloc[-1])
+    state = (f"upper_{dev}sigma_touch" if last >= upper
+             else f"lower_{dev}sigma_touch" if last <= lower else "neutral")
+    cycle = "Shorter" if period == 48 else "Longer"
+    extreme = " Extreme" if dev == 3 else ""
+    return {"basis": round(basis, dp), "upper": round(upper, dp), "lower": round(lower, dp),
+            "width": round(upper - lower, dp), "state": state,
+            "comment": f"{period}-period Bollinger Band with {dev} standard deviations.{extreme} {cycle}-cycle volatility context."}
+
+
+def _cci_block(high, low, close, period):
+    """One CCI (period). Momentum context, not a signal."""
+    if len(close) < period:
+        return {"value": None, "state": "insufficient_data",
+                "comment": f"{period}-period CCI. Not enough OHLC data for this period."}
+    s = calc_cci(high, low, close, period)
+    v = float(s.iloc[-1]) if not np.isnan(s.iloc[-1]) else 0.0
+    state = "overbought_context" if v >= 100 else "oversold_context" if v <= -100 else "neutral"
+    cycle = "Shorter" if period == 48 else "Longer"
+    return {"value": round(v, 1), "state": state, "comment": f"{cycle} cycle momentum context."}
+
+
+def _elliott_1d_placeholder():
+    return {"candidate": "unknown", "confidence": "low", "degree": "unknown", "phase": "unknown",
+            "invalidation_level": None, "note": "Heuristic placeholder only. Not a trading signal."}
+
+
+def build_empty_chart(tf_label):
+    """Placeholder chart block for a not-yet-available timeframe (4h / 1w)."""
+    return {"available": False, "source": None, "updated_at": None, "ohlc": [], "indicators": None,
+            "elliott": {"candidate": "unknown", "confidence": "low",
+                        "note": f"{tf_label} chart data is not available yet."},
+            "note": f"{tf_label} chart data is planned for a later phase."}
+
+
+def build_1d_chart_from_ohlc(df_d, dp, updated_at):
+    """Build a computed charts['1d'] block from a daily OHLC frame.
+
+    Bollinger Bands 48/288 (2σ/3σ) and CCI 48/288 are volatility/momentum
+    context only, not trading signals. Falls back to available:false on error.
+    """
+    try:
+        close = df_d["Close"].squeeze()
+        high = df_d["High"].squeeze()
+        low = df_d["Low"].squeeze()
+        if len(close) < 48:
+            return build_empty_chart("1d")
+        ohlc = []
+        for ts, r in df_d.tail(OHLC_MAX_BARS).iterrows():
+            try:
+                t = ts.strftime("%Y-%m-%dT00:00:00+09:00") if hasattr(ts, "strftime") else str(ts)
+                ohlc.append({"time": t, "open": round(float(r["Open"]), dp), "high": round(float(r["High"]), dp),
+                             "low": round(float(r["Low"]), dp), "close": round(float(r["Close"]), dp), "volume": None})
+            except Exception:
+                continue
+        indicators = {
+            "bollinger_bands": {
+                "48": {"std_2": _bb_block(close, 48, 2, dp), "std_3": _bb_block(close, 48, 3, dp)},
+                "288": {"std_2": _bb_block(close, 288, 2, dp), "std_3": _bb_block(close, 288, 3, dp)},
+            },
+            "cci": {"48": _cci_block(high, low, close, 48), "288": _cci_block(high, low, close, 288)},
+        }
+        return {"available": True, "source": "fx-analysis-system/yfinance", "updated_at": updated_at,
+                "ohlc": ohlc, "indicators": indicators, "elliott": _elliott_1d_placeholder(),
+                "note": "Indicators are market context only."}
+    except Exception:
+        return build_empty_chart("1d")
+
+
+def attach_charts_to_symbol(row, df_d, dp, updated_at):
+    """Attach 4h/1d/1w charts to a symbol row. 1d computed; 4h/1w placeholder."""
+    row["charts"] = {
+        "4h": build_empty_chart("4h"),
+        "1d": build_1d_chart_from_ohlc(df_d, dp, updated_at),
+        "1w": build_empty_chart("1w"),
+    }
+    return row
+
+
 def monte_carlo_prob(returns, n_sims=800, n_forward=5, direction="long"):
     """Vectorised bootstrap Monte Carlo – returns P(direction correct)."""
     clean = returns.dropna().values
@@ -507,7 +603,7 @@ def process_fx_advanced(fx_dict):
             dp = 5 if price < 10 else (3 if price < 100 else 2)
             bb_pct_display = round(max(0.0, min(1.0, bb_pct_d)), 3)
 
-            results.append({
+            row = {
                 "symbol": sym, "name": name,
                 "price": round(price, dp), "change_pct": round(chg_pct, 2),
                 "rsi": round(rsi, 1),
@@ -526,7 +622,11 @@ def process_fx_advanced(fx_dict):
                 "range_pct": 0.5,          # FX: not meaningful
                 "composite_score": max(0, min(100, score)),
                 "signal": signal, "error": None,
-            })
+            }
+            # v2.3: attach computed 1d chart detail for a small allowlist
+            if sym in CHART_SYMBOLS:
+                attach_charts_to_symbol(row, df_d, dp, datetime.now(JST).isoformat())
+            results.append(row)
 
         except Exception as exc:
             results.append({"symbol": sym, "name": name, "composite_score": -1,

@@ -195,6 +195,17 @@ See [DATA_CONTRACT.md](DATA_CONTRACT.md) §4–§5 and the populated USDJPY 1d e
 [docs/sample-signals.json](docs/sample-signals.json). Indicators are market context only and
 are not trading signals.
 
+### v2.3 — charts in the live data.json
+
+`fetch_signals.py` now computes and attaches a `charts.1d` block (Bollinger Bands 48/288 with
+2σ/3σ, CCI 48/288, Elliott placeholder) to a small FX allowlist — **USDJPY, EURUSD, XAUUSD** —
+in `docs/data.json`, using the existing yfinance dependency (no new external API). The public
+detail panel renders these when `available:true`; 4h/1w remain placeholder. Other symbols have
+no charts and fall back gracefully. Computed values appear after the next GitHub Actions run.
+
+Charts and indicators are provided for market context and portfolio demonstration only. They
+are not trading signals or investment advice.
+
 ---
 
 ## Portfolio context
