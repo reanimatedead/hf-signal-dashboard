@@ -161,6 +161,13 @@ tbody tr.detail-row,tbody tr.detail-row:hover{background:var(--bg2)}
 .dt-disc{margin-top:6px;font-size:10px;color:var(--text-faint)}
 .dt-bb{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:4px 18px;margin-top:6px;font-size:11px;color:var(--text)}
 .dt-bb b{color:var(--text-dim);font-weight:400}
+.dt-chart{margin-top:8px;max-width:560px}
+.dt-svg,.dt-cci-svg{width:100%;height:auto;display:block;background:var(--bg2);border:1px solid var(--border);border-radius:5px}
+.dt-cci-svg{margin-top:5px}
+.dt-legend{display:flex;flex-wrap:wrap;gap:4px 12px;margin-top:5px;font-size:10px;color:var(--text-dim)}
+.dt-leg{display:inline-flex;align-items:center;gap:4px}
+.dt-leg i{width:11px;height:2px;display:inline-block;border-radius:1px}
+.dt-cap{font-size:10px;color:var(--text-faint);margin-top:3px}
 
 /* ── Symbol cell ── */
 .sym-cell{display:flex;align-items:center;gap:6px}
@@ -650,7 +657,7 @@ function detailHTML(r){
     <div class="dt-disc">Indicators are shown for market context only and are not trading signals.</div>
   </div>`;
 }
-// Render computed 1d Bollinger Bands (48/288, 2σ/3σ), CCI (48/288), Elliott.
+// Render computed 1d chart (Close + Bollinger overlay), CCI panel, readouts.
 function chart1dHTML(c, f){
   const ind=c.indicators||{};
   const bb=ind.bollinger_bands||{};
@@ -658,7 +665,16 @@ function chart1dHTML(c, f){
   const band=(o)=> o ? `mid ${f(o.basis)} · up ${f(o.upper)} · low ${f(o.lower)} <span style="color:var(--text-faint)">[${o.state||"—"}]</span>` : "—";
   const cciCell=(o)=> o ? `${f(o.value,1)} <span style="color:var(--text-faint)">[${o.state||"—"}]</span>` : "—";
   const el=c.elliott||{};
+  let chart="";
+  try{ chart = priceChartSVG(c) + cciChartSVG(c); }catch(e){ chart=""; }
+  const legend = chart ? `<div class="dt-legend">
+      <span class="dt-leg"><i style="background:var(--accent)"></i>Close</span>
+      <span class="dt-leg"><i style="background:var(--blue)"></i>BB48 2&sigma;</span>
+      <span class="dt-leg"><i style="background:var(--yellow)"></i>BB288 2&sigma;</span>
+      <span class="dt-leg"><i style="background:var(--text-faint)"></i>3&sigma; faint</span>
+    </div>` : "";
   return `<div class="dt-note" style="color:var(--text)"><b style="color:var(--accent)">日足 1d — computed indicators</b></div>
+    ${chart?`<div class="dt-chart">${chart}${legend}</div>`:""}
     <div class="dt-bb">
       <div><b>BB 48 / 2&sigma;</b> ${band(bb["48"]&&bb["48"].std_2)}</div>
       <div><b>BB 48 / 3&sigma;</b> ${band(bb["48"]&&bb["48"].std_3)}</div>
@@ -668,6 +684,93 @@ function chart1dHTML(c, f){
       <div><b>CCI 288</b> ${cciCell(cci["288"])}</div>
       <div><b>Elliott</b> ${el.candidate||"unknown"} <span style="color:var(--text-faint)">(${el.confidence||"low"})</span></div>
     </div>`;
+}
+// ── Lightweight inline-SVG chart helpers (no external library) ──
+function _n(v){ return (typeof v==="number" && isFinite(v)) ? v : null; }
+function _rollingBB(closes, period, dev){
+  const up=[], lo=[];
+  for(let i=0;i<closes.length;i++){
+    const w=closes.slice(i-period+1,i+1);
+    if(i<period-1 || w.some(x=>x==null)){ up.push(null); lo.push(null); continue; }
+    const m=w.reduce((a,b)=>a+b,0)/period;
+    const sd=Math.sqrt(w.reduce((a,b)=>a+(b-m)*(b-m),0)/period); // population (ddof=0)
+    up.push(m+dev*sd); lo.push(m-dev*sd);
+  }
+  return {up,lo};
+}
+function _bandSeries(closes, period, dev, latest){
+  if(closes.length>=period) return _rollingBB(closes,period,dev);
+  if(latest && _n(latest.upper)!=null && _n(latest.lower)!=null)
+    return {up:closes.map(()=>latest.upper), lo:closes.map(()=>latest.lower)};
+  return null;
+}
+function _rollingCCI(ohlc, period){
+  const tp=ohlc.map(o=>{ const h=_n(o&&o.high),l=_n(o&&o.low),cl=_n(o&&o.close); return (h!=null&&l!=null&&cl!=null)?(h+l+cl)/3:null; });
+  const out=[];
+  for(let i=0;i<tp.length;i++){
+    const w=tp.slice(i-period+1,i+1);
+    if(i<period-1 || w.some(x=>x==null)){ out.push(null); continue; }
+    const m=w.reduce((a,b)=>a+b,0)/period;
+    const mad=w.reduce((a,b)=>a+Math.abs(b-m),0)/period;
+    out.push(mad===0?0:(tp[i]-m)/(0.015*mad));
+  }
+  return out;
+}
+function priceChartSVG(c){
+  const ohlc=(c&&c.ohlc)||[];
+  const closes=ohlc.map(o=>_n(o&&o.close));
+  const valid=closes.filter(x=>x!=null);
+  if(valid.length<2) return "";
+  const bb=(c.indicators&&c.indicators.bollinger_bands)||{};
+  const b48=bb["48"]||{}, b288=bb["288"]||{};
+  const s48_2=_bandSeries(closes,48,2,b48.std_2);
+  const s48_3=_bandSeries(closes,48,3,b48.std_3);
+  const s288_2=_bandSeries(closes,288,2,b288.std_2);
+  const s288_3=_bandSeries(closes,288,3,b288.std_3);
+  let ys=valid.slice();                       // y-range from close + 2σ only (3σ may clip)
+  [s48_2,s288_2].forEach(s=>{ if(s){ s.up.concat(s.lo).forEach(v=>{ if(v!=null) ys.push(v); }); }});
+  let yMin=Math.min(...ys), yMax=Math.max(...ys);
+  if(yMin===yMax){ yMin-=1; yMax+=1; }
+  const pad=(yMax-yMin)*0.05; yMin-=pad; yMax+=pad;
+  const W=320,H=120,L=2,R=2,T=6,B=6, n=closes.length;
+  const X=i=> L+(n<=1?0:i/(n-1)*(W-L-R));
+  const Y=v=> T+(1-(v-yMin)/(yMax-yMin))*(H-T-B);
+  const poly=(arr)=> arr.map((v,i)=> v==null?null:`${X(i).toFixed(1)},${Y(v).toFixed(1)}`).filter(Boolean).join(" ");
+  const line=(pts,color,w,op,dash)=> pts?`<polyline fill="none" stroke="${color}" stroke-width="${w}"${op?` opacity="${op}"`:""}${dash?` stroke-dasharray="${dash}"`:""} points="${pts}"/>`:"";
+  let svg=`<svg class="dt-svg" viewBox="0 0 ${W} ${H}" role="img" aria-label="1d close price and Bollinger Bands">`;
+  if(s48_3){ svg+=line(poly(s48_3.up),"var(--text-faint)",0.8,0.5,"3 2")+line(poly(s48_3.lo),"var(--text-faint)",0.8,0.5,"3 2"); }
+  if(s288_3){ svg+=line(poly(s288_3.up),"var(--text-faint)",0.8,0.4,"3 2")+line(poly(s288_3.lo),"var(--text-faint)",0.8,0.4,"3 2"); }
+  if(s288_2){ svg+=line(poly(s288_2.up),"var(--yellow)",0.9,0.85)+line(poly(s288_2.lo),"var(--yellow)",0.9,0.85); }
+  if(s48_2){ svg+=line(poly(s48_2.up),"var(--blue)",0.9,0.9)+line(poly(s48_2.lo),"var(--blue)",0.9,0.9); }
+  svg+=line(poly(closes),"var(--accent)",1.4);
+  return svg+`</svg>`;
+}
+function cciChartSVG(c){
+  const ohlc=(c&&c.ohlc)||[];
+  const cciInd=(c.indicators&&c.indicators.cci)||{};
+  const l48=cciInd["48"]?_n(cciInd["48"].value):null;
+  const l288=cciInd["288"]?_n(cciInd["288"].value):null;
+  const ser48 = ohlc.length>=48 ? _rollingCCI(ohlc,48) : null;
+  let vals=[100,-100];
+  if(ser48) ser48.forEach(v=>{ if(v!=null) vals.push(v); });
+  if(l48!=null) vals.push(l48);
+  if(l288!=null) vals.push(l288);
+  const cap=Math.max(220, Math.ceil(Math.max.apply(null,vals.map(Math.abs))/50)*50);
+  const W=320,H=70,L=2,R=2,T=4,B=4, n=Math.max(ohlc.length,2);
+  const X=i=> L+(n<=1?0:i/(n-1)*(W-L-R));
+  const Y=v=>{ const cv=Math.max(-cap,Math.min(cap,v)); return T+(1-(cv+cap)/(2*cap))*(H-T-B); };
+  let svg=`<svg class="dt-cci-svg" viewBox="0 0 ${W} ${H}" role="img" aria-label="1d CCI">`;
+  svg+=`<line x1="${L}" y1="${Y(0).toFixed(1)}" x2="${W-R}" y2="${Y(0).toFixed(1)}" stroke="var(--border2)" stroke-width="0.6"/>`;
+  [100,-100].forEach(g=>{ svg+=`<line x1="${L}" y1="${Y(g).toFixed(1)}" x2="${W-R}" y2="${Y(g).toFixed(1)}" stroke="var(--text-faint)" stroke-width="0.5" stroke-dasharray="3 2"/>`; });
+  if(l288!=null) svg+=`<line x1="${L}" y1="${Y(l288).toFixed(1)}" x2="${W-R}" y2="${Y(l288).toFixed(1)}" stroke="var(--yellow)" stroke-width="0.8" opacity="0.7" stroke-dasharray="2 2"/>`;
+  if(ser48){
+    const pts=ser48.map((v,i)=> v==null?null:`${X(i).toFixed(1)},${Y(v).toFixed(1)}`).filter(Boolean).join(" ");
+    if(pts) svg+=`<polyline fill="none" stroke="var(--accent)" stroke-width="1.2" points="${pts}"/>`;
+  } else if(l48!=null){
+    svg+=`<circle cx="${(W-R).toFixed(1)}" cy="${Y(l48).toFixed(1)}" r="1.8" fill="var(--accent)"/>`;
+  }
+  svg+=`</svg><div class="dt-cap">CCI 48 ${l48==null?"—":l48.toFixed(0)} &middot; CCI 288 ${l288==null?"—":l288.toFixed(0)} &middot; guides &plusmn;100 &middot; scale &plusmn;${cap}</div>`;
+  return svg;
 }
 
 // ══ Company links ══════════════════════════════════
