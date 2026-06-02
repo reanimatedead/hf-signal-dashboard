@@ -2,8 +2,8 @@
   "generated_at": "2026-06-03T08:00:00+09:00",
   "source": "fx-analysis-system",
   "timeframe": "1d",
-  "version": "2.0",
-  "_note": "Sample data for integration testing. Not live market data. Not investment advice.",
+  "version": "2.2.1",
+  "_note": "Sample data for integration testing. Not live market data. Not investment advice. Indicators are market context only, not trading signals. The 'charts' detail block is optional per signal; representative symbols (USDJPY, XAUUSD, SPX) show its shape. USDJPY 1d shows the populated v2.2.1 indicator schema (Bollinger Bands 48/288 with 2σ and 3σ, CCI 48/288, Elliott); other timeframes/symbols show available=false.",
   "macro": {
     "rates": {
       "US10Y": {
@@ -60,6 +60,36 @@
         "comment": "Bond volatility placeholder."
       }
     },
+    "usd": {
+      "DXY": {
+        "value": 105.0,
+        "trend": "up",
+        "risk": "medium",
+        "comment": "US dollar strength context."
+      }
+    },
+    "valuation": {
+      "real_yield": {
+        "value": null,
+        "state": "placeholder",
+        "risk": "unknown",
+        "comment": "Real-yield placeholder. Gold and equity valuation pressure context."
+      },
+      "breakeven_inflation": {
+        "value": null,
+        "state": "placeholder",
+        "risk": "unknown",
+        "comment": "Inflation-expectation placeholder."
+      }
+    },
+    "credit": {
+      "credit_spread": {
+        "value": null,
+        "state": "placeholder",
+        "risk": "unknown",
+        "comment": "Credit-stress / risk-appetite placeholder."
+      }
+    },
     "commodities": {
       "gold": {
         "symbol": "XAUUSD",
@@ -81,6 +111,13 @@
         "trend": "watch",
         "risk": "medium",
         "comment": "Monitored as global-growth and China-demand proxy."
+      },
+      "wti": {
+        "symbol": "WTI",
+        "value": null,
+        "trend": "neutral",
+        "risk": "unknown",
+        "comment": "Crude oil placeholder. Inflation / geopolitical / growth proxy."
       },
       "gold_silver_ratio": {
         "value": 80.0,
@@ -115,6 +152,8 @@
       "rates_regime": "restrictive_watch",
       "fx_regime": "yield_spread_sensitive",
       "commodity_regime": "mixed",
+      "liquidity_regime": "neutral",
+      "cross_asset_regime": "mixed_watch",
       "summary": "Cross-asset environment requires monitoring yields, USDJPY, volatility, and metals together. Context only; not a recommendation."
     }
   },
@@ -141,6 +180,48 @@
           "confidence": "low",
           "invalidation_level": null,
           "note": "Weekly structure requires manual validation."
+        }
+      },
+      "charts": {
+        "4h": {
+          "available": false,
+          "ohlc": [],
+          "indicators": null,
+          "elliott": { "candidate": "unknown", "confidence": "low", "degree": "unknown", "phase": "unknown", "invalidation_level": null, "note": "Heuristic candidate only. Manual validation required. Not a trading signal." },
+          "note": "Chart data not available in sample data."
+        },
+        "1d": {
+          "available": true,
+          "ohlc": [
+            { "time": "2026-06-01T00:00:00+09:00", "open": 149.20, "high": 150.10, "low": 149.05, "close": 149.85, "volume": null },
+            { "time": "2026-06-02T00:00:00+09:00", "open": 149.85, "high": 150.40, "low": 149.60, "close": 150.05, "volume": null },
+            { "time": "2026-06-03T00:00:00+09:00", "open": 150.05, "high": 150.55, "low": 149.80, "close": 150.30, "volume": null }
+          ],
+          "indicators": {
+            "bollinger_bands": {
+              "48": {
+                "std_2": { "basis": 149.40, "upper": 151.20, "lower": 147.60, "width": 3.60, "state": "neutral", "comment": "48-period Bollinger Band with 2 standard deviations. Shorter-cycle volatility context." },
+                "std_3": { "basis": 149.40, "upper": 152.10, "lower": 146.70, "width": 5.40, "state": "neutral", "comment": "48-period Bollinger Band with 3 standard deviations. Extreme short-cycle volatility context." }
+              },
+              "288": {
+                "std_2": { "basis": 147.80, "upper": 152.40, "lower": 143.20, "width": 9.20, "state": "expansion", "comment": "288-period Bollinger Band with 2 standard deviations. Longer-cycle volatility context." },
+                "std_3": { "basis": 147.80, "upper": 154.70, "lower": 140.90, "width": 13.80, "state": "neutral", "comment": "288-period Bollinger Band with 3 standard deviations. Extreme longer-cycle volatility context." }
+              }
+            },
+            "cci": {
+              "48": { "value": 112.0, "state": "overbought_context", "comment": "Shorter cycle momentum context." },
+              "288": { "value": 78.0, "state": "trend_strengthening", "comment": "Longer cycle momentum context." }
+            }
+          },
+          "elliott": { "candidate": "wave_3_candidate", "confidence": "low", "degree": "intermediate", "phase": "impulse_candidate", "invalidation_level": null, "note": "Heuristic candidate only. Manual validation required. Not a trading signal." },
+          "note": "Sample populated values for schema demonstration. Not live market data."
+        },
+        "1w": {
+          "available": false,
+          "ohlc": [],
+          "indicators": null,
+          "elliott": { "candidate": "unknown", "confidence": "low", "degree": "unknown", "phase": "unknown", "invalidation_level": null, "note": "Heuristic candidate only. Manual validation required. Not a trading signal." },
+          "note": "Chart data not available in sample data."
         }
       }
     },
@@ -242,6 +323,11 @@
           "invalidation_level": null,
           "note": "Weekly structure requires manual validation."
         }
+      },
+      "charts": {
+        "4h": { "available": false, "ohlc": [], "indicators": null, "elliott": { "candidate": "unknown", "confidence": "low", "degree": "unknown", "phase": "unknown", "invalidation_level": null, "note": "Heuristic candidate only. Manual validation required. Not a trading signal." }, "note": "Chart data not available in sample data." },
+        "1d": { "available": false, "ohlc": [], "indicators": null, "elliott": { "candidate": "unknown", "confidence": "low", "degree": "unknown", "phase": "unknown", "invalidation_level": null, "note": "Heuristic candidate only. Manual validation required. Not a trading signal." }, "note": "Chart data not available in sample data." },
+        "1w": { "available": false, "ohlc": [], "indicators": null, "elliott": { "candidate": "unknown", "confidence": "low", "degree": "unknown", "phase": "unknown", "invalidation_level": null, "note": "Heuristic candidate only. Manual validation required. Not a trading signal." }, "note": "Chart data not available in sample data." }
       }
     },
     {
@@ -392,6 +478,11 @@
           "invalidation_level": null,
           "note": "Weekly structure requires manual validation."
         }
+      },
+      "charts": {
+        "4h": { "available": false, "ohlc": [], "indicators": null, "elliott": { "candidate": "unknown", "confidence": "low", "degree": "unknown", "phase": "unknown", "invalidation_level": null, "note": "Heuristic candidate only. Manual validation required. Not a trading signal." }, "note": "Chart data not available in sample data." },
+        "1d": { "available": false, "ohlc": [], "indicators": null, "elliott": { "candidate": "unknown", "confidence": "low", "degree": "unknown", "phase": "unknown", "invalidation_level": null, "note": "Heuristic candidate only. Manual validation required. Not a trading signal." }, "note": "Chart data not available in sample data." },
+        "1w": { "available": false, "ohlc": [], "indicators": null, "elliott": { "candidate": "unknown", "confidence": "low", "degree": "unknown", "phase": "unknown", "invalidation_level": null, "note": "Heuristic candidate only. Manual validation required. Not a trading signal." }, "note": "Chart data not available in sample data." }
       }
     },
     {

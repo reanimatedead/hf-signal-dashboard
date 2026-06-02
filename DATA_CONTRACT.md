@@ -252,6 +252,128 @@ Yields and inversion are **risk observation**, not buy/sell judgments.
 
 ---
 
+## 4. v2.1 investment-bank macro factors
+
+Version `2.1` adds cross-asset factors used on a macro desk. Real data is optional;
+missing values are `null` / `placeholder` / `unknown`.
+
+| macro key | Field | Role |
+|---|---|---|
+| `usd.DXY` | `value`, `trend`, `risk`, `comment` | USD strength context |
+| `volatility.MOVE` | `value`, `state`, `risk`, `comment` | Bond volatility |
+| `valuation.real_yield` | `value`, `state`, `risk`, `comment` | Gold / equity valuation pressure |
+| `valuation.breakeven_inflation` | `value`, `state`, `risk`, `comment` | Inflation expectation |
+| `credit.credit_spread` | `value`, `state`, `risk`, `comment` | Credit stress / risk appetite |
+| `commodities.wti` | `symbol`, `value`, `trend`, `risk`, `comment` | Oil: inflation / geopolitical / growth proxy |
+| `commodities.gold_silver_ratio` | `value`, `state`, `comment` | Precious-metals relative valuation |
+| `commodities.copper_gold_ratio` | `value`, `state`, `comment` | Growth-vs-defensive signal |
+| `regime.risk_regime` | string | `risk_on` / `neutral` / `risk_off` |
+| `regime.liquidity_regime` | string | `easing` / `neutral` / `tightening` / `stress` / `unknown` |
+| `regime.cross_asset_regime` | string | Combined rates / FX / commodities / volatility / equity context |
+
+---
+
+## 5. v2.2 per-symbol chart detail
+
+Version `2.2` adds an optional `charts` object per signal, powering the symbol detail
+panel. Timeframes: `4h` (4時間足), `1d` (日足), `1w` (週足).
+
+```json
+"charts": {
+  "4h": { "available": false, "ohlc": [], "indicators": null, "elliott": { }, "note": "Chart data not available in sample data." },
+  "1d": { "available": true,  "ohlc": [ ], "indicators": { }, "elliott": { } },
+  "1w": { "available": false, "ohlc": [], "indicators": null, "elliott": { } }
+}
+```
+
+When `available` is `false`: `ohlc: []`, `indicators: null`, plus a `note`. Consumers must
+render gracefully (e.g. "Chart data is not available in this dataset.").
+
+### OHLC element
+
+```json
+{ "time": "2026-06-03T00:00:00+09:00", "open": 0, "high": 0, "low": 0, "close": 0, "volume": null }
+```
+
+### indicators.cci
+
+`48` and `288` — each: `value` (number|null), `state`, `comment`.
+
+CCI `state`: `overbought_context`, `oversold_context`, `neutral`, `trend_strengthening`,
+`trend_weakening`, `divergence_watch`, `placeholder`.
+`overbought` / `oversold` are **state descriptions, not buy/sell instructions**.
+
+### indicators.bollinger_bands (v2.2.1: 2σ / 3σ)
+
+Periods `48` and `288`; each carries both `std_2` and `std_3` deviation bands:
+
+```json
+"bollinger_bands": {
+  "48": {
+    "std_2": { "basis": null, "upper": null, "lower": null, "width": null, "state": "placeholder", "comment": "48-period Bollinger Band with 2 standard deviations. Shorter-cycle volatility context." },
+    "std_3": { "basis": null, "upper": null, "lower": null, "width": null, "state": "placeholder", "comment": "48-period Bollinger Band with 3 standard deviations. Extreme short-cycle volatility context." }
+  },
+  "288": {
+    "std_2": { "basis": null, "upper": null, "lower": null, "width": null, "state": "placeholder", "comment": "288-period Bollinger Band with 2 standard deviations. Longer-cycle volatility context." },
+    "std_3": { "basis": null, "upper": null, "lower": null, "width": null, "state": "placeholder", "comment": "288-period Bollinger Band with 3 standard deviations. Extreme longer-cycle volatility context." }
+  }
+}
+```
+
+| Band | Meaning |
+|---|---|
+| `48 / std_2` | Shorter-cycle standard volatility context |
+| `48 / std_3` | Shorter-cycle extreme (overheated / oversold) context |
+| `288 / std_2` | Longer-cycle standard volatility context |
+| `288 / std_3` | Longer-cycle extreme / large-scale divergence context |
+
+Bollinger `state`: `expansion`, `contraction`, `upper_2sigma_touch`, `lower_2sigma_touch`,
+`upper_3sigma_touch`, `lower_3sigma_touch`, `middle_reversion`, `neutral`, `insufficient_data`,
+`placeholder`.
+
+**Bollinger Bands are displayed as volatility context only. The 2σ and 3σ bands show normal
+and extreme volatility zones. They are not trading signals.**
+
+### Calculation (when OHLC exists)
+
+For each `period ∈ {48, 288}` and `deviation ∈ {2, 3}`:
+
+```
+SMA(period); std(period)
+upper = SMA + deviation * std
+lower = SMA - deviation * std
+width = upper - lower
+```
+
+If fewer than `period` bars: `value/basis: null`, `state: "insufficient_data"`.
+
+### charts[tf].elliott (v2.2)
+
+```json
+{ "candidate": "unknown", "confidence": "low", "degree": "unknown", "phase": "unknown", "invalidation_level": null, "note": "Heuristic candidate only. Manual validation required. Not a trading signal." }
+```
+
+| Field | Allowed values |
+|---|---|
+| `candidate` | `wave_1_candidate` … `wave_5_candidate`, `abc_correction_candidate`, `triangle_candidate`, `range_candidate`, `unknown` |
+| `confidence` | `low` / `medium` / `high` (default `low`) |
+| `degree` | `minor` / `intermediate` / `primary` / `unknown` |
+| `phase` | `impulse_candidate` / `correction_candidate` / `range_candidate` / `unknown` |
+| `invalidation_level` | `null` unless safely computed. Never a price target / entry. |
+
+Elliott candidates are **heuristic only**: no assertion, no price target, no buy/sell, no
+auto-trading connection.
+
+### Detail panel (UI)
+
+A symbol row/card click opens a detail panel showing: symbol, name, market, signal, score,
+risk, comment; timeframe tabs (4h / 1d / 1w); an OHLC chart (or "Chart data is not available
+in this sample dataset."); an indicator section (Bollinger Band 48 2σ/3σ, 288 2σ/3σ, CCI 48,
+CCI 288, Elliott candidate); and a macro-relation section. Indicators are shown for market
+context only and are not trading signals.
+
+---
+
 ## Forbidden fields
 
 The following must never appear in signals.json:
@@ -279,3 +401,6 @@ financial advice, price targets, trade execution, or buy/sell recommendations.
 |---|---|---|
 | 1.0 | 2026-06-03 | Initial integration contract |
 | 2.0 | 2026-06-03 | Add cross-asset `macro` section (rates, yield_curve, volatility, commodities, cross_asset, regime) and per-signal `elliott` candidate. US/Japan yields separated; Elliott heuristic-only. |
+| 2.1 | 2026-06-03 | Add investment-bank macro factors: `usd.DXY`, `volatility.MOVE`, `valuation.real_yield`, `valuation.breakeven_inflation`, `credit.credit_spread`, `commodities.wti`, `regime.liquidity_regime`, `regime.cross_asset_regime`. |
+| 2.2 | 2026-06-03 | Add per-symbol `charts` detail (4h / 1d / 1w): OHLC, indicators (Bollinger Bands 48/288, CCI 48/288), and per-timeframe Elliott candidate. Graceful `available:false` fallback. |
+| 2.2.1 | 2026-06-03 | Bollinger Bands gain explicit `std_2` and `std_3` deviation bands per period (48/288), with 2σ/3σ touch states. |

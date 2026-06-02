@@ -147,6 +147,18 @@ tbody tr:hover{background:var(--bg3)}
 tbody tr.wl-row{border-left:2px solid rgba(240,192,64,0.6)}
 tbody td{padding:7px 12px;border-right:1px solid var(--border);vertical-align:middle}
 tbody td:last-child{border-right:none}
+tbody tr.detail-row,tbody tr.detail-row:hover{background:var(--bg2)}
+.detail-row td{padding:0 12px 12px;border-right:none}
+.dt-wrap{background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:12px 14px;margin:2px 0 6px}
+.dt-hd{font-family:var(--cond);font-size:14px;color:var(--sym-color);margin-bottom:8px}
+.dt-tabs{display:flex;gap:6px;margin-bottom:8px}
+.dt-tab{font-size:10px;color:var(--text-dim);border:1px solid var(--border);border-radius:4px;padding:2px 8px}
+.dt-grid{display:flex;flex-wrap:wrap;gap:6px 18px;font-size:11px;color:var(--text)}
+.dt-grid b{color:var(--text-dim);font-weight:400}
+.dt-tf{margin-top:8px;font-size:11px;color:var(--text)}
+.dt-note{margin-top:10px;font-size:10px;color:var(--text-dim)}
+.dt-note a{color:var(--accent)}
+.dt-disc{margin-top:6px;font-size:10px;color:var(--text-faint)}
 
 /* ── Symbol cell ── */
 .sym-cell{display:flex;align-items:center;gap:6px}
@@ -580,13 +592,56 @@ function renderHead(){
 
 function sortBy(k){if(scol===k)sdir*=-1;else{scol=k;sdir=k==="change_pct"?1:-1;} renderTbl();}
 
+let ROWMAP={};
 function renderBody(rows){
   const tb=document.getElementById("tbody");
   if(!rows.length){
     tb.innerHTML=`<tr><td colspan="${cols().length}" style="text-align:center;padding:40px;color:var(--text-dim)">No results<br><small style="color:var(--text-faint)">[Esc] to clear filters</small></td></tr>`;
     return;
   }
-  tb.innerHTML=rows.map(r=>`<tr class="${WL.has(r.symbol)?"wl-row":""}">${cols().map(c=>cell(c,r)).join("")}</tr>`).join("");
+  ROWMAP={};
+  rows.forEach(r=>{ROWMAP[r.symbol]=r;});
+  tb.innerHTML=rows.map(r=>`<tr class="${WL.has(r.symbol)?"wl-row":""}" data-sym="${r.symbol}" onclick="toggleDetail(event,'${r.symbol}')" style="cursor:pointer">${cols().map(c=>cell(c,r)).join("")}</tr>`).join("");
+}
+
+// ══ Symbol detail panel ════════════════════════════
+function toggleDetail(ev,sym){
+  if(ev&&ev.target&&ev.target.closest&&ev.target.closest(".star, a")) return;
+  const row=document.querySelector(`tr[data-sym="${CSS.escape(sym)}"]`);
+  if(!row) return;
+  const nxt=row.nextElementSibling;
+  const open=nxt&&nxt.classList.contains("detail-row");
+  document.querySelectorAll("tr.detail-row").forEach(e=>e.remove());
+  if(open) return;
+  const r=ROWMAP[sym]||{};
+  const tr=document.createElement("tr");
+  tr.className="detail-row";
+  const td=document.createElement("td");
+  td.colSpan=cols().length;
+  td.innerHTML=detailHTML(r);
+  tr.appendChild(td);
+  row.after(tr);
+}
+function detailHTML(r){
+  const f=(v,d=2)=> (v==null||v==="")?"—":(typeof v==="number"?v.toFixed(d):v);
+  const score=r.composite_score??r.score;
+  const cci=(r.cci_daily!==undefined||r.cci_4h!==undefined)
+    ? `<div class="dt-tf"><b>CCI(288)</b>&nbsp;&nbsp;Daily ${f(r.cci_daily,0)}&nbsp;&middot;&nbsp;4H ${f(r.cci_4h,0)}</div>` : "";
+  return `<div class="dt-wrap">
+    <div class="dt-hd"><b>${r.symbol||"—"}</b> &nbsp;${r.name||""}&nbsp;&middot;&nbsp;${r.signal||"—"}&nbsp;&middot;&nbsp;Score ${f(score,0)}&nbsp;&middot;&nbsp;${r.error?'<span style="color:var(--red)">data error</span>':"ok"}</div>
+    <div class="dt-tabs"><span class="dt-tab">4時間足</span><span class="dt-tab">日足</span><span class="dt-tab">週足</span></div>
+    <div class="dt-grid">
+      <span><b>RSI(14)</b> ${f(r.rsi,1)}</span>
+      <span><b>MACD</b> ${r.macd_direction||"—"}</span>
+      <span><b>EMA</b> ${r.ema_signal||"—"}</span>
+      <span><b>BB %B</b> ${f(r.bb_pct,2)}</span>
+      <span><b>ATR</b> ${f(r.atr)}</span>
+      <span><b>Chg%</b> ${f(r.change_pct,2)}</span>
+    </div>
+    ${cci}
+    <div class="dt-note">Full multi-timeframe detail (4h / 1d / 1w &middot; Bollinger Bands 48/288 with 2&sigma; and 3&sigma; &middot; CCI 48/288 &middot; Elliott candidate) is defined in the <a href="https://github.com/reanimatedead/hf-signal-dashboard/blob/main/DATA_CONTRACT.md" target="_blank" rel="noopener">data contract</a>. Extended chart data is not available in this dataset.</div>
+    <div class="dt-disc">Indicators are shown for market context only and are not trading signals.</div>
+  </div>`;
 }
 
 // ══ Company links ══════════════════════════════════

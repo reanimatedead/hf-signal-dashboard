@@ -176,6 +176,25 @@ supported in the data contract and sample data, with UI surfacing planned as a l
 Yields and inversion are **risk observation**, not buy/sell judgments. This project does not
 provide investment advice, price targets, trade execution, or buy/sell recommendations.
 
+### v2.1 — investment-bank macro factors
+
+Adds DXY (USD strength), MOVE (bond volatility), real yield, breakeven inflation, credit
+spread, WTI, and `liquidity_regime` / `cross_asset_regime` labels. Real data is optional;
+missing values are null / placeholder / unknown.
+
+### v2.2 / v2.2.1 — per-symbol chart detail
+
+Adds an optional per-signal `charts` block for the symbol detail panel across **4h / 1d / 1w**:
+
+- **OHLC** series (or graceful `available:false` fallback)
+- **Bollinger Bands** period 48 and 288, each with **2σ and 3σ** deviation bands (v2.2.1) — volatility context only, not trading signals
+- **CCI** period 48 and 288 — momentum context (`overbought_context` / `oversold_context` are state labels, not buy/sell)
+- **Elliott** candidate per timeframe — heuristic only, `confidence: low`, no price target, no buy/sell
+
+See [DATA_CONTRACT.md](DATA_CONTRACT.md) §4–§5 and the populated USDJPY 1d example in
+[docs/sample-signals.json](docs/sample-signals.json). Indicators are market context only and
+are not trading signals.
+
 ---
 
 ## Portfolio context
