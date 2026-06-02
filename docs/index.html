@@ -323,13 +323,26 @@ body.light .cname{color:var(--text-dim)}
   <div class="tbl-wrap">
     <table><thead id="thead"></thead><tbody id="tbody"></tbody></table>
     <div id="errmsg">
-      <h2>⚠ データを読み込めませんでした</h2>
-      <p>GitHub Actions でシグナルを生成してください。</p>
+      <h2>⚠ No signal data available</h2>
+      <p>Run <strong>fetch_signals.py</strong> via GitHub Actions to generate data.json.</p>
+      <p style="margin-top:8px;font-size:11px;color:var(--text-faint)">
+        Analysis engine: <a href="https://github.com/reanimatedead/fx-analysis-system" target="_blank" rel="noopener" style="color:var(--accent)">fx-analysis-system</a>
+        &nbsp;·&nbsp;
+        <a href="https://github.com/reanimatedead/hf-signal-dashboard/blob/main/DATA_CONTRACT.md" target="_blank" rel="noopener" style="color:var(--text-dim)">Data contract</a>
+      </p>
+      <p style="margin-top:8px;font-size:10px;color:var(--text-faint)">
+        For data visualization purposes only. Not investment advice.
+      </p>
       <p style="margin-top:12px;font-size:11px;color:var(--text-faint)">
         Keys: [1-5] tabs · [/] search · [D] theme · [E] export · [W] watchlist · [Esc] clear
       </p>
     </div>
   </div>
+</div>
+
+<div id="footer" style="padding:10px 16px;font-size:10px;color:var(--text-faint);border-top:1px solid var(--border);text-align:center;display:none">
+  For data visualization purposes only. Not investment advice. No buy/sell recommendation. &nbsp;|&nbsp;
+  Analysis engine: <a href="https://github.com/reanimatedead/fx-analysis-system" target="_blank" rel="noopener" style="color:var(--text-faint)">fx-analysis-system</a>
 </div>
 
 <script>
@@ -458,6 +471,7 @@ async function loadData(){
       document.getElementById("header").style.display="flex";
       document.getElementById("main").style.display="block";
       document.getElementById("errmsg").style.display="block";
+      document.getElementById("footer").style.display="block";
     },800);
   }
 }
@@ -470,6 +484,7 @@ function init(){
   document.getElementById("header").style.display="flex";
   document.getElementById("sum-bar").style.display="flex";
   document.getElementById("main").style.display="block";
+  document.getElementById("footer").style.display="block";
   sw("nikkei225", document.querySelector(".tab.active"));
 }
 

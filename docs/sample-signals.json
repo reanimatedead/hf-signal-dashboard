@@ -1,0 +1,97 @@
+{
+  "generated_at": "2026-06-03T08:00:00+09:00",
+  "source": "fx-analysis-system",
+  "timeframe": "1d",
+  "version": "1.0",
+  "_note": "Sample data for integration testing. Not live market data.",
+  "signals": [
+    {
+      "symbol": "USDJPY",
+      "name": "USD/JPY",
+      "market": "FX",
+      "timeframe": "1d",
+      "signal": "watch",
+      "score": 68,
+      "trend": "up",
+      "risk": "medium",
+      "comment": "Dollar momentum positive. Yen weakness context elevated."
+    },
+    {
+      "symbol": "EURUSD",
+      "name": "EUR/USD",
+      "market": "FX",
+      "timeframe": "1d",
+      "signal": "neutral",
+      "score": 50,
+      "trend": "neutral",
+      "risk": "low",
+      "comment": "Ranging environment. No clear directional momentum."
+    },
+    {
+      "symbol": "GBPUSD",
+      "name": "GBP/USD",
+      "market": "FX",
+      "timeframe": "1d",
+      "signal": "caution",
+      "score": 35,
+      "trend": "down",
+      "risk": "medium",
+      "comment": "Risk-off pressure. Volatility elevated ahead of event risk."
+    },
+    {
+      "symbol": "GOLD",
+      "name": "Gold (XAU/USD)",
+      "market": "Commodity",
+      "timeframe": "1d",
+      "signal": "strong_watch",
+      "score": 81,
+      "trend": "up",
+      "risk": "medium",
+      "comment": "Precious metals stress elevated. Bond-gold divergence flagged."
+    },
+    {
+      "symbol": "SILVER",
+      "name": "Silver (XAG/USD)",
+      "market": "Commodity",
+      "timeframe": "1d",
+      "signal": "watch",
+      "score": 63,
+      "trend": "up",
+      "risk": "medium",
+      "comment": "Following gold momentum. COT speculative positioning elevated."
+    },
+    {
+      "symbol": "NKY",
+      "name": "Nikkei 225 Index",
+      "market": "Index",
+      "timeframe": "1d",
+      "signal": "neutral",
+      "score": 52,
+      "trend": "neutral",
+      "risk": "low",
+      "comment": "Yen impact on export stocks mixed. Macro environment stable."
+    },
+    {
+      "symbol": "SPX",
+      "name": "S&P 500 Index",
+      "market": "Index",
+      "timeframe": "1d",
+      "signal": "caution",
+      "score": 38,
+      "trend": "down",
+      "risk": "high",
+      "comment": "VIX elevated. Bond stress and risk-off pressure coexisting."
+    },
+    {
+      "symbol": "USOIL",
+      "name": "Crude Oil (WTI)",
+      "market": "Commodity",
+      "timeframe": "1d",
+      "signal": "avoid",
+      "score": 22,
+      "trend": "down",
+      "risk": "high",
+      "comment": "High volatility regime. Supply uncertainty elevated."
+    }
+  ]
+}
