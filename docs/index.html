@@ -159,6 +159,8 @@ tbody tr.detail-row,tbody tr.detail-row:hover{background:var(--bg2)}
 .dt-note{margin-top:10px;font-size:10px;color:var(--text-dim)}
 .dt-note a{color:var(--accent)}
 .dt-disc{margin-top:6px;font-size:10px;color:var(--text-faint)}
+.dt-bb{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:4px 18px;margin-top:6px;font-size:11px;color:var(--text)}
+.dt-bb b{color:var(--text-dim);font-weight:400}
 
 /* ── Symbol cell ── */
 .sym-cell{display:flex;align-items:center;gap:6px}
@@ -627,9 +629,14 @@ function detailHTML(r){
   const score=r.composite_score??r.score;
   const cci=(r.cci_daily!==undefined||r.cci_4h!==undefined)
     ? `<div class="dt-tf"><b>CCI(288)</b>&nbsp;&nbsp;Daily ${f(r.cci_daily,0)}&nbsp;&middot;&nbsp;4H ${f(r.cci_4h,0)}</div>` : "";
+  // v2.2.1: render computed 1d chart indicators when available; 4h/1w later.
+  const c1d = r.charts && r.charts["1d"];
+  const detail = (c1d && c1d.available)
+    ? chart1dHTML(c1d, f)
+    : `<div class="dt-note">Full multi-timeframe detail (4h / 1d / 1w &middot; Bollinger Bands 48/288 with 2&sigma; and 3&sigma; &middot; CCI 48/288 &middot; Elliott candidate) is defined in the <a href="https://github.com/reanimatedead/hf-signal-dashboard/blob/main/DATA_CONTRACT.md" target="_blank" rel="noopener">data contract</a>. Extended 1d chart data is not available in this dataset.</div>`;
   return `<div class="dt-wrap">
     <div class="dt-hd"><b>${r.symbol||"—"}</b> &nbsp;${r.name||""}&nbsp;&middot;&nbsp;${r.signal||"—"}&nbsp;&middot;&nbsp;Score ${f(score,0)}&nbsp;&middot;&nbsp;${r.error?'<span style="color:var(--red)">data error</span>':"ok"}</div>
-    <div class="dt-tabs"><span class="dt-tab">4時間足</span><span class="dt-tab">日足</span><span class="dt-tab">週足</span></div>
+    <div class="dt-tabs"><span class="dt-tab">4時間足</span><span class="dt-tab" style="border-color:var(--accent);color:var(--accent)">日足</span><span class="dt-tab">週足</span></div>
     <div class="dt-grid">
       <span><b>RSI(14)</b> ${f(r.rsi,1)}</span>
       <span><b>MACD</b> ${r.macd_direction||"—"}</span>
@@ -639,9 +646,28 @@ function detailHTML(r){
       <span><b>Chg%</b> ${f(r.change_pct,2)}</span>
     </div>
     ${cci}
-    <div class="dt-note">Full multi-timeframe detail (4h / 1d / 1w &middot; Bollinger Bands 48/288 with 2&sigma; and 3&sigma; &middot; CCI 48/288 &middot; Elliott candidate) is defined in the <a href="https://github.com/reanimatedead/hf-signal-dashboard/blob/main/DATA_CONTRACT.md" target="_blank" rel="noopener">data contract</a>. Extended chart data is not available in this dataset.</div>
+    ${detail}
     <div class="dt-disc">Indicators are shown for market context only and are not trading signals.</div>
   </div>`;
+}
+// Render computed 1d Bollinger Bands (48/288, 2σ/3σ), CCI (48/288), Elliott.
+function chart1dHTML(c, f){
+  const ind=c.indicators||{};
+  const bb=ind.bollinger_bands||{};
+  const cci=ind.cci||{};
+  const band=(o)=> o ? `mid ${f(o.basis)} · up ${f(o.upper)} · low ${f(o.lower)} <span style="color:var(--text-faint)">[${o.state||"—"}]</span>` : "—";
+  const cciCell=(o)=> o ? `${f(o.value,1)} <span style="color:var(--text-faint)">[${o.state||"—"}]</span>` : "—";
+  const el=c.elliott||{};
+  return `<div class="dt-note" style="color:var(--text)"><b style="color:var(--accent)">日足 1d — computed indicators</b></div>
+    <div class="dt-bb">
+      <div><b>BB 48 / 2&sigma;</b> ${band(bb["48"]&&bb["48"].std_2)}</div>
+      <div><b>BB 48 / 3&sigma;</b> ${band(bb["48"]&&bb["48"].std_3)}</div>
+      <div><b>BB 288 / 2&sigma;</b> ${band(bb["288"]&&bb["288"].std_2)}</div>
+      <div><b>BB 288 / 3&sigma;</b> ${band(bb["288"]&&bb["288"].std_3)}</div>
+      <div><b>CCI 48</b> ${cciCell(cci["48"])}</div>
+      <div><b>CCI 288</b> ${cciCell(cci["288"])}</div>
+      <div><b>Elliott</b> ${el.candidate||"unknown"} <span style="color:var(--text-faint)">(${el.confidence||"low"})</span></div>
+    </div>`;
 }
 
 // ══ Company links ══════════════════════════════════
