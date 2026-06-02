@@ -2,7 +2,7 @@
 
 Market signal visualization dashboard for Nikkei 225, Dow 30, Nasdaq 100, S&P 500, FX, and Commodities.
 
-**Live dashboard:** _replace with your Cloudflare Pages URL (e.g. `https://hf-signal-dashboard.pages.dev`)_
+**Live dashboard:** https://hf-signal-dashboard.pages.dev/
 
 ---
 
