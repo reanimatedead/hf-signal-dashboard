@@ -157,6 +157,25 @@ See [DATA_CONTRACT.md](DATA_CONTRACT.md) for the signals.json integration schema
 
 Sample data: [docs/sample-signals.json](docs/sample-signals.json)
 
+### v2.0 cross-asset macro extension
+
+The data contract (v2.0) adds an investment-bank-style cross-asset `macro` section and a
+per-signal `elliott` candidate, so a market is viewed across assets rather than as a single chart:
+
+- **Rates**: US10Y, US2Y, JP10Y (US and Japan reported separately)
+- **Yield curve**: US 10Y-2Y spread + inversion state, US-JP 10Y spread, Japan curve tracked on its own axes (`jp_yield_watch` / `boj_policy_watch` / `jgb_stress_watch`)
+- **Volatility**: VIX, MOVE (placeholder)
+- **Commodities**: Gold, Silver, Copper, Gold/Silver and Copper/Gold ratios
+- **Cross-asset relations**: USDJPY vs yield spread / VIX / gold; gold vs real yields; equity vs VIX
+- **Regime**: risk / rates / fx / commodity regime labels + summary
+- **Elliott**: daily & weekly heuristic candidates, `confidence: low`, no price targets, no buy/sell
+
+The dashboard UI currently renders the v1.0 signal table; the v2.0 macro/rates data is
+supported in the data contract and sample data, with UI surfacing planned as a later phase.
+
+Yields and inversion are **risk observation**, not buy/sell judgments. This project does not
+provide investment advice, price targets, trade execution, or buy/sell recommendations.
+
 ---
 
 ## Portfolio context

@@ -157,6 +157,101 @@ This format is the integration contract between the two repositories.
 
 ---
 
+## 3. v2.0 cross-asset macro extension
+
+Version `2.0` adds a top-level `macro` object and a per-signal `elliott` object.
+v1.0 consumers can ignore both; the v1.0 `signals[]` fields are unchanged.
+
+This extension provides **cross-asset, investment-bank-style risk-observation context** —
+rates, yield curve, volatility, commodities, and regime — so a market is viewed across
+assets rather than as a single chart. It is **risk observation, not a trade view**.
+
+```json
+{
+  "version": "2.0",
+  "macro": {
+    "rates": { "...": {} },
+    "yield_curve": { "...": {} },
+    "volatility": { "...": {} },
+    "commodities": { "...": {} },
+    "cross_asset": { "...": {} },
+    "regime": { "...": {} }
+  },
+  "signals": [ { "...": {}, "elliott": {} } ]
+}
+```
+
+### macro.rates
+
+`US10Y`, `US2Y`, `JP10Y` — each: `value` (number|null), `change_1d` (number|null),
+`trend` (`up`/`down`/`neutral`), `risk` (`low`/`medium`/`high`/`unknown`), `comment`.
+US and Japan yields are reported as **separate** rate points.
+
+### macro.yield_curve
+
+| Key | Fields | Notes |
+|---|---|---|
+| `us_10y_2y_spread` | `value`, `state`, `risk`, `comment` | `state` ∈ `inverted` / `normal` / `unknown`. `inverted` when `US10Y - US2Y < 0` → `risk: high`. |
+| `jp_curve_state` | `state`, `risk`, `comment` | Japan is assessed **separately**: `jp_yield_watch` / `boj_policy_watch` / `jgb_stress_watch`. US inversion logic is **not** applied to JGB. |
+| `us_jp_10y_spread` | `value`, `risk`, `relation` | `relation` describes USDJPY support context when widening. |
+
+### macro.volatility
+
+`VIX` and `MOVE` — each: `value` (number|null), `state` (`normal`/`elevated`/`stress`/`unknown`),
+`risk`, `comment`. `MOVE` is a placeholder when bond-volatility data is unavailable.
+
+### macro.commodities
+
+`gold`, `silver`, `copper` — each: `symbol`, `value` (number|null), `trend`, `risk`, plus a
+relation/comment. Ratios `gold_silver_ratio` and `copper_gold_ratio` carry `value` (number|null),
+`state` (`computed`/`placeholder`), `comment`.
+
+### macro.cross_asset
+
+`usdjpy_yield_spread_relation`, `gold_real_yield_relation`, `equity_vix_relation` —
+each: `state`, `risk`, `comment`. These are relationship checks (USDJPY vs yield spread / VIX / gold;
+gold vs real yields / USD; equity vs VIX), not directional calls.
+
+### macro.regime
+
+`risk_regime`, `rates_regime`, `fx_regime`, `commodity_regime`, `summary` — compact
+cross-asset regime labels for environment review.
+
+### signals[].elliott
+
+Per-signal heuristic Elliott wave **candidates** only.
+
+```json
+"elliott": {
+  "daily":  { "candidate": "impulse_wave_candidate", "confidence": "low", "invalidation_level": null, "note": "Heuristic candidate only. Not a trading signal." },
+  "weekly": { "candidate": "corrective_wave_candidate", "confidence": "low", "invalidation_level": null, "note": "Weekly structure requires manual validation." }
+}
+```
+
+| Field | Notes |
+|---|---|
+| `candidate` | e.g. `impulse_wave_candidate`, `corrective_wave_candidate`, `undetermined_candidate`. Descriptive label, never a buy/sell instruction. |
+| `confidence` | Default `low`. Elliott output is heuristic. |
+| `invalidation_level` | `null` unless a level was computed safely. Never a price target / entry. |
+| `note` | Always states it is heuristic and not a trading signal. |
+
+### v2.0 signal targets
+
+`USDJPY`, `EURUSD`, `GBPUSD`, `AUDUSD`, `XAUUSD`, `XAGUSD`, `COPPER`, `NKY`, `DJI`,
+`NDX`, `SPX`, `VIX`, `US10Y`, `US2Y`, `JP10Y`.
+
+### Determination rules (v1, non-assertive)
+
+- **US inversion**: `US10Y - US2Y < 0` → `inverted` / `risk: high`; else `normal`. `unknown` if either point missing.
+- **Japan bonds**: never folded into US inversion logic. Tracked as `jp_yield_watch` / `boj_policy_watch` / `jgb_stress_watch`.
+- **USDJPY relations**: US-JP 10Y spread widening = support factor; high VIX = safe-haven / risk-off factor; gold up with yields down = risk-hedge / real-yield sensitivity.
+- **Gold / Silver / Copper**: gold vs real yields & USD; silver = gold + industrial demand; copper = global growth / China-demand proxy.
+- **Elliott**: candidate only, `confidence: low`, no price target, no buy/sell.
+
+Yields and inversion are **risk observation**, not buy/sell judgments.
+
+---
+
 ## Forbidden fields
 
 The following must never appear in signals.json:
@@ -170,8 +265,17 @@ The following must never appear in signals.json:
 
 ---
 
+## Scope and disclaimer
+
+This project provides market visualization and cross-asset signal context for portfolio
+demonstration and personal analysis workflows. It does not provide investment advice,
+financial advice, price targets, trade execution, or buy/sell recommendations.
+
+---
+
 ## Version history
 
 | Version | Date | Changes |
 |---|---|---|
 | 1.0 | 2026-06-03 | Initial integration contract |
+| 2.0 | 2026-06-03 | Add cross-asset `macro` section (rates, yield_curve, volatility, commodities, cross_asset, regime) and per-signal `elliott` candidate. US/Japan yields separated; Elliott heuristic-only. |
