@@ -387,13 +387,14 @@ renders, otherwise the panel shows a graceful fallback.
 
 ## 6. v2.3 — charts in the live data.json
 
-`fetch_signals.py` (the dashboard's own GitHub Actions pipeline) now attaches a computed
-`charts` block to a small allowlist of FX rows in `docs/data.json`:
+`fetch_signals.py` (the dashboard's own GitHub Actions pipeline) attaches a computed
+`charts` block to every **FX / Commodities** row in `docs/data.json`:
 
-| Symbol | charts.1d |
+| Rows | charts.1d |
 |---|---|
-| `USDJPY=X`, `EURUSD=X`, `XAUUSD=X` | `available: true` — Bollinger Bands 48/288 (2σ/3σ) and CCI 48/288 computed from daily yfinance OHLC (last 120 bars emitted; bands use the full history). 4h / 1w stay `available: false` (later phase). |
-| all other rows | no `charts` key — the detail panel falls back gracefully |
+| All FX / Commodities pairs (incl. `USDJPY=X`, `EURUSD=X`, `XAUUSD`, `XAGUSD`) | `available: true` — Bollinger Bands 48/288 (2σ/3σ) and CCI 48/288 computed from daily yfinance OHLC (last 120 bars emitted; bands use the full history). 4h / 1w stay `available: false` (later phase). |
+| Equity rows (Nikkei/Dow/Nasdaq/S&P) | no `charts` key — the detail panel falls back gracefully (payload reasons) |
+| Symbols that error / lack daily data | no `charts` key — graceful fallback |
 
 Each chart timeframe also carries `source`, `updated_at`, an Elliott placeholder, and a `note`.
 Indicators below the per-period bar count emit `state: "insufficient_data"`. Charts are computed
@@ -497,5 +498,5 @@ financial advice, price targets, trade execution, or buy/sell recommendations.
 | 2.1 | 2026-06-03 | Add investment-bank macro factors: `usd.DXY`, `volatility.MOVE`, `valuation.real_yield`, `valuation.breakeven_inflation`, `credit.credit_spread`, `commodities.wti`, `regime.liquidity_regime`, `regime.cross_asset_regime`. |
 | 2.2 | 2026-06-03 | Add per-symbol `charts` detail (4h / 1d / 1w): OHLC, indicators (Bollinger Bands 48/288, CCI 48/288), and per-timeframe Elliott candidate. Graceful `available:false` fallback. |
 | 2.2.1 | 2026-06-03 | Bollinger Bands gain explicit `std_2` and `std_3` deviation bands per period (48/288), with 2σ/3σ touch states. |
-| 2.3 | 2026-06-03 | `fetch_signals.py` supplies computed `charts.1d` (Bollinger 48/288 2σ/3σ, CCI 48/288) into `docs/data.json` for a small FX allowlist (USDJPY/EURUSD/XAUUSD). 4h/1w placeholder. No new external API. |
+| 2.3 | 2026-06-03 | `fetch_signals.py` supplies computed `charts.1d` (Bollinger 48/288 2σ/3σ, CCI 48/288) into `docs/data.json` for **all FX / Commodities pairs** (initially a 3-symbol allowlist; expanded to every FX row so the FX tab renders charts consistently). Equities fall back. 4h/1w placeholder. No new external API. |
 | 2.4 | 2026-06-03 | Add per-signal `edge_context` analytical summary (overall / technical / macro / cross_asset / risk_adjusted / confidence / supporting & conflicting factors). Schema + placeholder/sample only; analytical context, never a trading advantage or signal. |

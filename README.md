@@ -198,7 +198,7 @@ are not trading signals.
 ### v2.3 — charts in the live data.json
 
 `fetch_signals.py` now computes and attaches a `charts.1d` block (Bollinger Bands 48/288 with
-2σ/3σ, CCI 48/288, Elliott placeholder) to a small FX allowlist — **USDJPY, EURUSD, XAUUSD** —
+2σ/3σ, CCI 48/288, Elliott placeholder) to **every FX / Commodities pair** (USDJPY, EURUSD, XAUUSD, XAGUSD, and the other FX pairs) —
 in `docs/data.json`, using the existing yfinance dependency (no new external API). The public
 detail panel renders these when `available:true`; 4h/1w remain placeholder. Other symbols have
 no charts and fall back gracefully. Computed values appear after the next GitHub Actions run.

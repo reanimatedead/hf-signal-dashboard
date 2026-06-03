@@ -200,8 +200,10 @@ def calc_cci(high, low, close, period):
 
 # ─── CHART DETAIL (v2.3) ─────────────────────────────────
 # Symbols (yfinance fetch keys) that carry a computed charts.1d block in
-# data.json. Kept small to limit payload; other rows fall back gracefully.
-CHART_SYMBOLS = {"USDJPY=X", "EURUSD=X", "GC=F", "SI=F"}
+# data.json. All FX / Commodities pairs are charted (BB288/CCI are already
+# computed for every FX row), so the FX tab renders charts consistently.
+# Equity rows are not charted (payload) and fall back gracefully.
+CHART_SYMBOLS = set(FX_PAIRS.keys())
 OHLC_MAX_BARS = 120
 
 # Precious metals are fetched via reliable COMEX futures tickers (GC=F/SI=F)
