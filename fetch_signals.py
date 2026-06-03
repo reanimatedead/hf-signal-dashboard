@@ -1265,6 +1265,84 @@ def attach_mtf_for_allowlist(market_groups):
             except Exception as exc:
                 print(f"  {r['symbol']}: mtf skipped ({str(exc)[:50]})")
 
+# ─── EQUITY CHARTS (v3.5) ────────────────────────────────
+# Index-level proxies + a small constituent allowlist get charts.1d (1d only;
+# 4h/1w deferred for equities to control payload). yfinance only; failures fall
+# back. All 364+ constituents are NOT charted (payload). Context only.
+
+# Index proxy rows added to each equity tab: (yfinance ticker, name, group).
+EQUITY_INDEX = [
+    ("^N225", "Nikkei 225 Index", "nikkei225"),
+    ("^DJI", "Dow Jones Industrial Average", "dow30"),
+    ("^NDX", "Nasdaq 100 Index", "nasdaq100"),
+    ("^GSPC", "S&P 500 Index", "sp500"),
+]
+# Existing constituents that get charts.1d (must match data.json symbols).
+EQUITY_ALLOWLIST = {
+    "AAPL", "MSFT", "NVDA", "AMZN", "GOOGL", "META", "TSLA", "JPM", "UNH",
+    "7203.T", "9984.T", "8035.T",
+}
+
+
+def _equity_empty_charts():
+    c = {"4h": build_empty_chart("4h"), "1d": build_empty_chart("1d"), "1w": build_empty_chart("1w")}
+    c["4h"]["note"] = "Equity 4h chart is deferred to avoid payload expansion."
+    c["1w"]["note"] = "Equity weekly chart is deferred to avoid payload expansion."
+    return c
+
+
+def build_equity_chart_1d(df, source_ticker, now, dp):
+    """charts.1d (BB288/CCI) from a daily equity/index OHLC frame, or None."""
+    chart = build_1d_chart_from_ohlc(df, dp, now)
+    if chart.get("available") is not True:
+        return None
+    chart["source"] = "yfinance"
+    chart["source_ticker"] = source_ticker
+    chart["note"] = "Equity chart and indicators are market context only."
+    return chart
+
+
+def attach_equity_charts(equity_markets):
+    """Add charts.1d to allowlisted constituents and insert scored+charted index
+    proxy rows. yfinance only; per-symbol try/except so the run never fails."""
+    print("\n[Equity charts] index proxies + selected constituents (1d only)…")
+    now = datetime.now(JST).isoformat()
+    # selected existing constituents
+    for grp in ("nikkei225", "dow30", "nasdaq100", "sp500"):
+        for r in equity_markets.get(grp, []):
+            if r.get("symbol") not in EQUITY_ALLOWLIST or r.get("error"):
+                continue
+            try:
+                df = fetch_batch([r["symbol"]], period="2y").get(r["symbol"])
+                if df is None or len(df) < 60:
+                    continue
+                price = r.get("price") or float(df["Close"].squeeze().iloc[-1])
+                dp = 2 if (price or 0) >= 100 else 3 if (price or 0) >= 1 else 5
+                chart = build_equity_chart_1d(df, r["symbol"], now, dp)
+                if chart:
+                    r["charts"] = {"4h": _equity_empty_charts()["4h"], "1d": chart,
+                                   "1w": _equity_empty_charts()["1w"]}
+            except Exception:
+                continue
+    # index-level proxy rows (scored via process_ticker + charted), pinned on top
+    for idx_t, name, grp in EQUITY_INDEX:
+        try:
+            df = fetch_batch([idx_t], period="2y").get(idx_t)
+            if df is None or len(df) < 60:
+                continue
+            row = process_ticker(df, idx_t, name)
+            if row.get("error"):
+                continue
+            price = row.get("price") or 0
+            dp = 2 if (price or 0) >= 100 else 3
+            chart = build_equity_chart_1d(df, idx_t, now, dp)
+            ec = _equity_empty_charts()
+            row["charts"] = {"4h": ec["4h"], "1d": chart or ec["1d"], "1w": ec["1w"]}
+            equity_markets.setdefault(grp, []).insert(0, row)
+            print(f"  {idx_t:7s} index row added to {grp} (chart={bool(chart)})")
+        except Exception as exc:
+            print(f"  {idx_t}: index chart skipped ({str(exc)[:50]})")
+
 # ─── SUMMARY ─────────────────────────────────────────────
 
 def build_summary(rows):
@@ -1311,6 +1389,10 @@ def main():
 
     # v3.2: 4h / 1w charts for a small allowlist (reuses existing chart builder)
     attach_mtf_for_allowlist((fx_results, vol_results, crypto_results, rates_results))
+
+    # v3.5: equity charts — index proxies + selected constituents (1d only)
+    attach_equity_charts({"nikkei225": nk_results, "dow30": dj_results,
+                          "nasdaq100": nq_results, "sp500": sp_results})
 
     next_run = (now_jst + timedelta(days=1)).replace(
         hour=8, minute=0, second=0, microsecond=0)

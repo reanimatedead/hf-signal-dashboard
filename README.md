@@ -66,7 +66,7 @@ Markets/symbols without computed charts (e.g. equities, IMM, Japan rates) show a
 
 | Tab | Coverage | Detail charts |
 |---|---|---|
-| Nikkei 225 / Dow 30 / Nasdaq 100 / S&P 500 | Major index constituents (380+ symbols) | Signal table (charts: later phase) |
+| Nikkei 225 / Dow 30 / Nasdaq 100 / S&P 500 | Major index constituents (380+ symbols) | Signal table; index proxy (^N225/^DJI/^NDX/^GSPC) + selected constituents have 1d charts (BB288 + CCI ±200); others fall back |
 | FX / Commodities | Major & minor pairs, Gold, Silver | Close + BB288 + CCI ±200 (live) |
 | Rates / Bonds | US2Y, US10Y (live) · JP2Y, JP10Y (placeholder) + yield curve | US2Y/US10Y yield charts (live) |
 | VIX | CBOE Volatility Index (live) | Close + BB288 + CCI ±200 (live) |

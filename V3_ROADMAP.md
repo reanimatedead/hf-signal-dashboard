@@ -74,13 +74,25 @@ Other symbols keep the `unknown_context` placeholder ("No clear edge context" in
 
 ---
 
-## v3.5 — Equity charts (deferred)
+## v3.5 — Equity charts  ✅ (index + allowlist shipped)
 
 **Goal:** extend `charts.1d` to the equity tabs.
 
-- All constituents (Nikkei 225 / Dow 30 / Nasdaq 100 / S&P 500) is a large payload.
-- Start index-level or watchlist-only; consider allowlist / lazy loading / a separate data file.
-  Full per-symbol 120-bar OHLC for 380+ names is likely too heavy for one `data.json`.
+- **Shipped:** index-proxy rows (^N225 / ^DJI / ^NDX / ^GSPC) are scored (`process_ticker`) and
+  charted, pinned atop each equity tab; a small constituent allowlist (AAPL, MSFT, NVDA, AMZN,
+  GOOGL, META, TSLA, JPM, UNH, 7203.T, 9984.T, 8035.T) gains `charts.1d` (BB288 2σ/3σ + CCI ±200).
+  Equity 4h/1w are deferred (`available:false`) to control payload. ~16 charts; `data.json` kept
+  well under 1.5MB. Per-symbol `try/except`; failures fall back.
+- **Deferred:** full per-symbol equity charts (380+ names), equity 4h/1w, and lazy loading / a
+  separate per-market JSON — these would bloat a single `data.json`; revisit only if needed.
+
+---
+
+## v3 status
+
+v3.1 (edge), v3.2 (4h/1w allowlist), v3.3 (JP rates CSV), v3.4 (IMM CSV), v3.5 (equity charts) are
+all shipped. Remaining items are intentionally deferred (full-symbol expansion, automated CFTC/JP
+live feeds, lazy loading) — each would add payload/fragility without proportional portfolio value.
 
 ---
 
