@@ -135,17 +135,21 @@ or buy/sell recommendations. IMM `long`/`short` refer to CFTC positioning catego
 
 ## Screenshots
 
-Best viewed live: **https://hf-signal-dashboard.pages.dev/**
+Live: **https://hf-signal-dashboard.pages.dev/** — the captures below are of the live site.
 
-Representative views (open the live site and click any FX / Crypto / VIX / Rates row):
+### FX / Commodities detail panel
 
-- Market tab with the signal table and summary bar
-- Symbol detail panel: Close/yield line + Bollinger 288 (2σ/3σ) overlay
-- CCI ±200 lower panel
-- Rates / Bonds tab showing live US2Y / US10Y yields, yield-curve state, and `data_status`
+A selected FX symbol (USDJPY=X) with its 1d close line, Bollinger Bands 288 (2σ / 3σ) overlay,
+a CCI ±200 lower panel, Elliott/edge context, and the market-context disclaimer.
 
-> Static screenshots can be added under `docs/assets/` and embedded here without affecting the
-> build. The live URL above always reflects the latest daily data.
+![HF Signal Dashboard — FX detail panel with Bollinger Bands and CCI](docs/assets/hf-signal-dashboard-detail.png)
+
+### Rates / Bonds view
+
+The Rates / Bonds tab shows live US2Y / US10Y yields (`data_status: live`) alongside placeholder
+Japan rows (`data_status: placeholder`), with a yield chart for the available US rates.
+
+![HF Signal Dashboard — Rates / Bonds tab with live US yields and a US10Y yield chart](docs/assets/hf-signal-dashboard-rates.png)
 
 ---
 
