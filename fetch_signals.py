@@ -294,6 +294,25 @@ def attach_charts_to_symbol(row, df_d, dp, updated_at):
     return row
 
 
+def build_empty_edge_context():
+    """Placeholder analytical edge-context (v2.4). No scoring here.
+
+    Edge = analytical/contextual edge that organises technical / macro /
+    cross-asset / risk context for review — never a trading advantage or signal.
+    """
+    return {
+        "overall": "unknown",
+        "confidence": "low",
+        "technical": {"state": "unknown", "factors": []},
+        "macro": {"state": "unknown", "factors": []},
+        "cross_asset": {"state": "unknown", "factors": []},
+        "risk_adjusted": {"state": "unknown", "factors": []},
+        "supporting_factors": [],
+        "conflicting_factors": [],
+        "note": "Edge context is an analytical summary for market review only. It is not investment advice, a trading signal, or an instruction to enter or exit positions.",
+    }
+
+
 def monte_carlo_prob(returns, n_sims=800, n_forward=5, direction="long"):
     """Vectorised bootstrap Monte Carlo – returns P(direction correct)."""
     clean = returns.dropna().values
@@ -624,8 +643,10 @@ def process_fx_advanced(fx_dict):
                 "signal": signal, "error": None,
             }
             # v2.3: attach computed 1d chart detail for a small allowlist
+            # v2.4: attach edge_context placeholder (analytical summary, no scoring)
             if sym in CHART_SYMBOLS:
                 attach_charts_to_symbol(row, df_d, dp, datetime.now(JST).isoformat())
+                row["edge_context"] = build_empty_edge_context()
             results.append(row)
 
         except Exception as exc:

@@ -396,6 +396,66 @@ are not trading signals or investment advice.
 
 ---
 
+## 7. v2.4 — edge_context (analytical summary)
+
+Version `2.4` adds an optional per-signal `edge_context`: an analytical layer that **organises**
+the existing technical / macro / cross-asset / risk context into one review summary.
+
+> **"Edge" means analytical / contextual edge — the clarity of the analytical picture — not a
+> trading advantage.** Edge context is never a buy/sell signal, a score-threshold trade decision,
+> or an instruction to enter or exit positions.
+
+```json
+"edge_context": {
+  "overall": "moderate_contextual_edge",
+  "confidence": "medium",
+  "technical":     { "state": "favorable_context",   "factors": ["CCI 48 trend strengthening", "Close near BB 48 upper 2σ", "Elliott impulse candidate"] },
+  "macro":         { "state": "mixed_macro_context",  "factors": ["US-JP yield spread supports USDJPY", "VIX rising adds risk-off pressure"] },
+  "cross_asset":   { "state": "partially_aligned",    "factors": ["USDJPY aligned with yield spread", "Gold strength conflicts with risk-on view"] },
+  "risk_adjusted": { "state": "mixed_risk_context",   "factors": ["Volatility regime requires caution"] },
+  "supporting_factors": ["CCI 48 trend strengthening", "Close near BB 48 upper 2σ", "US-JP yield spread supports USDJPY"],
+  "conflicting_factors": ["VIX rising adds risk-off pressure", "Gold strength conflicts with risk-on view", "Volatility regime requires caution"],
+  "note": "Edge context is an analytical summary for market review only. It is not investment advice, a trading signal, or an instruction to enter or exit positions."
+}
+```
+
+### Fields
+
+| Field | Type | Notes |
+|---|---|---|
+| `overall` | string | Aggregate clarity of the analytical picture (see values). |
+| `confidence` | string | `low` / `medium` / `high`. |
+| `technical` | object | `{ state, factors[] }` — technical context (CCI, Bollinger, Elliott candidate). |
+| `macro` | object | `{ state, factors[] }` — rates / yield curve / volatility context. |
+| `cross_asset` | object | `{ state, factors[] }` — USDJPY vs yield spread / gold / VIX alignment. |
+| `risk_adjusted` | object | `{ state, factors[] }` — volatility-regime / risk context. |
+| `supporting_factors` | string[] | Factors that strengthen the contextual read. |
+| `conflicting_factors` | string[] | Factors that weaken or contradict it. |
+| `note` | string | Mandatory disclaimer (verbatim below). |
+
+### `overall` values
+
+`strong_contextual_edge`, `moderate_contextual_edge`, `neutral_context`, `limited_context`,
+`unclear_context`, `unknown`.
+
+### dimension `state` values (per dimension)
+
+`favorable_context`, `mixed_macro_context` / `mixed_risk_context` / `mixed_*_context`,
+`unfavorable_context`, `neutral_context`, `aligned`, `partially_aligned`, `conflicting`, `unknown`.
+
+### Determination
+
+This release ships **schema + placeholder/sample only** — no real scoring from indicators.
+The export engine and `fetch_signals.py` emit an `overall: "unknown"` placeholder; the populated
+USDJPY example in `docs/sample-signals.json` demonstrates the shape. Real scoring (mapping
+indicator states into edge states) is a later phase and must remain context-only.
+
+**Mandatory disclaimer (verbatim):**
+"Edge context is an analytical summary for market review only. It is not investment advice, a
+trading signal, or an instruction to enter or exit positions."
+
+---
+
 ## Forbidden fields
 
 The following must never appear in signals.json:
@@ -427,3 +487,4 @@ financial advice, price targets, trade execution, or buy/sell recommendations.
 | 2.2 | 2026-06-03 | Add per-symbol `charts` detail (4h / 1d / 1w): OHLC, indicators (Bollinger Bands 48/288, CCI 48/288), and per-timeframe Elliott candidate. Graceful `available:false` fallback. |
 | 2.2.1 | 2026-06-03 | Bollinger Bands gain explicit `std_2` and `std_3` deviation bands per period (48/288), with 2σ/3σ touch states. |
 | 2.3 | 2026-06-03 | `fetch_signals.py` supplies computed `charts.1d` (Bollinger 48/288 2σ/3σ, CCI 48/288) into `docs/data.json` for a small FX allowlist (USDJPY/EURUSD/XAUUSD). 4h/1w placeholder. No new external API. |
+| 2.4 | 2026-06-03 | Add per-signal `edge_context` analytical summary (overall / technical / macro / cross_asset / risk_adjusted / confidence / supporting & conflicting factors). Schema + placeholder/sample only; analytical context, never a trading advantage or signal. |

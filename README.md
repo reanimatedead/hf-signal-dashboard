@@ -206,6 +206,19 @@ no charts and fall back gracefully. Computed values appear after the next GitHub
 Charts and indicators are provided for market context and portfolio demonstration only. They
 are not trading signals or investment advice.
 
+### v2.4 — edge_context (analytical summary)
+
+Adds an optional per-signal `edge_context` that **organises** the existing technical / macro /
+cross-asset / risk context into one review summary: `overall`, `confidence`, per-dimension
+states, and supporting vs conflicting factor lists. **"Edge" means analytical/contextual edge
+— the clarity of the picture — not a trading advantage.** This release is schema + placeholder/
+sample only (no scoring); the detail panel renders it when present and meaningful. See
+[DATA_CONTRACT.md](DATA_CONTRACT.md) §7 and the populated USDJPY example in
+[docs/sample-signals.json](docs/sample-signals.json).
+
+Edge context is an analytical summary for market review only. It is not investment advice, a
+trading signal, or an instruction to enter or exit positions.
+
 ---
 
 ## Portfolio context

@@ -2,8 +2,8 @@
   "generated_at": "2026-06-03T08:00:00+09:00",
   "source": "fx-analysis-system",
   "timeframe": "1d",
-  "version": "2.2.1",
-  "_note": "Sample data for integration testing. Not live market data. Not investment advice. Indicators are market context only, not trading signals. The 'charts' detail block is optional per signal; representative symbols (USDJPY, XAUUSD, SPX) show its shape. USDJPY 1d shows the populated v2.2.1 indicator schema (Bollinger Bands 48/288 with 2σ and 3σ, CCI 48/288, Elliott); other timeframes/symbols show available=false.",
+  "version": "2.4",
+  "_note": "Sample data for integration testing. Not live market data. Not investment advice. Indicators are market context only, not trading signals. The 'charts' detail block is optional per signal; representative symbols (USDJPY, XAUUSD, SPX) show its shape. USDJPY 1d shows the populated v2.2.1 indicator schema (Bollinger Bands 48/288 with 2σ and 3σ, CCI 48/288, Elliott). USDJPY also carries a populated v2.4 edge_context (analytical summary only); other symbols omit it.",
   "macro": {
     "rates": {
       "US10Y": {
@@ -168,6 +168,29 @@
       "trend": "up",
       "risk": "medium",
       "comment": "Dollar firm. US-JP yield spread is a support factor; VIX and gold are cross-checks.",
+      "edge_context": {
+        "overall": "moderate_contextual_edge",
+        "confidence": "medium",
+        "technical": {
+          "state": "favorable_context",
+          "factors": ["CCI 48 trend strengthening", "Close near BB 48 upper 2σ", "Elliott impulse candidate"]
+        },
+        "macro": {
+          "state": "mixed_macro_context",
+          "factors": ["US-JP yield spread supports USDJPY", "VIX rising adds risk-off pressure"]
+        },
+        "cross_asset": {
+          "state": "partially_aligned",
+          "factors": ["USDJPY aligned with yield spread", "Gold strength conflicts with risk-on view"]
+        },
+        "risk_adjusted": {
+          "state": "mixed_risk_context",
+          "factors": ["Volatility regime requires caution"]
+        },
+        "supporting_factors": ["CCI 48 trend strengthening", "Close near BB 48 upper 2σ", "US-JP yield spread supports USDJPY"],
+        "conflicting_factors": ["VIX rising adds risk-off pressure", "Gold strength conflicts with risk-on view", "Volatility regime requires caution"],
+        "note": "Edge context is an analytical summary for market review only. It is not investment advice, a trading signal, or an instruction to enter or exit positions."
+      },
       "elliott": {
         "daily": {
           "candidate": "impulse_wave_candidate",

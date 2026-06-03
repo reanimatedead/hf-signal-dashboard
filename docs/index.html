@@ -168,6 +168,15 @@ tbody tr.detail-row,tbody tr.detail-row:hover{background:var(--bg2)}
 .dt-leg{display:inline-flex;align-items:center;gap:4px}
 .dt-leg i{width:11px;height:2px;display:inline-block;border-radius:1px}
 .dt-cap{font-size:10px;color:var(--text-faint);margin-top:3px}
+.dt-edge{margin-top:10px;border-top:1px solid var(--border);padding-top:8px}
+.dt-edge-hd{font-size:12px;color:var(--text);margin-bottom:6px;display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+.dt-edge-badge{background:var(--bg4);border:1px solid var(--border2);border-radius:4px;padding:1px 8px;font-size:11px;color:var(--accent)}
+.dt-edge-conf{color:var(--text-dim);font-size:11px}
+.dt-edge-grid{display:flex;flex-wrap:wrap;gap:4px 18px;font-size:11px;color:var(--text)}
+.dt-edge-grid b{color:var(--text-dim);font-weight:400}
+.dt-edge-facs{display:flex;flex-wrap:wrap;gap:4px 24px;margin-top:6px;font-size:11px}
+.dt-edge-facs ul{margin:2px 0 0 14px;padding:0}
+.dt-edge-facs li{font-size:10px;color:var(--text-dim)}
 
 /* ── Symbol cell ── */
 .sym-cell{display:flex;align-items:center;gap:6px}
@@ -654,7 +663,34 @@ function detailHTML(r){
     </div>
     ${cci}
     ${detail}
+    ${edgeHTML(r.edge_context)}
     <div class="dt-disc">Indicators are shown for market context only and are not trading signals.</div>
+  </div>`;
+}
+function esc(s){ return String(s==null?"":s).replace(/[&<>]/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[m])); }
+// Render edge_context (v2.4) when present and meaningful. Analytical summary only.
+function edgeHTML(e){
+  if(!e) return "";
+  const meaningful = (e.overall && e.overall!=="unknown")
+    || (e.supporting_factors&&e.supporting_factors.length)
+    || (e.conflicting_factors&&e.conflicting_factors.length);
+  if(!meaningful) return "";
+  const dim=(label,o)=> o?`<div><b>${label}</b> ${esc(o.state||"unknown")}</div>`:"";
+  const list=(arr)=> (arr&&arr.length)?arr.map(x=>`<li>${esc(x)}</li>`).join(""):`<li style="color:var(--text-faint)">—</li>`;
+  const disc="Edge context is an analytical summary for market review only. It is not investment advice, a trading signal, or an instruction to enter or exit positions.";
+  return `<div class="dt-edge">
+    <div class="dt-edge-hd"><b>Edge context</b> <span class="dt-edge-badge">${esc(e.overall||"unknown")}</span> <span class="dt-edge-conf">confidence: ${esc(e.confidence||"low")}</span></div>
+    <div class="dt-edge-grid">
+      ${dim("Technical", e.technical)}
+      ${dim("Macro", e.macro)}
+      ${dim("Cross-asset", e.cross_asset)}
+      ${dim("Risk-adjusted", e.risk_adjusted)}
+    </div>
+    <div class="dt-edge-facs">
+      <div><b style="color:var(--green)">Supporting</b><ul>${list(e.supporting_factors)}</ul></div>
+      <div><b style="color:var(--yellow)">Conflicting</b><ul>${list(e.conflicting_factors)}</ul></div>
+    </div>
+    <div class="dt-disc">${esc(e.note||disc)}</div>
   </div>`;
 }
 // Render computed 1d chart (Close + Bollinger overlay), CCI panel, readouts.
