@@ -96,6 +96,38 @@ live feeds, lazy loading) — each would add payload/fragility without proportio
 
 ---
 
+## Future v4: Macro Valuation Extension (roadmap only — not implemented)
+
+> Recorded for planning only. No code, data, or fetch is part of this entry.
+
+### Buffett Indicator
+
+**Purpose:** add long-term equity-market **valuation context** to the dashboard.
+
+**Scope:**
+- Buffett Indicator = total market capitalization / GDP
+- US market cap to GDP
+- Japan market cap to GDP (only if reliable data is available)
+- Equity valuation regime label + historical valuation context
+- **Not a timing signal. Not investment advice.**
+
+**Data source policy:**
+- Use only reliable, verifiable public data.
+- No API keys in v1.
+- If a live source is unstable, use a **manual CSV fallback** (same pattern as JP rates / IMM).
+- Do **not** fabricate market-cap or GDP values; manual CSV fallback is acceptable when live data
+  is unreliable, but only with verified figures.
+
+**UI:**
+- Add to a Macro / Valuation section or a Market Overview view.
+- Show as **long-term valuation context** only.
+- Do **not** present as trade timing or an entry/exit trigger.
+
+**Disclaimer:** the Buffett Indicator is long-term valuation context only. It is not a trading
+signal, a market-timing tool, or investment advice.
+
+---
+
 ## Guardrails (all phases)
 
 - yfinance / free sources only; no API keys, no paid APIs.
