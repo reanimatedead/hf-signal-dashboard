@@ -75,9 +75,9 @@ Markets/symbols without computed charts (e.g. equities, IMM, Japan rates) show a
 |---|---|---|
 | Nikkei 225 / Dow 30 / Nasdaq 100 / S&P 500 | Major index constituents (380+ symbols) | Signal table; index proxy (^N225/^DJI/^NDX/^GSPC) + selected constituents have 1d charts (BB288 + CCI ±200); others fall back |
 | FX / Commodities | Major & minor pairs, Gold, Silver | Close + BB288 + CCI ±200 (live) |
-| Rates / Bonds | US2Y, US10Y (live) · JP2Y, JP10Y (placeholder) + yield curve | US2Y/US10Y yield charts (live) |
+| Rates / Bonds | US2Y, US10Y (live) · JP2Y, JP10Y (verified CSV) + yield curve | US2Y/US10Y yield charts (live); JP2Y/JP10Y charts when `data/jp_rates.csv` has a multi-date series |
 | VIX | CBOE Volatility Index (live) | Close + BB288 + CCI ±200 (live) |
-| IMM | CFTC currency positioning (JPY/EUR/GBP/AUD/CAD/CHF) | Verified manual CSV (`data/imm_positions.csv`) → net position / state / crowding; else placeholder |
+| IMM | CFTC currency positioning (JPY/EUR/GBP/AUD/CAD/CHF) | **Auto-ingested from the official CFTC COT report** (`auto_cftc`, no API key) → net position / state / crowding; verified manual CSV (`data/imm_positions.csv`) / placeholder fallback |
 | Crypto | BTC, ETH, XRP, BCH (live) | Close + BB288 + CCI ±200 (live) |
 | Valuation | Buffett Indicator — US, Japan (market cap ÷ GDP) | Verified manual CSV (`data/valuation_metrics.csv`) → value + long-term valuation context; a multi-date series (≥2 points) also renders a valuation chart. Else placeholder (no fabrication). |
 

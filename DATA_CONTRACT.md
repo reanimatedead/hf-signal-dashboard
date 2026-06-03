@@ -501,6 +501,11 @@ only, not investment advice or trading signals.
   `data_status: "manual_csv"` (`source: "data/jp_rates.csv"`); otherwise they stay `placeholder`.
   See `docs/sample-jp-rates.csv` for the format (`date,JP2Y,JP10Y,source,note`). Only real,
   user-verified values belong in `data/jp_rates.csv` — samples stay under `docs/`.
+- **JP rates charts (CSV time series):** when `data/jp_rates.csv` holds **two or more dated rows**,
+  each of JP2Y / JP10Y gains a `charts.1d` (flat OHLC of the yield series, BB 48/288 + CCI 48/288 on
+  the full series, OHLC capped at 120 bars, `source: "data/jp_rates.csv"`), rendered by the shared 1d
+  chart in the existing Rates detail panel. Fewer than two points → `charts.1d.available:false` with
+  an explicit note. `fetch_jp_rate_yield_live()` remains the hook to enable a verified live source.
 - `data_status` ∈ `live` (US, yfinance) / `manual_csv` (JP, verified CSV) / `placeholder`.
 - Any fetch/parse failure falls back to `placeholder` (`yield: null`) so the pipeline never fails;
   values are plausibility-gated (`0 <= y < 25`).
@@ -540,8 +545,19 @@ Without the file, rows stay `placeholder` (no fabrication). `positioning_state` 
 `net_long_context` (net > 10000) / `net_short_context` (net < -10000) / `neutral_context` /
 `placeholder` / `invalid_data`; `crowding_risk` = high (|net| ≥ 100000) / medium (≥ 50000) / low.
 When `JPY_IMM` is `manual_csv`, the USDJPY `edge_context` cross-asset dimension gains a (non-trade)
-positioning-context factor. CFTC auto-download is a later phase. Positioning is market context
-only, not investment advice or a trading signal.
+positioning-context factor. Positioning is market context only, not investment advice or a trading
+signal.
+
+**v4.2 — IMM auto-ingestion (CFTC):** IMM rows are now populated **automatically** from the official
+CFTC Commitments of Traders report (legacy futures-only) via the public Socrata endpoint
+`publicreporting.cftc.gov` — **no API key**. Currency futures are keyed by stable CFTC contract-market
+codes (CME): JPY 097741 / EUR 099741 / GBP 096742 / AUD 232741 / CAD 090741 / CHF 092741.
+`net_position = noncomm_long − noncomm_short`, `weekly_change = Δnoncomm_long − Δnoncomm_short`,
+`data_status: "auto_cftc"` (`source: "CFTC COT (publicreporting.cftc.gov, futures-only)"`, latest
+report per currency). The fetch is wrapped in a timeout + `try/except`; on any failure it falls back
+to the verified manual CSV (`manual_csv`) and then `placeholder` (no fabrication), so the workflow
+never breaks. `auto_cftc` (like `manual_csv`) feeds the USDJPY edge JPY-IMM context factor. `long` /
+`short` remain CFTC positioning categories only — never trade instructions.
 
 ### markets.crypto (v1: live)
 
@@ -677,3 +693,4 @@ financial advice, price targets, trade execution, or buy/sell recommendations.
 | 3.5 | 2026-06-03 | Equity charts: index proxies (^N225/^DJI/^NDX/^GSPC, scored + charted, pinned atop each equity tab) and a small constituent allowlist (AAPL/MSFT/NVDA/AMZN/GOOGL/META/TSLA/JPM/UNH/7203.T/9984.T/8035.T) gain `charts.1d` (BB288 2σ/3σ + CCI ±200). Equity 4h/1w deferred (payload). All other constituents stay chart-less (fallback). yfinance only; payload kept under ~1.5MB. Context only. |
 | 4.0 | 2026-06-03 | Macro Valuation Extension: add `markets.valuation` + Valuation UI tab with the **Buffett Indicator** (market_cap/GDP×100) for US & Japan via verified manual CSV (`data/valuation_metrics.csv`; see `docs/sample-valuation-metrics.csv`). `value` from explicit value or market_cap/gdp; plausibility 0<v<1000; else `placeholder` (no fabrication). `valuation_context` ∈ historically_extreme/elevated/neutral_to_elevated/moderate/low_valuation/placeholder — long-term valuation context only, not a timing signal. No auto-fetch, no API key. Live market-cap/GDP feed deferred. |
 | 4.1 | 2026-06-03 | Buffett Indicator **charts**: a multi-date `data/valuation_metrics.csv` (≥ 2 dated points per region) yields `charts.1d` (flat OHLC of the value series, BB 48/288 + CCI 48/288 computed on the full series, OHLC capped at 120 bars) rendered via the shared 1d chart in the Valuation detail panel; 4h/1w stay `available:false`. Fewer than two points (or no CSV) → `charts.1d.available:false` with an explicit note (no fabricated/single-point line). Valuation chart line is the Buffett Indicator value over time — long-term context only, not a price or timing signal. |
+| 4.2 | 2026-06-03 | **External data ingestion (no UI/design change).** (1) **IMM auto-ingestion** from the official CFTC COT report (legacy futures-only, `publicreporting.cftc.gov` Socrata, no API key) → `data_status: auto_cftc` for JPY/EUR/GBP/AUD/CAD/CHF (net = noncomm long−short), with timeout + `try/except` fallback to `manual_csv` → `placeholder`; `auto_cftc` also feeds the USDJPY edge JPY-IMM factor. (2) **JP rates charts** from a multi-date `data/jp_rates.csv` (≥ 2 dated points) → JP2Y/JP10Y `charts.1d` via the shared chart (Japan curve / US-JP spread already compute when JP yields exist). (3) Buffett charts confirmed (v4.1). No `docs/index.html` / CSS / layout changes — data flows into the existing renderer. `long`/`short` are CFTC categories only; all rows remain market context only. |

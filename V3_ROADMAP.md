@@ -143,6 +143,33 @@ a trading signal, a market-timing tool, or investment advice.
 
 ---
 
+## v4.2 — External data ingestion (no UI/design change)  ✅
+
+**Goal:** move beyond `manual_csv` / `placeholder` "decoration" by wiring at least one **official**
+external auto-source, and supply charts for the remaining manual series — **without touching the UI**.
+
+- **CFTC IMM auto-ingestion (shipped):** IMM rows are populated automatically from the official CFTC
+  Commitments of Traders report (legacy futures-only) via the public Socrata endpoint
+  `publicreporting.cftc.gov` — **no API key**. JPY/EUR/GBP/AUD/CAD/CHF keyed by stable CFTC
+  contract-market codes; `net = noncomm long − short`, `data_status: auto_cftc`. Timeout + `try/except`
+  → falls back to verified `manual_csv` → `placeholder` (never breaks the run). Feeds the USDJPY edge
+  JPY-IMM context factor. `long`/`short` are CFTC categories only, not trade instructions.
+- **JP rates charts (shipped):** a multi-date `data/jp_rates.csv` (≥ 2 dated points) gives JP2Y/JP10Y
+  a `charts.1d` via the shared chart builder; the Japan curve and US-JP 10Y spread already compute when
+  JP yields exist. No verified keyless **live** JGB source confirmed, so live stays a hook
+  (`fetch_jp_rate_yield_live()`); CSV is the offline-import fallback.
+- **Buffett charts (confirmed, v4.1):** multi-date `data/valuation_metrics.csv` → `charts.1d`. No
+  keyless source aligns US/JP market-cap **and** GDP definitions, so Buffett stays manual-CSV (no
+  single-side fabrication).
+- **No design change:** `docs/index.html`, CSS, layout, tabs, and the detail panel are unchanged —
+  the new data/charts flow into the existing renderer. `manual_csv` = offline verified import,
+  `placeholder` = intentional no-fabrication fallback.
+
+**Deferred:** verified keyless live JGB yields; a definition-aligned keyless market-cap + GDP source
+for Buffett. Until then, those stay CSV/​placeholder rather than show unverified data.
+
+---
+
 ## Guardrails (all phases)
 
 - yfinance / free sources only; no API keys, no paid APIs.

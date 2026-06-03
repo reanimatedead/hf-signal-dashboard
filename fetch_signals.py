@@ -301,6 +301,37 @@ def attach_charts_to_symbol(row, df_d, dp, updated_at):
     return row
 
 
+def _build_value_series_chart_1d(series, updated_at, dp, source, note, elliott):
+    """Generic charts['1d'] from a [{date, value}] series (used by JP rates and the
+    Buffett Indicator). Each point becomes a flat OHLC bar (open=high=low=close=value);
+    BB 48/288 (2σ/3σ) + CCI 48/288 are computed on the *full* series (they report
+    `insufficient_data` until their period of points exists), and OHLC is capped at
+    OHLC_MAX_BARS. Needs >= 2 valid points to render a line — a single point draws no
+    line (no fabrication). Returns the block, or None when fewer than two points.
+    Market context only, never a trading signal. Never raises."""
+    try:
+        pts = [(s.get("date"), float(s.get("value")))
+               for s in (series or []) if s.get("value") is not None and s.get("date")]
+        if len(pts) < 2:
+            return None
+        close = pd.Series([v for _, v in pts], dtype="float64")
+        ohlc = [{"time": d, "open": round(v, dp), "high": round(v, dp),
+                 "low": round(v, dp), "close": round(v, dp), "volume": None}
+                for d, v in pts[-OHLC_MAX_BARS:]]
+        indicators = {
+            "bollinger_bands": {
+                "48": {"std_2": _bb_block(close, 48, 2, dp), "std_3": _bb_block(close, 48, 3, dp)},
+                "288": {"std_2": _bb_block(close, 288, 2, dp), "std_3": _bb_block(close, 288, 3, dp)},
+            },
+            "cci": {"48": _cci_block(close, close, close, 48),
+                    "288": _cci_block(close, close, close, 288)},
+        }
+        return {"available": True, "source": source, "updated_at": updated_at,
+                "ohlc": ohlc, "indicators": indicators, "elliott": elliott, "note": note}
+    except Exception:
+        return None
+
+
 def build_empty_edge_context():
     """Placeholder analytical edge-context (v2.4). No scoring here.
 
@@ -795,12 +826,13 @@ def fetch_rate_history(tickers):
 
 
 def load_jp_rates_from_csv(path="data/jp_rates.csv"):
-    """Load user-verified Japan yields from a manual CSV (v3.3 fallback).
+    """Load user-verified Japan yields from a manual CSV (v3.3 + time series).
 
-    Returns {"JP2Y": float, "JP10Y": float} for plausible (0 <= y < 25) numeric
-    values from the latest dated row, or {} if the file is absent/empty/invalid.
-    Only real, user-verified data should live in data/jp_rates.csv (samples go in
-    docs/sample-jp-rates.csv). Never breaks the run.
+    Returns {sym: {"value": latest_float, "series": [{date, value}, ...]}} for
+    JP2Y / JP10Y, keeping plausible (0 <= y < 25) numeric points chronologically, or
+    {} if the file is absent/empty/invalid. The series feeds an optional charts.1d
+    (>= 2 points). Only real, user-verified data should live in data/jp_rates.csv
+    (samples go in docs/sample-jp-rates.csv). Never breaks the run.
     """
     p = Path(path)
     if not p.exists():
@@ -808,20 +840,44 @@ def load_jp_rates_from_csv(path="data/jp_rates.csv"):
     try:
         with open(p, newline="", encoding="utf-8") as f:
             rows = [r for r in csv.DictReader(f)]
+        rows = [r for r in rows if (r.get("date") or "").strip()]
         if not rows:
             return {}
-        latest = sorted(rows, key=lambda r: r.get("date", ""))[-1]
+        rows.sort(key=lambda r: r.get("date", ""))
         out = {}
         for k in ("JP2Y", "JP10Y"):
-            try:
-                v = float(latest.get(k))
+            series = []
+            for r in rows:
+                try:
+                    v = float(r.get(k))
+                except (TypeError, ValueError):
+                    continue
                 if 0 <= v < 25:
-                    out[k] = round(v, 3)
-            except (TypeError, ValueError):
-                pass
+                    series.append({"date": (r.get("date") or "").strip(), "value": round(v, 3)})
+            if series:
+                out[k] = {"value": series[-1]["value"], "series": series}
         return out
     except Exception:
         return {}
+
+
+_JP_RATE_ELLIOTT = {"candidate": "unknown", "confidence": "low",
+                    "note": "Not applicable. JP yields are macro context, not a trading wave signal."}
+_JP_CHART_NOTE = ("Japan yield chart is macro context only. It is not investment advice "
+                  "or a trading signal.")
+
+
+def build_jp_rate_chart_1d(series, updated_at):
+    """charts['1d'] from a verified multi-date JP yield series (data/jp_rates.csv).
+    >= 2 dated points render the yield line (BB/CCI where enough history exists);
+    otherwise an explicit unavailable block. Macro context only. No fabrication."""
+    chart = _build_value_series_chart_1d(series, updated_at, 3, "data/jp_rates.csv",
+                                         _JP_CHART_NOTE, dict(_JP_RATE_ELLIOTT))
+    if chart:
+        return chart
+    c = build_empty_chart("1d")
+    c["note"] = "Japan rates time series needs at least two dated points; not configured yet."
+    return c
 
 
 def fetch_jp_rate_yield_live():
@@ -861,10 +917,9 @@ def build_rates_market():
             data_status, source, ticker_out, risk = "live", "yfinance", src_t, "medium"
             note = "Yield chart and indicators are market context only, not investment advice."
         elif csv_y is not None:
-            y, chg = csv_y, None
-            charts = {"4h": build_empty_chart("4h"), "1d": build_empty_chart("1d"),
-                      "1w": build_empty_chart("1w")}
-            charts["1d"]["note"] = "Japan rates chart source is not configured yet."
+            y, chg = csv_y["value"], None
+            jp_chart = build_jp_rate_chart_1d(csv_y.get("series"), now)
+            charts = {"4h": build_empty_chart("4h"), "1d": jp_chart, "1w": build_empty_chart("1w")}
             data_status, source, ticker_out, risk = "manual_csv", "data/jp_rates.csv", None, "medium"
             note = "Japan yield data loaded from a user-verified manual CSV. Market context only, not investment advice."
         else:
@@ -935,6 +990,67 @@ _IMM_NOTE = ("IMM positioning is weekly market context only. long/short refer to
              "positioning categories and are not trade instructions.")
 _IMM_CCY = {"JPY", "EUR", "GBP", "AUD", "CAD", "CHF"}
 
+# Official CFTC Commitments of Traders (legacy futures-only) — public Socrata
+# endpoint, no API key. Currency futures are keyed by stable contract-market codes
+# (CME). net_position = non-commercial (speculative) long - short. Positioning
+# context only; long/short are CFTC categories, never trade instructions.
+CFTC_COT_URL = "https://publicreporting.cftc.gov/resource/6dca-aqww.json"
+CFTC_IMM_CODES = {"JPY": "097741", "EUR": "099741", "GBP": "096742",
+                  "AUD": "232741", "CAD": "090741", "CHF": "092741"}
+
+
+def _parse_cftc_imm_rows(rows):
+    """Pure parser: CFTC Socrata rows -> {CCY: {date, net_position, weekly_change,
+    long_contracts, short_contracts}} keeping the latest report per currency.
+    net_position = noncomm_long - noncomm_short; weekly_change = Δlong - Δshort."""
+    code_to_ccy = {v: k for k, v in CFTC_IMM_CODES.items()}
+    out = {}
+    for row in rows or []:
+        ccy = code_to_ccy.get(str(row.get("cftc_contract_market_code") or "").strip())
+        if not ccy:
+            continue
+        try:
+            lng = int(round(float(row.get("noncomm_positions_long_all"))))
+            sht = int(round(float(row.get("noncomm_positions_short_all"))))
+        except (TypeError, ValueError):
+            continue
+        d = (row.get("report_date_as_yyyy_mm_dd") or "")[:10]
+        if ccy in out and d <= out[ccy]["date"]:
+            continue
+        try:
+            wc = int(round(float(row.get("change_in_noncomm_long_all"))
+                           - float(row.get("change_in_noncomm_short_all"))))
+        except (TypeError, ValueError):
+            wc = None
+        out[ccy] = {"date": d, "net_position": lng - sht, "weekly_change": wc,
+                    "long_contracts": lng, "short_contracts": sht}
+    return out
+
+
+def fetch_cftc_imm_positions(timeout=25):
+    """Auto-ingest IMM positioning from the official CFTC COT report (legacy
+    futures-only, Socrata; no API key). Returns {CCY: {...}} or {} on any failure,
+    so the caller falls back to manual CSV / placeholder. No fabrication; never
+    raises. Positioning context only, not a trading signal."""
+    try:
+        import requests
+        codes = "','".join(CFTC_IMM_CODES.values())
+        params = {
+            "$where": f"cftc_contract_market_code in ('{codes}')",
+            "$order": "report_date_as_yyyy_mm_dd DESC",
+            "$limit": "150",
+            "$select": ("cftc_contract_market_code,report_date_as_yyyy_mm_dd,"
+                        "noncomm_positions_long_all,noncomm_positions_short_all,"
+                        "change_in_noncomm_long_all,change_in_noncomm_short_all"),
+        }
+        resp = requests.get(CFTC_COT_URL, params=params, timeout=timeout,
+                            headers={"User-Agent": "hf-signal-dashboard (market context)"})
+        resp.raise_for_status()
+        return _parse_cftc_imm_rows(resp.json())
+    except Exception as e:
+        print(f"  [CFTC] auto-ingest unavailable ({type(e).__name__}); falling back to CSV/placeholder")
+        return {}
+
 
 def load_imm_positions_from_csv(path="data/imm_positions.csv"):
     """Load user-verified CFTC/IMM positioning from a manual CSV (v3.4).
@@ -988,22 +1104,30 @@ def classify_imm_positioning(net):
 
 
 def build_imm_market():
-    """IMM rows (v3.4). Uses a verified manual CSV (data/imm_positions.csv) if
-    present, else placeholder. CFTC auto-download is a later phase. Context only."""
+    """IMM rows: auto-ingest from the official CFTC COT report (data_status:
+    auto_cftc); fall back to a verified manual CSV (data/imm_positions.csv ->
+    manual_csv), then placeholder. No fabrication. long/short are CFTC positioning
+    categories only, not trade instructions."""
+    auto = fetch_cftc_imm_positions()
     data = load_imm_positions_from_csv()
-    print(f"\n[IMM] {'manual CSV (' + str(len(data)) + ' ccy)' if data else 'placeholder (no verified CSV)'}")
+    if auto:
+        print(f"[IMM] auto_cftc ({len(auto)} ccy)" + (f" + manual CSV fallback ({len(data)})" if data else ""))
+    else:
+        print(f"[IMM] {'manual CSV (' + str(len(data)) + ' ccy)' if data else 'placeholder (no source)'}")
     rows = []
     for sym, ccy, name in IMM:
-        d = data.get(ccy)
-        if d:
-            state, crowd = classify_imm_positioning(d["net_position"])
+        a = auto.get(ccy)
+        rec = a or data.get(ccy)
+        if rec:
+            state, crowd = classify_imm_positioning(rec["net_position"])
             row = {
                 "symbol": sym, "name": name, "market": "IMM", "currency": ccy,
-                "date": d["date"], "net_position": d["net_position"],
-                "weekly_change": d["weekly_change"],
-                "long_contracts": d["long_contracts"], "short_contracts": d["short_contracts"],
+                "date": rec.get("date"), "net_position": rec["net_position"],
+                "weekly_change": rec.get("weekly_change"),
+                "long_contracts": rec.get("long_contracts"), "short_contracts": rec.get("short_contracts"),
                 "positioning_state": state, "crowding_risk": crowd,
-                "data_status": "manual_csv", "source": "data/imm_positions.csv",
+                "data_status": "auto_cftc" if a else "manual_csv",
+                "source": "CFTC COT (publicreporting.cftc.gov, futures-only)" if a else "data/imm_positions.csv",
                 "note": _IMM_NOTE, "error": None,
             }
         else:
@@ -1013,7 +1137,7 @@ def build_imm_market():
                 "long_contracts": None, "short_contracts": None,
                 "positioning_state": "placeholder", "crowding_risk": "unknown",
                 "data_status": "placeholder", "source": None,
-                "note": _IMM_NOTE + " Add a verified data/imm_positions.csv to enable.",
+                "note": _IMM_NOTE + " CFTC auto-ingest unavailable and no verified data/imm_positions.csv.",
                 "error": None,
             }
         rows.append(row)
@@ -1157,37 +1281,14 @@ def _valuation_side_charts():
 def build_valuation_chart_1d(series, updated_at, dp=1):
     """charts['1d'] from a verified Buffett Indicator value time series (v4.1).
 
-    Needs >= 2 verified dated points to render a close line. Each point becomes a flat
-    OHLC bar (open=high=low=close=value). BB 48/288 (2σ/3σ) and CCI 48/288 reuse the
-    shared blocks, which report `insufficient_data` until their full period of points
-    exists, so a short series still shows the value line only. Long-term valuation
-    context only — not a timing signal. No fabrication (one point draws no line).
-    Never raises."""
-    try:
-        pts = [(s.get("date"), float(s.get("value")))
-               for s in (series or []) if s.get("value") is not None and s.get("date")]
-        if len(pts) < 2:
-            return _valuation_1d_unavailable(
-                "Verified valuation time series needs at least two dated points; not configured yet.")
-        # Indicators use the full series; OHLC is capped to the last OHLC_MAX_BARS bars
-        # for payload (same convention as build_1d_chart_from_ohlc).
-        close = pd.Series([v for _, v in pts], dtype="float64")
-        ohlc = [{"time": d, "open": round(v, dp), "high": round(v, dp),
-                 "low": round(v, dp), "close": round(v, dp), "volume": None}
-                for d, v in pts[-OHLC_MAX_BARS:]]
-        indicators = {
-            "bollinger_bands": {
-                "48": {"std_2": _bb_block(close, 48, 2, dp), "std_3": _bb_block(close, 48, 3, dp)},
-                "288": {"std_2": _bb_block(close, 288, 2, dp), "std_3": _bb_block(close, 288, 3, dp)},
-            },
-            "cci": {"48": _cci_block(close, close, close, 48),
-                    "288": _cci_block(close, close, close, 288)},
-        }
-        return {"available": True, "source": "data/valuation_metrics.csv", "updated_at": updated_at,
-                "ohlc": ohlc, "indicators": indicators, "elliott": _VAL_ELLIOTT,
-                "note": _VAL_CHART_NOTE}
-    except Exception:
-        return _valuation_1d_unavailable("Valuation chart could not be built from the series.")
+    Delegates to the shared value-series chart builder: >= 2 dated points render the
+    value line (BB 48/288 + CCI 48/288 computed on the full series, OHLC capped at
+    OHLC_MAX_BARS); fewer points yield an explicit unavailable block. Long-term
+    valuation context only — not a timing signal. No fabrication. Never raises."""
+    chart = _build_value_series_chart_1d(series, updated_at, dp, "data/valuation_metrics.csv",
+                                         _VAL_CHART_NOTE, dict(_VAL_ELLIOTT))
+    return chart or _valuation_1d_unavailable(
+        "Verified valuation time series needs at least two dated points; not configured yet.")
 
 
 def build_valuation_market():
@@ -1315,13 +1416,13 @@ def classify_cross_asset_edge(usdjpy_row, fx, vol, yield_curve, imm=None):
         gaps.append("US-JP 10Y spread unavailable (JP yields placeholder) — incomplete FX-rates context")
     else:
         sup.append("US-JP 10Y spread available — USDJPY yield-spread context")
-    # v3.4: JPY IMM positioning context (only when verified CSV data is present)
+    # v3.4 + auto-ingest: JPY IMM positioning context (CFTC auto or verified CSV)
     jpy_imm = next((r for r in (imm or []) if r.get("symbol") == "JPY_IMM"), {}) or {}
-    if jpy_imm.get("data_status") == "manual_csv" and jpy_imm.get("positioning_state") not in (None, "placeholder", "invalid_data"):
+    if jpy_imm.get("data_status") in ("auto_cftc", "manual_csv") and jpy_imm.get("positioning_state") not in (None, "placeholder", "invalid_data"):
         sup.append(f"JPY IMM positioning available — {jpy_imm.get('positioning_state')} "
                    f"(crowding {jpy_imm.get('crowding_risk')}); CFTC category context only")
     else:
-        gaps.append("JPY IMM positioning unavailable (no verified CSV) — positioning context incomplete")
+        gaps.append("JPY IMM positioning unavailable — positioning context incomplete")
     gaps.append("DXY not in dataset — USD-strength cross-check unavailable")
     state = "partially_aligned" if (sup and con) else ("favorable_context" if sup else "mixed_macro_context")
     return state, sup, con, gaps

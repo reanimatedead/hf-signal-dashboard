@@ -1,2 +1,4 @@
 date,JP2Y,JP10Y,source,note
-2026-06-03,0.85,1.65,sample,"SAMPLE ONLY — illustrative format. Replace with verified public JGB 2Y/10Y yields (percent) and copy to data/jp_rates.csv to enable live Japan rates. Do not commit unverified values."
+2025-09-30,0.43,1.05,sample,"SAMPLE ONLY — illustrative format, NOT verified. Two or more dated rows enable the JP rates chart. Replace with verified public JGB 2Y/10Y yields (percent) and copy to data/jp_rates.csv. Do not commit unverified values."
+2025-12-31,0.55,1.18,sample,"SAMPLE ONLY — illustrative, NOT verified."
+2026-03-31,0.68,1.32,sample,"SAMPLE ONLY — illustrative, NOT verified. The latest dated row is the table yield; all dated rows form the chart series."
