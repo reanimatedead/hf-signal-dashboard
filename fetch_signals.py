@@ -128,7 +128,7 @@ FX_PAIRS = {
     "CHFJPY=X":"CHF/JPY","EURUSD=X":"EUR/USD","GBPUSD=X":"GBP/USD",
     "AUDUSD=X":"AUD/USD","USDCAD=X":"USD/CAD","USDCHF=X":"USD/CHF",
     "NZDUSD=X":"NZD/USD","EURGBP=X":"EUR/GBP","EURAUD=X":"EUR/AUD",
-    "GBPAUD=X":"GBP/AUD","XAUUSD=X":"Gold (XAU/USD)","XAGUSD=X":"Silver (XAG/USD)",
+    "GBPAUD=X":"GBP/AUD","GC=F":"Gold (XAU/USD)","SI=F":"Silver (XAG/USD)",
 }
 
 
@@ -199,10 +199,15 @@ def calc_cci(high, low, close, period):
     return (tp - sma) / (0.015 * mad.replace(0, np.nan))
 
 # ─── CHART DETAIL (v2.3) ─────────────────────────────────
-# Symbols that carry a computed charts.1d block in data.json. Kept small to
-# limit payload; other rows have no charts key and fall back gracefully.
-CHART_SYMBOLS = {"USDJPY=X", "EURUSD=X", "XAUUSD=X"}
+# Symbols (yfinance fetch keys) that carry a computed charts.1d block in
+# data.json. Kept small to limit payload; other rows fall back gracefully.
+CHART_SYMBOLS = {"USDJPY=X", "EURUSD=X", "GC=F", "SI=F"}
 OHLC_MAX_BARS = 120
+
+# Precious metals are fetched via reliable COMEX futures tickers (GC=F/SI=F)
+# because the spot pairs XAUUSD=X / XAGUSD=X return no data on yfinance.
+# A stable display symbol is presented for UI / data-contract continuity.
+SYMBOL_DISPLAY = {"GC=F": "XAUUSD", "SI=F": "XAGUSD"}
 
 
 def _bb_block(close, period, dev, dp):
@@ -515,10 +520,11 @@ def process_fx_advanced(fx_dict):
     results    = []
 
     for sym, name in fx_dict.items():
+        out_sym = SYMBOL_DISPLAY.get(sym, sym)   # display symbol (e.g. GC=F -> XAUUSD)
         try:
             df_d = daily_data.get(sym)
             if df_d is None or len(df_d) < 60:
-                results.append({"symbol":sym,"name":name,"composite_score":-1,
+                results.append({"symbol":out_sym,"name":name,"composite_score":-1,
                                  "signal":"ERROR","error":"No daily data"})
                 continue
 
@@ -623,7 +629,7 @@ def process_fx_advanced(fx_dict):
             bb_pct_display = round(max(0.0, min(1.0, bb_pct_d)), 3)
 
             row = {
-                "symbol": sym, "name": name,
+                "symbol": out_sym, "name": name,
                 "price": round(price, dp), "change_pct": round(chg_pct, 2),
                 "rsi": round(rsi, 1),
                 "macd_hist": round(macd_hist, 8), "macd_direction": macd_dir,
@@ -650,7 +656,7 @@ def process_fx_advanced(fx_dict):
             results.append(row)
 
         except Exception as exc:
-            results.append({"symbol": sym, "name": name, "composite_score": -1,
+            results.append({"symbol": out_sym, "name": name, "composite_score": -1,
                              "signal": "ERROR", "error": str(exc)})
 
     results.sort(key=lambda x: x.get("composite_score", -1), reverse=True)
