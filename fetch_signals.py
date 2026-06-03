@@ -384,6 +384,11 @@ def fetch_batch(tickers, period=DATA_PERIOD):
         try:
             if len(batch) == 1:
                 raw = yf.download(batch[0], period=period, auto_adjust=True, progress=False)
+                # Current yfinance returns MultiIndex columns even for a single
+                # ticker; flatten to level-0 (Open/High/Low/Close/Volume) so
+                # per-row access (iterrows) yields scalars like the multi path.
+                if isinstance(raw.columns, pd.MultiIndex):
+                    raw.columns = raw.columns.get_level_values(0)
                 if not raw.empty:
                     results[batch[0]] = raw
             else:
