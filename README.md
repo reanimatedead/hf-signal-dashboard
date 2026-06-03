@@ -141,19 +141,29 @@ or buy/sell recommendations. IMM `long`/`short` refer to CFTC positioning catego
 
 Live: **https://hf-signal-dashboard.pages.dev/** — the captures below are of the live site.
 
-### FX / Commodities detail panel
+### FX / Commodities detail with Edge Context
 
-A selected FX symbol (USDJPY=X) with its 1d close line, Bollinger Bands 288 (2σ / 3σ) overlay,
-a CCI ±200 lower panel, Elliott/edge context, and the market-context disclaimer.
+USDJPY=X with switchable 4h / 1d / 1w timeframe tabs, a 1d close line, Bollinger Bands 288
+(2σ / 3σ) overlay, a CCI ±200 lower panel, an Elliott placeholder, and the USDJPY **Edge Context**
+(overall / confidence + technical / macro / cross-asset / risk-adjusted dimensions with supporting
+vs conflicting factors) — analytical context only.
 
-![HF Signal Dashboard — FX detail panel with Bollinger Bands and CCI](docs/assets/hf-signal-dashboard-detail.png)
+![HF Signal Dashboard — FX detail with multi-timeframe tabs, BB288, CCI ±200, and Edge Context](docs/assets/hf-signal-dashboard-detail.png)
 
-### Rates / Bonds view
+### Rates / Bonds live yield view
 
-The Rates / Bonds tab shows live US2Y / US10Y yields (`data_status: live`) alongside placeholder
-Japan rows (`data_status: placeholder`), with a yield chart for the available US rates.
+The Rates / Bonds tab separates live US2Y / US10Y yields (`data_status: live`) from placeholder
+Japan rows (`data_status: placeholder`), with a yield chart (BB288 + CCI ±200) for the available
+US rates. US and Japan curves are assessed separately.
 
-![HF Signal Dashboard — Rates / Bonds tab with live US yields and a US10Y yield chart](docs/assets/hf-signal-dashboard-rates.png)
+![HF Signal Dashboard — Rates / Bonds with live US yields and a US10Y yield chart](docs/assets/hf-signal-dashboard-rates.png)
+
+### Equity chart view
+
+Index proxies (^N225/^DJI/^NDX/^GSPC) and a selected constituent allowlist (e.g. AAPL, shown)
+include a 1d chart with BB288 (2σ / 3σ) and CCI ±200; non-allowlist symbols fall back gracefully.
+
+![HF Signal Dashboard — S&P 500 equity (AAPL) 1d chart with BB288 and CCI ±200](docs/assets/hf-signal-dashboard-v3-equity.png)
 
 ---
 
