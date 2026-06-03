@@ -96,32 +96,32 @@ live feeds, lazy loading) — each would add payload/fragility without proportio
 
 ---
 
-## Future v4: Macro Valuation Extension (roadmap only — not implemented)
+## v4 — Macro Valuation Extension
 
-> Recorded for planning only. No code, data, or fetch is part of this entry.
-
-### Buffett Indicator
+### v4.0 — Buffett Indicator  ✅ (manual-CSV path shipped)
 
 **Purpose:** add long-term equity-market **valuation context** to the dashboard.
 
-**Scope:**
-- Buffett Indicator = total market capitalization / GDP
-- US market cap to GDP
-- Japan market cap to GDP (only if reliable data is available)
-- Equity valuation regime label + historical valuation context
-- **Not a timing signal. Not investment advice.**
+**Shipped (v4.0):**
+- `markets.valuation` + a **Valuation** UI tab (Symbol / Region / Metric / Value / Context / Data /
+  Source) with a dedicated detail panel (explanation + value / market_cap / GDP / context / source
+  + disclaimer). No charts (valuation is slow-moving).
+- Buffett Indicator = total market capitalization / GDP × 100, for **US** and **Japan**
+  (`US_BUFFETT_INDICATOR`, `JP_BUFFETT_INDICATOR`).
+- **Manual CSV** path: a verified `data/valuation_metrics.csv`
+  (`date,region,metric,market_cap,gdp,value,source,note`; see `docs/sample-valuation-metrics.csv`)
+  populates rows (`data_status: manual_csv`, latest dated row per region). `value` = explicit value,
+  else `market_cap / gdp × 100`; plausibility `0 < v < 1000`. Without the file, rows stay
+  `placeholder` — **no fabricated market-cap or GDP values**.
+- `valuation_context` regime labels (`historically_extreme` ≥ 200 / `elevated` ≥ 150 /
+  `neutral_to_elevated` ≥ 100 / `moderate` ≥ 70 / `low_valuation` < 70 / `placeholder`) —
+  **long-term valuation context, not a timing signal**; no undervalued/overvalued verdicts.
+- No API keys, no auto-fetch, per-region `try/except` via the loader; never breaks the workflow.
 
-**Data source policy:**
-- Use only reliable, verifiable public data.
-- No API keys in v1.
-- If a live source is unstable, use a **manual CSV fallback** (same pattern as JP rates / IMM).
-- Do **not** fabricate market-cap or GDP values; manual CSV fallback is acceptable when live data
-  is unreliable, but only with verified figures.
-
-**UI:**
-- Add to a Macro / Valuation section or a Market Overview view.
-- Show as **long-term valuation context** only.
-- Do **not** present as trade timing or an entry/exit trigger.
+**Deferred (later phase):**
+- Automated live market-cap / GDP feeds (World Bank / FRED / official GDP; a reliable total
+  market-cap source; Japan via TSE market cap / nominal GDP). v4.0 stays manual-CSV until a verified,
+  scale-validated live source is confirmed.
 
 **Disclaimer:** the Buffett Indicator is long-term valuation context only. It is not a trading
 signal, a market-timing tool, or investment advice.

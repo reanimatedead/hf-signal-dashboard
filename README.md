@@ -35,8 +35,8 @@ without leaving the portfolio incomplete.
 
 ## Features
 
-- **9 market tabs** — Nikkei 225, Dow 30, Nasdaq 100, S&P 500, FX / Commodities, Rates / Bonds,
-  VIX, IMM, Crypto.
+- **10 market tabs** — Nikkei 225, Dow 30, Nasdaq 100, S&P 500, FX / Commodities, Rates / Bonds,
+  VIX, IMM, Crypto, Valuation.
 - **Click-to-expand detail panel** per symbol with lightweight **inline-SVG charts** (no external
   chart library, mobile-friendly), with **switchable 4h / 1d / 1w timeframe tabs** (4h/1w on an
   allowlist of liquid symbols — USDJPY, EURUSD, XAUUSD, XAGUSD, VIX, BTC, ETH, US2Y, US10Y):
@@ -53,6 +53,11 @@ without leaving the portfolio incomplete.
   USDJPY edge context picks up the spread automatically.
 - **Cross-asset macro layer** (data contract) — rates, volatility (VIX/MOVE), commodities incl.
   Gold/Silver & Copper/Gold ratios, regime labels, and an `edge_context` analytical summary.
+- **Valuation (v4.0) — Buffett Indicator** — long-term equity-market valuation context
+  (market cap ÷ GDP × 100) for US & Japan, supplied via a **user-verified**
+  `data/valuation_metrics.csv` (`data_status: manual_csv`; see `docs/sample-valuation-metrics.csv`);
+  without it, rows stay an explicit placeholder (no fabricated market-cap/GDP). Shown as a
+  long-term valuation regime label only — **not market timing**, not a trading signal.
 - **Watchlist, search, signal filters, CSV export, dark/light theme** in the UI.
 - **Graceful degradation** — symbols without chart data, errored tickers, and placeholder rows
   all fall back cleanly; the daily pipeline never fails on a single bad ticker.
@@ -72,6 +77,7 @@ Markets/symbols without computed charts (e.g. equities, IMM, Japan rates) show a
 | VIX | CBOE Volatility Index (live) | Close + BB288 + CCI ±200 (live) |
 | IMM | CFTC currency positioning (JPY/EUR/GBP/AUD/CAD/CHF) | Verified manual CSV (`data/imm_positions.csv`) → net position / state / crowding; else placeholder |
 | Crypto | BTC, ETH, XRP, BCH (live) | Close + BB288 + CCI ±200 (live) |
+| Valuation | Buffett Indicator — US, Japan (market cap ÷ GDP) | Verified manual CSV (`data/valuation_metrics.csv`) → value + long-term valuation context; else placeholder. No charts (slow-moving). |
 
 ---
 

@@ -1019,6 +1019,137 @@ def build_imm_market():
         rows.append(row)
     return rows
 
+# ─── VALUATION / BUFFETT INDICATOR (v4.0) ────────────────
+
+VALUATION = [("US_BUFFETT_INDICATOR", "US", "US Buffett Indicator"),
+             ("JP_BUFFETT_INDICATOR", "Japan", "Japan Buffett Indicator")]
+
+_VAL_NOTE = ("Buffett Indicator is shown as long-term equity market valuation context "
+             "only. It is not a trading signal, market timing tool, or investment advice.")
+_VAL_REGIONS = {"US", "JAPAN"}
+
+
+def compute_buffett_indicator(market_cap, gdp, value):
+    """Resolve the Buffett Indicator percent for one region (v4.0).
+
+    Priority: an explicit `value` (already a percent) wins; otherwise compute
+    market_cap / gdp * 100 when both are positive. Returns a float inside a sane
+    plausibility band (0 < v < 1000) or None. Never raises. No fabrication: with
+    no usable input this returns None and the caller falls back to placeholder.
+    """
+    def _num(x):
+        try:
+            if x is None or (isinstance(x, str) and not x.strip()):
+                return None
+            return float(x)
+        except (TypeError, ValueError):
+            return None
+    v = _num(value)
+    if v is None:
+        mc, g = _num(market_cap), _num(gdp)
+        if mc is not None and g is not None and g > 0:
+            v = mc / g * 100.0
+    if v is None or not (0 < v < 1000):
+        return None
+    return round(v, 1)
+
+
+def classify_valuation_context(value):
+    """Long-term valuation-regime label (v4.0). Context, not a timing signal.
+    Deliberately avoids undervalued/overvalued verdicts and any buy/sell wording."""
+    if not isinstance(value, (int, float)):
+        return "placeholder"
+    if value >= 200:
+        return "historically_extreme_context"
+    if value >= 150:
+        return "elevated_context"
+    if value >= 100:
+        return "neutral_to_elevated_context"
+    if value >= 70:
+        return "moderate_context"
+    return "low_valuation_context"
+
+
+def load_valuation_metrics_from_csv(path="data/valuation_metrics.csv"):
+    """Load user-verified Buffett Indicator inputs from a manual CSV (v4.0).
+
+    CSV columns: date,region,metric,market_cap,gdp,value,source,note
+    Only metric == buffett_indicator and region in {US, Japan} are used; the latest
+    dated row per region wins. Returns {REGION: {value, market_cap, gdp, date, source}}
+    with `value` resolved via compute_buffett_indicator (value, else market_cap/gdp).
+    Rows that resolve to no plausible value are skipped. {} if absent/empty/invalid.
+    Only real, user-verified data belongs in data/valuation_metrics.csv (samples in
+    docs/). Never breaks the run."""
+    p = Path(path)
+    if not p.exists():
+        return {}
+    try:
+        with open(p, newline="", encoding="utf-8") as f:
+            rows = [r for r in csv.DictReader(f)]
+        out = {}
+        for r in rows:
+            region = (r.get("region") or "").strip()
+            metric = (r.get("metric") or "").strip().lower()
+            if region.upper() not in _VAL_REGIONS or metric != "buffett_indicator":
+                continue
+            value = compute_buffett_indicator(r.get("market_cap"), r.get("gdp"), r.get("value"))
+            if value is None:
+                continue
+            d = (r.get("date") or "").strip()
+            key = region.upper()
+            if key in out and d <= out[key]["date"]:
+                continue
+            def _opt_num(k):
+                try:
+                    x = r.get(k)
+                    if x is None or (isinstance(x, str) and not x.strip()):
+                        return None
+                    return float(x)
+                except (TypeError, ValueError):
+                    return None
+            out[key] = {"date": d, "value": value,
+                        "market_cap": _opt_num("market_cap"), "gdp": _opt_num("gdp"),
+                        "source": (r.get("source") or "").strip() or None}
+        return out
+    except Exception:
+        return {}
+
+
+def build_valuation_market():
+    """Valuation rows (v4.0 Buffett Indicator). Uses a verified manual CSV
+    (data/valuation_metrics.csv) if present, else placeholder. No market-cap / GDP
+    auto-fetch and no fabrication. Long-term valuation context only — not a timing
+    signal or investment advice."""
+    data = load_valuation_metrics_from_csv()
+    print(f"\n[Valuation] {'manual CSV (' + str(len(data)) + ' region)' if data else 'placeholder (no verified CSV)'}")
+    rows = []
+    for sym, region, name in VALUATION:
+        d = data.get(region.upper())
+        if d:
+            row = {
+                "symbol": sym, "name": name, "market": "Valuation", "region": region,
+                "metric": "market_cap_to_gdp", "value": d["value"], "unit": "%",
+                "market_cap": d["market_cap"], "gdp": d["gdp"],
+                "valuation_context": classify_valuation_context(d["value"]),
+                "data_status": "manual_csv",
+                "source": d["source"] or "data/valuation_metrics.csv",
+                "date": d["date"], "note": _VAL_NOTE, "error": None,
+            }
+        else:
+            row = {
+                "symbol": sym, "name": name, "market": "Valuation", "region": region,
+                "metric": "market_cap_to_gdp", "value": None, "unit": "%",
+                "market_cap": None, "gdp": None,
+                "valuation_context": "placeholder",
+                "data_status": "placeholder", "source": None, "date": None,
+                "note": "Verified market cap / GDP data is not configured yet. "
+                        "Add a verified data/valuation_metrics.csv to enable. " + _VAL_NOTE,
+                "error": None,
+            }
+        rows.append(row)
+    return rows
+
+
 # ─── EDGE SCORING v1 (v3.1) ──────────────────────────────
 # USDJPY-only analytical edge context: integrate technical / macro / cross-asset
 # / risk context into one summary. "Edge" = clarity of the analytical picture,
@@ -1376,6 +1507,7 @@ def main():
     vol_results   = process_volatility()
     imm_results   = build_imm_market()
     crypto_results = process_crypto()
+    valuation_results = build_valuation_market()  # v4.0 Buffett Indicator (manual CSV / placeholder)
     yield_curve   = build_yield_curve_state(rates_results)
 
     # v3.1: populate USDJPY=X edge_context from integrated context (USDJPY only)
@@ -1408,7 +1540,7 @@ def main():
                 "nasdaq100": len(nq_results), "sp500": len(sp_results),
                 "fx": len(fx_results), "rates": len(rates_results),
                 "volatility": len(vol_results), "imm": len(imm_results),
-                "crypto": len(crypto_results),
+                "crypto": len(crypto_results), "valuation": len(valuation_results),
             },
             "yield_curve": yield_curve,
         },
@@ -1425,6 +1557,7 @@ def main():
             "fx":        fx_results,
             "rates":      rates_results, "volatility": vol_results,
             "imm":        imm_results,   "crypto":     crypto_results,
+            "valuation":  valuation_results,
         },
     }
 

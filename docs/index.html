@@ -345,6 +345,7 @@ body.light .cname{color:var(--text-dim)}
     <button class="tab" onclick="sw('volatility',this)">VIX</button>
     <button class="tab" onclick="sw('imm',this)">IMM</button>
     <button class="tab" onclick="sw('crypto',this)">Crypto</button>
+    <button class="tab" onclick="sw('valuation',this)">Valuation</button>
   </div>
   <div id="toolbar">
     <div id="srch-wrap">
@@ -454,7 +455,16 @@ const C_CRYPTO=[
   {k:"change_pct", l:"Chg%",     a:"right", w:80},
   {k:"risk",       l:"Risk",     a:"center",w:100},
 ];
-const cols=()=>({fx:C_FX,rates:C_RATES,volatility:C_VOL,imm:C_IMM,crypto:C_CRYPTO})[tab]||C_STOCK;
+const C_VALUATION=[
+  {k:"symbol",            l:"Symbol",   a:"left",  w:200},
+  {k:"region",            l:"Region",   a:"center",w:84},
+  {k:"metric",            l:"Metric",   a:"left",  w:160},
+  {k:"value",             l:"Value",    a:"right", w:96},
+  {k:"valuation_context", l:"Context",  a:"center",w:210},
+  {k:"data_status",       l:"Data",     a:"center",w:104},
+  {k:"source",            l:"Source",   a:"left",  w:160},
+];
+const cols=()=>({fx:C_FX,rates:C_RATES,volatility:C_VOL,imm:C_IMM,crypto:C_CRYPTO,valuation:C_VALUATION})[tab]||C_STOCK;
 
 // ══ Boot ═══════════════════════════════════════════
 window.addEventListener("DOMContentLoaded",()=>{
@@ -685,6 +695,7 @@ function toggleDetail(ev,sym){
 }
 function detailHTML(r){
   const f=(v,d=2)=> (v==null||v==="")?"—":(typeof v==="number"?v.toFixed(d):v);
+  if(r.market==="Valuation"||r.metric==="market_cap_to_gdp") return valuationDetailHTML(r);
   const score=r.composite_score??r.score;
   const cci=(r.cci_daily!==undefined||r.cci_4h!==undefined)
     ? `<div class="dt-tf"><b>CCI(288)</b>&nbsp;&nbsp;Daily ${f(r.cci_daily,0)}&nbsp;&middot;&nbsp;4H ${f(r.cci_4h,0)}</div>` : "";
@@ -706,6 +717,29 @@ function detailHTML(r){
     <div class="dt-tfwrap">${tfChartHTML(r,"1d",f)}</div>
     ${edgeHTML(r.edge_context)}
     <div class="dt-disc">Charts, indicators, Elliott candidates, and edge context are provided for market context and portfolio demonstration only. They are not investment advice or trading signals.</div>
+  </div>`;
+}
+// v4.0 Buffett Indicator detail panel — long-term valuation context only (no charts).
+function valuationDetailHTML(r){
+  const big=v=>v==null?"—":Number(v).toLocaleString();
+  const val=(r.value==null)?"—":`${Number(r.value).toFixed(1)}${esc(r.unit||"%")}`;
+  const ph=(r.data_status==="placeholder");
+  const note=ph
+    ? "Verified market cap / GDP data is not configured yet (manual CSV). Showing a placeholder — no fabricated values."
+    : "";
+  return `<div class="dt-wrap">
+    <div class="dt-hd"><b>${esc(r.symbol||"—")}</b> &nbsp;${esc(r.name||"")}&nbsp;&middot;&nbsp;${esc(r.region||"")}&nbsp;&middot;&nbsp;${ph?"placeholder":"manual CSV"}</div>
+    <div class="dt-note" style="margin-top:8px">The <b>Buffett Indicator</b> = total stock-market capitalization &divide; GDP &times; 100. It is a long-term equity-market <b>valuation context</b> measure — a big-picture gauge of how richly a whole market is valued relative to the size of its economy. It is slow-moving and is not a timing tool.</div>
+    <div class="dt-grid" style="margin-top:8px">
+      <span><b>Value</b> ${val}</span>
+      <span><b>Context</b> ${esc(valCtxLabel(r.valuation_context))}</span>
+      <span><b>Market cap</b> ${big(r.market_cap)}</span>
+      <span><b>GDP</b> ${big(r.gdp)}</span>
+      <span><b>Data</b> ${esc(r.data_status||"—")}</span>
+      <span><b>Source</b> ${esc(r.source||"—")}</span>
+    </div>
+    ${note?`<div class="dt-note" style="margin-top:8px">${esc(note)}</div>`:""}
+    <div class="dt-disc">Buffett Indicator is shown as long-term equity market valuation context only. It is not a trading signal, a market timing tool, or investment advice. No buy/sell recommendation, and no entry/exit, take-profit, or stop-loss.</div>
   </div>`;
 }
 // Render the chart block for a given timeframe (4h / 1d / 1w); graceful fallback.
@@ -980,9 +1014,29 @@ function cell(c,r){
       h=`<span class="cci-v ${cl}">${v>=0?"+":""}${v.toFixed(0)}</span>`;
       break;
     }
+    case"value":
+      h=(r.value==null)?`<span style="color:var(--text-faint)">—</span>`
+        :`<span class="price">${Number(r.value).toFixed(1)}${esc(r.unit||"")}</span>`;
+      break;
+    case"valuation_context":{
+      const ph=r.valuation_context==="placeholder"||r.valuation_context==null;
+      h=`<span style="color:${ph?"var(--text-faint)":"var(--text-dim)"}">${esc(valCtxLabel(r.valuation_context))}</span>`;
+      break;
+    }
     default: h=r[c.k]??"—";
   }
   return`<td style="${al}">${h}</td>`;
+}
+// Long-term valuation-regime label (v4.0). Context only — no buy/sell semantics.
+function valCtxLabel(c){
+  return ({
+    placeholder:"Placeholder",
+    historically_extreme_context:"Historically extreme (context)",
+    elevated_context:"Elevated (context)",
+    neutral_to_elevated_context:"Neutral–elevated (context)",
+    moderate_context:"Moderate (context)",
+    low_valuation_context:"Low valuation (context)"
+  })[c] || (c?String(c).replace(/_/g," "):"—");
 }
 
 // ══ Signal class map ═══════════════════════════════

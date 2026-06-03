@@ -557,6 +557,64 @@ financial advice, or trading signals.
 
 ---
 
+## 9. v4.0 — Valuation / Buffett Indicator (Macro Valuation Extension)
+
+`markets.valuation` adds long-term equity-market **valuation context**. v4.0 ships the **Buffett
+Indicator** (total stock-market capitalization ÷ GDP × 100) for two regions via a **verified manual
+CSV** (no market-cap / GDP auto-fetch, no API key, no fabrication).
+
+### markets.valuation
+
+Rows: `US_BUFFETT_INDICATOR`, `JP_BUFFETT_INDICATOR`.
+
+| Field | Type | Meaning |
+|---|---|---|
+| `symbol` | string | `US_BUFFETT_INDICATOR` / `JP_BUFFETT_INDICATOR` |
+| `name` | string | Display name |
+| `market` | string | `"Valuation"` |
+| `region` | string | `US` / `Japan` |
+| `metric` | string | `"market_cap_to_gdp"` |
+| `value` | number\|null | Buffett Indicator percent; `null` when not configured |
+| `unit` | string | `"%"` |
+| `market_cap` | number\|null | Optional, from CSV |
+| `gdp` | number\|null | Optional, from CSV |
+| `valuation_context` | string | regime label (below) |
+| `data_status` | string | `manual_csv` / `placeholder` |
+| `source` | string\|null | CSV source / region source; `null` when placeholder |
+| `date` | string\|null | Latest dated CSV row used |
+| `note` | string | Disclaimer (long-term context only) |
+
+### Manual CSV (`data/valuation_metrics.csv`)
+
+Columns: `date,region,metric,market_cap,gdp,value,source,note`. Only `metric == buffett_indicator`
+and `region ∈ {US, Japan}` are used; the latest dated row per region wins. `value` is resolved as:
+an explicit `value` (already a percent) wins; otherwise `market_cap / gdp * 100` when both are
+present and `gdp > 0`. A plausibility gate keeps only `0 < value < 1000`; rows that resolve to no
+plausible value are skipped. Without the file (or with no usable rows), both rows are `placeholder`
+— **no fabricated market-cap or GDP values**. Sample template: `docs/sample-valuation-metrics.csv`
+(SAMPLE ONLY — never treated as verified data; never copied verbatim into `data/`).
+
+### `valuation_context` values
+
+`placeholder` (value null) · `historically_extreme_context` (≥ 200) · `elevated_context` (≥ 150) ·
+`neutral_to_elevated_context` (≥ 100) · `moderate_context` (≥ 70) · `low_valuation_context` (< 70).
+These are **long-term valuation-regime labels, not timing signals** — deliberately no
+undervalued/overvalued verdicts and no buy/sell wording.
+
+### UI
+
+A **Valuation** tab lists Symbol / Region / Metric / Value / Context / Data / Source. The detail
+panel explains the Buffett Indicator, shows value / market_cap / GDP / context / source, and carries
+the disclaimer. No charts in v4.0 (valuation is slow-moving; `charts` not provided). Automated live
+market-cap / GDP feeds (e.g. World Bank / FRED / official GDP, reliable total-market-cap source) are
+a deferred later phase.
+
+> **Disclaimer:** the Buffett Indicator is shown as long-term equity market valuation context only.
+> It is **not** a trading signal, a market timing tool, or investment advice. No buy/sell
+> recommendation, and no entry/exit, take-profit, or stop-loss.
+
+---
+
 ## Forbidden fields
 
 The following must never appear in signals.json:
@@ -597,3 +655,4 @@ financial advice, price targets, trade execution, or buy/sell recommendations.
 | 3.2 | 2026-06-03 | Multi-timeframe charts for an allowlist (USDJPY, EURUSD, XAUUSD, XAGUSD, VIX, BTC, ETH, US2Y, US10Y): `charts.4h` (1h→4h resample) and `charts.1w` (1d→1w resample) reuse the 1d chart builder (BB288 2σ/3σ + CCI ±200). OHLC capped at 120 bars; insufficient periods → `insufficient_data` (close line still shows). Other symbols/timeframes stay `available:false`. UI timeframe tabs switch between 4h/1d/1w. Context only. |
 | 3.4 | 2026-06-03 | IMM positioning via verified manual CSV (`data/imm_positions.csv`): JPY/EUR/GBP/AUD/CAD/CHF gain net_position / weekly_change / long & short contracts / positioning_state / crowding_risk / `data_status: manual_csv`; else `placeholder` (no fabrication). USDJPY edge gains a JPY-IMM positioning-context factor when present. long/short are CFTC categories only, not trade instructions. CFTC auto-download deferred. |
 | 3.5 | 2026-06-03 | Equity charts: index proxies (^N225/^DJI/^NDX/^GSPC, scored + charted, pinned atop each equity tab) and a small constituent allowlist (AAPL/MSFT/NVDA/AMZN/GOOGL/META/TSLA/JPM/UNH/7203.T/9984.T/8035.T) gain `charts.1d` (BB288 2σ/3σ + CCI ±200). Equity 4h/1w deferred (payload). All other constituents stay chart-less (fallback). yfinance only; payload kept under ~1.5MB. Context only. |
+| 4.0 | 2026-06-03 | Macro Valuation Extension: add `markets.valuation` + Valuation UI tab with the **Buffett Indicator** (market_cap/GDP×100) for US & Japan via verified manual CSV (`data/valuation_metrics.csv`; see `docs/sample-valuation-metrics.csv`). `value` from explicit value or market_cap/gdp; plausibility 0<v<1000; else `placeholder` (no fabrication). `valuation_context` ∈ historically_extreme/elevated/neutral_to_elevated/moderate/low_valuation/placeholder — long-term valuation context only, not a timing signal. No auto-fetch, no API key. Live market-cap/GDP feed deferred. |
