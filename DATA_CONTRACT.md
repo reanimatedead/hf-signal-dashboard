@@ -372,6 +372,12 @@ in this sample dataset."); an indicator section (Bollinger Band 48 2σ/3σ, 288 
 CCI 288, Elliott candidate); and a macro-relation section. Indicators are shown for market
 context only and are not trading signals.
 
+**Chart-rendering note (UI):** the 1d price chart overlays **BB288 (2σ/3σ) only** — BB48 stays
+in the data/contract but is excluded from chart overlays to keep the price line readable. CCI
+(48/288) is drawn in a separate lower panel, never over price. SVG line colours are set via the
+CSS `style` attribute (so theme `var()` tokens resolve); only `charts.1d.available === true`
+renders, otherwise the panel shows a graceful fallback.
+
 ---
 
 ## 6. v2.3 — charts in the live data.json

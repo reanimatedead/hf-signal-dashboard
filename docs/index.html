@@ -162,8 +162,9 @@ tbody tr.detail-row,tbody tr.detail-row:hover{background:var(--bg2)}
 .dt-bb{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:4px 18px;margin-top:6px;font-size:11px;color:var(--text)}
 .dt-bb b{color:var(--text-dim);font-weight:400}
 .dt-chart{margin-top:8px;max-width:560px}
-.dt-svg,.dt-cci-svg{width:100%;height:auto;display:block;background:var(--bg2);border:1px solid var(--border);border-radius:5px}
-.dt-cci-svg{margin-top:5px}
+.dt-svg,.dt-cci-svg{width:100%;display:block;background:var(--bg2);border:1px solid var(--border);border-radius:5px}
+.dt-svg{height:150px}
+.dt-cci-svg{height:84px;margin-top:5px}
 .dt-legend{display:flex;flex-wrap:wrap;gap:4px 12px;margin-top:5px;font-size:10px;color:var(--text-dim)}
 .dt-leg{display:inline-flex;align-items:center;gap:4px}
 .dt-leg i{width:11px;height:2px;display:inline-block;border-radius:1px}
@@ -664,17 +665,19 @@ function detailHTML(r){
     ${cci}
     ${detail}
     ${edgeHTML(r.edge_context)}
-    <div class="dt-disc">Indicators are shown for market context only and are not trading signals.</div>
+    <div class="dt-disc">Charts, indicators, Elliott candidates, and edge context are provided for market context and portfolio demonstration only. They are not investment advice or trading signals.</div>
   </div>`;
 }
 function esc(s){ return String(s==null?"":s).replace(/[&<>]/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[m])); }
 // Render edge_context (v2.4) when present and meaningful. Analytical summary only.
 function edgeHTML(e){
   if(!e) return "";
-  const meaningful = (e.overall && e.overall!=="unknown")
+  const disc0="Edge context is an analytical summary for market review only. It is not investment advice or a trading signal.";
+  const meaningful = (e.overall && e.overall!=="unknown" && e.overall!=="unclear_context")
     || (e.supporting_factors&&e.supporting_factors.length)
     || (e.conflicting_factors&&e.conflicting_factors.length);
-  if(!meaningful) return "";
+  if(!meaningful)
+    return `<div class="dt-edge"><div class="dt-edge-hd"><b>Edge context</b> <span class="dt-edge-conf">No clear edge context.</span></div></div>`;
   const dim=(label,o)=> o?`<div><b>${label}</b> ${esc(o.state||"unknown")}</div>`:"";
   const list=(arr)=> (arr&&arr.length)?arr.map(x=>`<li>${esc(x)}</li>`).join(""):`<li style="color:var(--text-faint)">—</li>`;
   const disc="Edge context is an analytical summary for market review only. It is not investment advice, a trading signal, or an instruction to enter or exit positions.";
@@ -701,16 +704,22 @@ function chart1dHTML(c, f){
   const band=(o)=> o ? `mid ${f(o.basis)} · up ${f(o.upper)} · low ${f(o.lower)} <span style="color:var(--text-faint)">[${o.state||"—"}]</span>` : "—";
   const cciCell=(o)=> o ? `${f(o.value,1)} <span style="color:var(--text-faint)">[${o.state||"—"}]</span>` : "—";
   const el=c.elliott||{};
-  let chart="";
-  try{ chart = priceChartSVG(c) + cciChartSVG(c); }catch(e){ chart=""; }
-  const legend = chart ? `<div class="dt-legend">
+  let priceSVG="",cciSVG="";
+  try{ priceSVG=priceChartSVG(c); cciSVG=cciChartSVG(c); }catch(e){ priceSVG=""; cciSVG=""; }
+  const hasBB=!!(bb["288"]&&bb["288"].std_2&&_n(bb["288"].std_2.upper)!=null);
+  const hasCCI=!!((cci["48"]&&_n(cci["48"].value)!=null)||(cci["288"]&&_n(cci["288"].value)!=null));
+  const legend = priceSVG ? `<div class="dt-legend">
       <span class="dt-leg"><i style="background:var(--accent)"></i>Close</span>
-      <span class="dt-leg"><i style="background:var(--blue)"></i>BB48 2&sigma;</span>
       <span class="dt-leg"><i style="background:var(--yellow)"></i>BB288 2&sigma;</span>
-      <span class="dt-leg"><i style="background:var(--text-faint)"></i>3&sigma; faint</span>
+      <span class="dt-leg"><i style="background:var(--text-faint)"></i>BB288 3&sigma; faint</span>
     </div>` : "";
-  return `<div class="dt-note" style="color:var(--text)"><b style="color:var(--accent)">日足 1d — computed indicators</b></div>
-    ${chart?`<div class="dt-chart">${chart}${legend}</div>`:""}
+  const bbCap = priceSVG ? `<div class="dt-cap">Bollinger Bands are long-cycle volatility context only. BB 288 / 2&sigma; = standard zone; BB 288 / 3&sigma; = extreme deviation zone. Not trading signals.</div>` : "";
+  const indNote = (priceSVG && !hasBB && !hasCCI) ? `<div class="dt-cap">Indicators unavailable for this symbol/timeframe — close price shown only.</div>` : "";
+  const chartBlock = priceSVG
+    ? `<div class="dt-chart">${priceSVG}${legend}${bbCap}${indNote}${cciSVG}</div>`
+    : `<div class="dt-cap">Chart data is not available for this symbol/timeframe.</div>`;
+  return `<div class="dt-note" style="color:var(--text)"><b style="color:var(--accent)">日足 1d — chart</b></div>
+    ${chartBlock}
     <div class="dt-bb">
       <div><b>BB 48 / 2&sigma;</b> ${band(bb["48"]&&bb["48"].std_2)}</div>
       <div><b>BB 48 / 3&sigma;</b> ${band(bb["48"]&&bb["48"].std_3)}</div>
@@ -758,13 +767,12 @@ function priceChartSVG(c){
   const valid=closes.filter(x=>x!=null);
   if(valid.length<2) return "";
   const bb=(c.indicators&&c.indicators.bollinger_bands)||{};
-  const b48=bb["48"]||{}, b288=bb["288"]||{};
-  const s48_2=_bandSeries(closes,48,2,b48.std_2);
-  const s48_3=_bandSeries(closes,48,3,b48.std_3);
+  const b288=bb["288"]||{};
+  // Chart overlays BB288 only — BB48 is intentionally excluded from rendering.
   const s288_2=_bandSeries(closes,288,2,b288.std_2);
   const s288_3=_bandSeries(closes,288,3,b288.std_3);
-  let ys=valid.slice();                       // y-range from close + 2σ only (3σ may clip)
-  [s48_2,s288_2].forEach(s=>{ if(s){ s.up.concat(s.lo).forEach(v=>{ if(v!=null) ys.push(v); }); }});
+  let ys=valid.slice();                       // y-range from close + BB288 2σ (3σ may clip)
+  if(s288_2){ s288_2.up.concat(s288_2.lo).forEach(v=>{ if(v!=null) ys.push(v); }); }
   let yMin=Math.min(...ys), yMax=Math.max(...ys);
   if(yMin===yMax){ yMin-=1; yMax+=1; }
   const pad=(yMax-yMin)*0.05; yMin-=pad; yMax+=pad;
@@ -772,13 +780,12 @@ function priceChartSVG(c){
   const X=i=> L+(n<=1?0:i/(n-1)*(W-L-R));
   const Y=v=> T+(1-(v-yMin)/(yMax-yMin))*(H-T-B);
   const poly=(arr)=> arr.map((v,i)=> v==null?null:`${X(i).toFixed(1)},${Y(v).toFixed(1)}`).filter(Boolean).join(" ");
-  const line=(pts,color,w,op,dash)=> pts?`<polyline fill="none" stroke="${color}" stroke-width="${w}"${op?` opacity="${op}"`:""}${dash?` stroke-dasharray="${dash}"`:""} points="${pts}"/>`:"";
-  let svg=`<svg class="dt-svg" viewBox="0 0 ${W} ${H}" role="img" aria-label="1d close price and Bollinger Bands">`;
-  if(s48_3){ svg+=line(poly(s48_3.up),"var(--text-faint)",0.8,0.5,"3 2")+line(poly(s48_3.lo),"var(--text-faint)",0.8,0.5,"3 2"); }
-  if(s288_3){ svg+=line(poly(s288_3.up),"var(--text-faint)",0.8,0.4,"3 2")+line(poly(s288_3.lo),"var(--text-faint)",0.8,0.4,"3 2"); }
-  if(s288_2){ svg+=line(poly(s288_2.up),"var(--yellow)",0.9,0.85)+line(poly(s288_2.lo),"var(--yellow)",0.9,0.85); }
-  if(s48_2){ svg+=line(poly(s48_2.up),"var(--blue)",0.9,0.9)+line(poly(s48_2.lo),"var(--blue)",0.9,0.9); }
-  svg+=line(poly(closes),"var(--accent)",1.4);
+  // Colours go in `style` (CSS) so var() resolves — presentation attrs do not resolve var().
+  const ln=(pts,css)=> pts?`<polyline points="${pts}" style="fill:none;${css}"/>`:"";
+  let svg=`<svg class="dt-svg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="1d close price with Bollinger Band 288 context">`;
+  if(s288_3){ svg+=ln(poly(s288_3.up),"stroke:var(--text-faint);stroke-width:0.8;opacity:0.55;stroke-dasharray:3 2")+ln(poly(s288_3.lo),"stroke:var(--text-faint);stroke-width:0.8;opacity:0.55;stroke-dasharray:3 2"); }
+  if(s288_2){ svg+=ln(poly(s288_2.up),"stroke:var(--yellow);stroke-width:1;opacity:0.9")+ln(poly(s288_2.lo),"stroke:var(--yellow);stroke-width:1;opacity:0.9"); }
+  svg+=ln(poly(closes),"stroke:var(--accent);stroke-width:1.5");
   return svg+`</svg>`;
 }
 function cciChartSVG(c){
@@ -792,20 +799,23 @@ function cciChartSVG(c){
   if(l48!=null) vals.push(l48);
   if(l288!=null) vals.push(l288);
   const cap=Math.max(220, Math.ceil(Math.max.apply(null,vals.map(Math.abs))/50)*50);
+  if(l48==null && l288==null && !ser48) return "";   // nothing to show
   const W=320,H=70,L=2,R=2,T=4,B=4, n=Math.max(ohlc.length,2);
   const X=i=> L+(n<=1?0:i/(n-1)*(W-L-R));
   const Y=v=>{ const cv=Math.max(-cap,Math.min(cap,v)); return T+(1-(cv+cap)/(2*cap))*(H-T-B); };
-  let svg=`<svg class="dt-cci-svg" viewBox="0 0 ${W} ${H}" role="img" aria-label="1d CCI">`;
-  svg+=`<line x1="${L}" y1="${Y(0).toFixed(1)}" x2="${W-R}" y2="${Y(0).toFixed(1)}" stroke="var(--border2)" stroke-width="0.6"/>`;
-  [100,-100].forEach(g=>{ svg+=`<line x1="${L}" y1="${Y(g).toFixed(1)}" x2="${W-R}" y2="${Y(g).toFixed(1)}" stroke="var(--text-faint)" stroke-width="0.5" stroke-dasharray="3 2"/>`; });
-  if(l288!=null) svg+=`<line x1="${L}" y1="${Y(l288).toFixed(1)}" x2="${W-R}" y2="${Y(l288).toFixed(1)}" stroke="var(--yellow)" stroke-width="0.8" opacity="0.7" stroke-dasharray="2 2"/>`;
+  const hl=(yv,css)=>`<line x1="${L}" y1="${yv}" x2="${W-R}" y2="${yv}" style="${css}"/>`;
+  let svg=`<svg class="dt-cci-svg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="1d CCI momentum context">`;
+  svg+=hl(Y(0).toFixed(1),"stroke:var(--border2);stroke-width:0.6");
+  [100,-100].forEach(g=>{ svg+=hl(Y(g).toFixed(1),"stroke:var(--text-faint);stroke-width:0.5;stroke-dasharray:3 2"); });
+  if(l288!=null) svg+=hl(Y(l288).toFixed(1),"stroke:var(--yellow);stroke-width:0.8;opacity:0.75;stroke-dasharray:2 2");
   if(ser48){
     const pts=ser48.map((v,i)=> v==null?null:`${X(i).toFixed(1)},${Y(v).toFixed(1)}`).filter(Boolean).join(" ");
-    if(pts) svg+=`<polyline fill="none" stroke="var(--accent)" stroke-width="1.2" points="${pts}"/>`;
+    if(pts) svg+=`<polyline points="${pts}" style="fill:none;stroke:var(--accent);stroke-width:1.3"/>`;
   } else if(l48!=null){
-    svg+=`<circle cx="${(W-R).toFixed(1)}" cy="${Y(l48).toFixed(1)}" r="1.8" fill="var(--accent)"/>`;
+    const yv=Y(l48).toFixed(1);
+    svg+=`<line x1="${(W-R-7).toFixed(1)}" y1="${yv}" x2="${(W-R).toFixed(1)}" y2="${yv}" style="stroke:var(--accent);stroke-width:2"/>`;
   }
-  svg+=`</svg><div class="dt-cap">CCI 48 ${l48==null?"—":l48.toFixed(0)} &middot; CCI 288 ${l288==null?"—":l288.toFixed(0)} &middot; guides &plusmn;100 &middot; scale &plusmn;${cap}</div>`;
+  svg+=`</svg><div class="dt-cap">CCI 48 ${l48==null?"—":l48.toFixed(0)} &middot; CCI 288 ${l288==null?"—":l288.toFixed(0)} &middot; guides &plusmn;100 &middot; scale &plusmn;${cap} &middot; momentum context only, not a trading signal</div>`;
   return svg;
 }
 
