@@ -45,8 +45,11 @@ without leaving the portfolio incomplete.
   - Heuristic **Elliott** candidate (badge/note only, `confidence: low`)
 - **Live yields & yield curve** — US2Y / US10Y fetched and normalized from Yahoo; **US and Japan
   curves are assessed separately** (US recession-inversion logic is never applied to JGB);
-  US-JP 10Y spread as USDJPY context. Japan yields stay an explicit placeholder rather than show
-  unreliable data.
+  US-JP 10Y spread as USDJPY context. Japan (JP2Y/JP10Y) has no stable free live source, so it can
+  be supplied via a **user-verified** `data/jp_rates.csv` (`data_status: manual_csv`; see
+  `docs/sample-jp-rates.csv`); without it, Japan stays an explicit placeholder rather than show
+  unverified data. When JP yields are present, the Japan curve and US-JP spread compute and the
+  USDJPY edge context picks up the spread automatically.
 - **Cross-asset macro layer** (data contract) — rates, volatility (VIX/MOVE), commodities incl.
   Gold/Silver & Copper/Gold ratios, regime labels, and an `edge_context` analytical summary.
 - **Watchlist, search, signal filters, CSV export, dark/light theme** in the UI.

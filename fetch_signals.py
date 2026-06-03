@@ -5,7 +5,7 @@ HF Signal Scanner Pro v2 - Daily Signal Generator
 - FX     : CCI(288) + BB(288, 2σ/3σ) on Daily + 4H, Monte Carlo ≥55% filter
 """
 
-import json, sys, time, warnings
+import json, sys, time, warnings, csv
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 
@@ -794,16 +794,61 @@ def fetch_rate_history(tickers):
     return None, None
 
 
+def load_jp_rates_from_csv(path="data/jp_rates.csv"):
+    """Load user-verified Japan yields from a manual CSV (v3.3 fallback).
+
+    Returns {"JP2Y": float, "JP10Y": float} for plausible (0 <= y < 25) numeric
+    values from the latest dated row, or {} if the file is absent/empty/invalid.
+    Only real, user-verified data should live in data/jp_rates.csv (samples go in
+    docs/sample-jp-rates.csv). Never breaks the run.
+    """
+    p = Path(path)
+    if not p.exists():
+        return {}
+    try:
+        with open(p, newline="", encoding="utf-8") as f:
+            rows = [r for r in csv.DictReader(f)]
+        if not rows:
+            return {}
+        latest = sorted(rows, key=lambda r: r.get("date", ""))[-1]
+        out = {}
+        for k in ("JP2Y", "JP10Y"):
+            try:
+                v = float(latest.get(k))
+                if 0 <= v < 25:
+                    out[k] = round(v, 3)
+            except (TypeError, ValueError):
+                pass
+        return out
+    except Exception:
+        return {}
+
+
+def fetch_jp_rate_yield_live():
+    """Live JGB yield fetch — disabled in v3.3.
+
+    No stable, free, keyless daily JGB 2Y/10Y source was confirmed: yfinance has
+    no clean JGB-yield ticker, and unverified scrape/CSV endpoints (e.g. Stooq)
+    could not be scale-validated here, so they are not adopted (avoid wrong data).
+    Returns {} so the pipeline uses the manual CSV / placeholder path. This is the
+    hook to enable a verified live source later.
+    """
+    return {}
+
+
 def build_rates_market():
-    """Rates rows (v1). US2Y/US10Y get live yield + charts.1d (BB288/CCI) from the
-    daily yield series; Japan stays placeholder. yfinance only; failures fall back
-    so the run never fails. Context only, not investment advice."""
-    print("\n[Rates] live yield + charts (yfinance; Japan stays placeholder)")
+    """Rates rows (v3.3). US2Y/US10Y get live yield + charts.1d (BB288/CCI) from the
+    daily yield series. Japan uses a verified manual CSV (data/jp_rates.csv) if
+    present, else placeholder. yfinance only; failures fall back so the run never
+    fails. Context only, not investment advice."""
+    print("\n[Rates] US live yield + charts; Japan via manual CSV or placeholder")
     now = datetime.now(JST).isoformat()
+    jp_yields = fetch_jp_rate_yield_live() or load_jp_rates_from_csv()
     rows = []
     for sym, name, region, tenor, role, tickers in RATE_TICKERS:
         df, src_t = fetch_rate_history(tickers) if tickers else (None, None)
         live = df is not None and len(df) >= 60
+        csv_y = jp_yields.get(sym) if region == "JP" else None
         if live:
             close = df["Close"].squeeze()
             y = round(float(close.iloc[-1]), 3)
@@ -813,29 +858,34 @@ def build_rates_market():
             chart["source_ticker"] = src_t
             chart["note"] = "Yield chart and indicators are market context only."
             charts = {"4h": build_empty_chart("4h"), "1d": chart, "1w": build_empty_chart("1w")}
+            data_status, source, ticker_out, risk = "live", "yfinance", src_t, "medium"
             note = "Yield chart and indicators are market context only, not investment advice."
+        elif csv_y is not None:
+            y, chg = csv_y, None
+            charts = {"4h": build_empty_chart("4h"), "1d": build_empty_chart("1d"),
+                      "1w": build_empty_chart("1w")}
+            charts["1d"]["note"] = "Japan rates chart source is not configured yet."
+            data_status, source, ticker_out, risk = "manual_csv", "data/jp_rates.csv", None, "medium"
+            note = "Japan yield data loaded from a user-verified manual CSV. Market context only, not investment advice."
         else:
             y, chg = None, None
             charts = {"4h": build_empty_chart("4h"), "1d": build_empty_chart("1d"),
                       "1w": build_empty_chart("1w")}
-            charts["1d"]["note"] = ("Japan rates live chart source is not configured yet."
+            charts["1d"]["note"] = ("Japan rates source is not configured yet."
                                     if region == "JP" else
                                     "Rates chart unavailable for this symbol.")
-            note = ("Japan rates live chart source is not configured yet."
+            data_status, source, ticker_out, risk = "placeholder", None, None, "unknown"
+            note = ("Japan yield data unavailable. Add a verified data/jp_rates.csv to enable. "
+                    "Placeholder retained for macro context."
                     if region == "JP" else
                     "Yield data unavailable. Placeholder row retained for macro context.")
         rows.append({
             "symbol": sym, "name": name, "market": "Rates", "region": region,
             "tenor": tenor, "yield": y, "change": chg, "curve_role": role,
-            "risk": "medium" if live else "unknown",
-            "data_status": "live" if live else "placeholder",
-            "source": "yfinance" if live else None,
-            "source_ticker": src_t if live else None,
-            "charts": charts,
-            "note": note,
-            "error": None,
+            "risk": risk, "data_status": data_status, "source": source,
+            "source_ticker": ticker_out, "charts": charts, "note": note, "error": None,
         })
-        print(f"  {sym}: {'live '+str(y)+' ('+str(src_t)+') chart ohlc='+str(len(charts['1d'].get('ohlc') or [])) if live else 'placeholder'}")
+        print(f"  {sym}: {data_status} yield={y} src={source}")
     return rows
 
 

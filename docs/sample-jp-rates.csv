@@ -1,0 +1,2 @@
+date,JP2Y,JP10Y,source,note
+2026-06-03,0.85,1.65,sample,"SAMPLE ONLY — illustrative format. Replace with verified public JGB 2Y/10Y yields (percent) and copy to data/jp_rates.csv to enable live Japan rates. Do not commit unverified values."

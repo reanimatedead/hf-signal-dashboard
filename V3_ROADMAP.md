@@ -40,13 +40,18 @@ Other symbols keep the `unknown_context` placeholder ("No clear edge context" in
 
 ---
 
-## v3.3 — Japan rates live (deferred)
+## v3.3 — Japan rates live  ✅ (manual-CSV path shipped)
 
 **Goal:** make JP2Y / JP10Y real and complete the Japan curve + US-JP 10Y spread.
 
-- Adopt a stable free source if one exists; otherwise a **manual CSV input** path.
-- No fabrication, no API key, never break the workflow. Japan stays placeholder until a
-  reliable source is wired.
+- **Decision:** no stable free keyless **live** source was confirmed (yfinance has no clean
+  JGB-yield ticker; unverified scrape/CSV endpoints could not be scale-validated). Shipped the
+  **manual CSV** path: commit a user-verified `data/jp_rates.csv`
+  (`date,JP2Y,JP10Y,source,note`; see `docs/sample-jp-rates.csv`) → JP rows become `manual_csv`,
+  and the Japan curve, US-JP 10Y spread, and the USDJPY edge cross-asset factor compute
+  automatically. Without the file, Japan stays `placeholder`.
+- No fabrication, no API key, never breaks the workflow. `fetch_jp_rate_yield_live()` is a hook to
+  enable a verified live source later. Japan is always assessed separately from the US curve.
 
 ---
 

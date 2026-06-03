@@ -495,10 +495,15 @@ only, not investment advice or trading signals.
 - Values are normalized to percent: a raw value `> 25` is treated as a legacy ×10 quote and
   divided by 10; the result must be a plausible yield `0 < y < 25` or it is rejected (no
   fabrication / no guessing).
-- `JP2Y` / `JP10Y` have **no stable free Yahoo source**, so they remain `placeholder` rather than
-  show unreliable values.
-- Any fetch failure falls back to `data_status: "placeholder"` (`yield: null`) so the pipeline
-  never fails.
+- `JP2Y` / `JP10Y` (v3.3): no stable free keyless **live** source was confirmed (yfinance has no
+  clean JGB-yield ticker; unverified scrape/CSV endpoints could not be scale-validated), so Japan
+  uses a **manual CSV** path. If a user-verified `data/jp_rates.csv` is committed, JP rows become
+  `data_status: "manual_csv"` (`source: "data/jp_rates.csv"`); otherwise they stay `placeholder`.
+  See `docs/sample-jp-rates.csv` for the format (`date,JP2Y,JP10Y,source,note`). Only real,
+  user-verified values belong in `data/jp_rates.csv` — samples stay under `docs/`.
+- `data_status` ∈ `live` (US, yfinance) / `manual_csv` (JP, verified CSV) / `placeholder`.
+- Any fetch/parse failure falls back to `placeholder` (`yield: null`) so the pipeline never fails;
+  values are plausibility-gated (`0 <= y < 25`).
 
 **Yield curve (`meta.yield_curve`)** — US and Japan are assessed **separately**:
 
@@ -576,3 +581,4 @@ financial advice, price targets, trade execution, or buy/sell recommendations.
 | 2.5.1 | 2026-06-03 | Rates live yield v1: US10Y (^TNX) / US2Y (2YY=F) fetched via yfinance with ×10 scale normalization + plausibility gate; `data_status`/`source`/`source_ticker` added. Japan stays placeholder (no stable free source). yield_curve thresholds add flat zone (`< 0.25`). |
 | 2.5.2 | 2026-06-03 | Rates `charts.1d` for US2Y/US10Y: daily yield series (normalized) → Close line + Bollinger 288 (2σ/3σ) + CCI 48/288 (±200), reusing the shared chart builder. Japan charts stay `available:false`. Context only. |
 | 3.1 | 2026-06-03 | Edge Scoring v1: populate `USDJPY=X` `edge_context` (1d) from BB288/CCI + US rates/yield_curve + VIX + Gold. overall ∈ moderate/limited/neutral/conflicting/insufficient (no strong); confidence low/medium; data gaps shown but not counted as conflicts. Analytical context only. See V3_ROADMAP.md. |
+| 3.3 | 2026-06-03 | Japan rates via verified manual CSV (`data/jp_rates.csv`): JP2Y/JP10Y become `data_status: manual_csv` when present, else `placeholder` (no fabrication). Japan curve (`jp_10y_2y_spread`) and `us_jp_10y_spread` compute when JP yields exist; USDJPY `edge_context` cross-asset then gains the US-JP spread factor automatically. Japan assessed separately from US. |
