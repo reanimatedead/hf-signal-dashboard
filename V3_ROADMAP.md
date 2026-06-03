@@ -30,13 +30,18 @@ Other symbols keep the `unknown_context` placeholder ("No clear edge context" in
 
 ---
 
-## v3.2 — 4h / 1w charts (deferred)
+## v3.2 — 4h / 1w charts  ✅ (allowlist shipped)
 
 **Goal:** extend the existing 1d chart to 4h and 1w, incrementally.
 
-- Targets: major FX pairs, VIX, Crypto, US2Y/US10Y.
-- Notes: 4h fetching is heavier → restrict via an allowlist. 1w needs long history for BB288.
-  Watch `data.json` payload size; consider a separate data file if it grows.
+- **Shipped:** `charts.4h` (1h→4h resample, ~60d) and `charts.1w` (1d→1w resample, ~5y) for an
+  allowlist — USDJPY, EURUSD, XAUUSD, XAGUSD, VIX, BTC, ETH, US2Y, US10Y — reusing the shared 1d
+  chart builder (BB288 2σ/3σ + CCI ±200; BB48 not chart-rendered). OHLC capped at 120 bars per
+  timeframe; 1w typically has <288 weeks so BB288/CCI288 report `insufficient_data` while the
+  close line + CCI48 still render. UI timeframe tabs (4時間足/日足/週足) now switch the chart.
+  Per-symbol `try/except`; failures fall back to `available:false`.
+- **Deferred:** full-symbol expansion (all FX / equities), 4h/1w on every market — kept off to
+  control `data.json` payload and Actions time.
 
 ---
 

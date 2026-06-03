@@ -38,7 +38,8 @@ without leaving the portfolio incomplete.
 - **9 market tabs** — Nikkei 225, Dow 30, Nasdaq 100, S&P 500, FX / Commodities, Rates / Bonds,
   VIX, IMM, Crypto.
 - **Click-to-expand detail panel** per symbol with lightweight **inline-SVG charts** (no external
-  chart library, mobile-friendly):
+  chart library, mobile-friendly), with **switchable 4h / 1d / 1w timeframe tabs** (4h/1w on an
+  allowlist of liquid symbols — USDJPY, EURUSD, XAUUSD, XAGUSD, VIX, BTC, ETH, US2Y, US10Y):
   - Close / yield line
   - **Bollinger Bands 288** (2σ and 3σ) overlay — long-cycle volatility context
   - **CCI 48 / 288** lower panel with ±200 reference — extended momentum context

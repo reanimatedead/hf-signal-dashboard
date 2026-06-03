@@ -152,7 +152,9 @@ tbody tr.detail-row,tbody tr.detail-row:hover{background:var(--bg2)}
 .dt-wrap{background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:12px 14px;margin:2px 0 6px}
 .dt-hd{font-family:var(--cond);font-size:14px;color:var(--sym-color);margin-bottom:8px}
 .dt-tabs{display:flex;gap:6px;margin-bottom:8px}
-.dt-tab{font-size:10px;color:var(--text-dim);border:1px solid var(--border);border-radius:4px;padding:2px 8px}
+.dt-tab{font-size:10px;color:var(--text-dim);border:1px solid var(--border);border-radius:4px;padding:2px 8px;cursor:pointer}
+.dt-tab:hover{color:var(--text)}
+.dt-tab-on{border-color:var(--accent);color:var(--accent)}
 .dt-grid{display:flex;flex-wrap:wrap;gap:6px 18px;font-size:11px;color:var(--text)}
 .dt-grid b{color:var(--text-dim);font-weight:400}
 .dt-tf{margin-top:8px;font-size:11px;color:var(--text)}
@@ -685,14 +687,12 @@ function detailHTML(r){
   const score=r.composite_score??r.score;
   const cci=(r.cci_daily!==undefined||r.cci_4h!==undefined)
     ? `<div class="dt-tf"><b>CCI(288)</b>&nbsp;&nbsp;Daily ${f(r.cci_daily,0)}&nbsp;&middot;&nbsp;4H ${f(r.cci_4h,0)}</div>` : "";
-  // v2.2.1: render computed 1d chart indicators when available; 4h/1w later.
-  const c1d = r.charts && r.charts["1d"];
-  const detail = (c1d && c1d.available)
-    ? chart1dHTML(c1d, f)
-    : `<div class="dt-note">Full multi-timeframe detail (4h / 1d / 1w &middot; Bollinger Bands 48/288 with 2&sigma; and 3&sigma; &middot; CCI 48/288 &middot; Elliott candidate) is defined in the <a href="https://github.com/reanimatedead/hf-signal-dashboard/blob/main/DATA_CONTRACT.md" target="_blank" rel="noopener">data contract</a>. Extended 1d chart data is not available in this dataset.</div>`;
+  // v3.2: interactive timeframe tabs (4h / 1d / 1w); default 1d.
+  const sym = r.symbol || "";
+  const tab = (tf,label,active)=> `<span class="dt-tab${active?" dt-tab-on":""}" onclick="showTF('${sym}','${tf}',this)">${label}</span>`;
   return `<div class="dt-wrap">
     <div class="dt-hd"><b>${r.symbol||"—"}</b> &nbsp;${r.name||""}&nbsp;&middot;&nbsp;${r.signal||"—"}&nbsp;&middot;&nbsp;Score ${f(score,0)}&nbsp;&middot;&nbsp;${r.error?'<span style="color:var(--red)">data error</span>':"ok"}</div>
-    <div class="dt-tabs"><span class="dt-tab">4時間足</span><span class="dt-tab" style="border-color:var(--accent);color:var(--accent)">日足</span><span class="dt-tab">週足</span></div>
+    <div class="dt-tabs">${tab("4h","4時間足",false)}${tab("1d","日足",true)}${tab("1w","週足",false)}</div>
     <div class="dt-grid">
       <span><b>RSI(14)</b> ${f(r.rsi,1)}</span>
       <span><b>MACD</b> ${r.macd_direction||"—"}</span>
@@ -702,10 +702,28 @@ function detailHTML(r){
       <span><b>Chg%</b> ${f(r.change_pct,2)}</span>
     </div>
     ${cci}
-    ${detail}
+    <div class="dt-tfwrap">${tfChartHTML(r,"1d",f)}</div>
     ${edgeHTML(r.edge_context)}
     <div class="dt-disc">Charts, indicators, Elliott candidates, and edge context are provided for market context and portfolio demonstration only. They are not investment advice or trading signals.</div>
   </div>`;
+}
+// Render the chart block for a given timeframe (4h / 1d / 1w); graceful fallback.
+function tfChartHTML(r, tf, f){
+  const label = {"4h":"4時間足 4h","1d":"日足 1d","1w":"週足 1w"}[tf]||tf;
+  const c = r.charts && r.charts[tf];
+  if(c && c.available) return chart1dHTML(c, f, label);
+  const note = (c && c.note) ? c.note : "Chart data is not available for this timeframe.";
+  return `<div class="dt-note">${label} — ${esc(note)}</div>`;
+}
+// Swap the chart area to the selected timeframe (re-renders from ROWMAP).
+function showTF(sym, tf, btn){
+  const r = ROWMAP[sym]; if(!r) return;
+  const f=(v,d=2)=> (v==null||v==="")?"—":(typeof v==="number"?v.toFixed(d):v);
+  const wrap = btn.closest(".dt-wrap");
+  const area = wrap && wrap.querySelector(".dt-tfwrap");
+  if(area) area.innerHTML = tfChartHTML(r, tf, f);
+  wrap.querySelectorAll(".dt-tab").forEach(t=>t.classList.remove("dt-tab-on"));
+  btn.classList.add("dt-tab-on");
 }
 function esc(s){ return String(s==null?"":s).replace(/[&<>]/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[m])); }
 // Render edge_context (v2.4) when present and meaningful. Analytical summary only.
@@ -736,7 +754,8 @@ function edgeHTML(e){
   </div>`;
 }
 // Render computed 1d chart (Close + Bollinger overlay), CCI panel, readouts.
-function chart1dHTML(c, f){
+function chart1dHTML(c, f, tfLabel){
+  tfLabel = tfLabel || "日足 1d";
   const ind=c.indicators||{};
   const bb=ind.bollinger_bands||{};
   const cci=ind.cci||{};
@@ -757,7 +776,7 @@ function chart1dHTML(c, f){
   const chartBlock = priceSVG
     ? `<div class="dt-chart">${priceSVG}${legend}${bbCap}${indNote}${cciSVG}</div>`
     : `<div class="dt-cap">Chart data is not available for this symbol/timeframe.</div>`;
-  return `<div class="dt-note" style="color:var(--text)"><b style="color:var(--accent)">日足 1d — chart</b></div>
+  return `<div class="dt-note" style="color:var(--text)"><b style="color:var(--accent)">${tfLabel} — chart</b></div>
     ${chartBlock}
     <div class="dt-bb">
       <div><b>BB 48 / 2&sigma;</b> ${band(bb["48"]&&bb["48"].std_2)}</div>

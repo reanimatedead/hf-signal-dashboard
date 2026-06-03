@@ -1077,6 +1077,113 @@ def build_usdjpy_edge_context(usdjpy_row, fx, rates, vol, yield_curve):
         "note": _EDGE_NOTE,
     }
 
+# ─── MULTI-TIMEFRAME CHARTS (v3.2) ───────────────────────
+# 4h (1h→4h resample) and 1w (1d→1w resample) charts for a small allowlist,
+# reusing build_1d_chart_from_ohlc. yfinance only; failures fall back to the
+# existing available:false placeholder. Context only, not trading signals.
+
+# display symbol -> (yfinance source ticker, is_yield)
+MTF_ALLOWLIST = {
+    "USDJPY=X": ("USDJPY=X", False), "EURUSD=X": ("EURUSD=X", False),
+    "XAUUSD": ("GC=F", False), "XAGUSD": ("SI=F", False),
+    "VIX": ("^VIX", False), "BTC-USD": ("BTC-USD", False), "ETH-USD": ("ETH-USD", False),
+    "US10Y": ("^TNX", True), "US2Y": ("2YY=F", True),
+}
+
+
+def fetch_ohlc_history(ticker, interval, period):
+    """Daily/intraday OHLC via yfinance, with single-ticker MultiIndex flattened."""
+    try:
+        raw = yf.download(ticker, interval=interval, period=period, auto_adjust=True, progress=False)
+        if raw is None or raw.empty:
+            return None
+        if isinstance(raw.columns, pd.MultiIndex):
+            raw.columns = raw.columns.get_level_values(0)
+        return raw
+    except Exception:
+        return None
+
+
+def resample_ohlc(df, rule):
+    """Resample OHLC to `rule` (e.g. '4h', '1W'). Returns None on failure."""
+    agg = {"Open": "first", "High": "max", "Low": "min", "Close": "last"}
+    if "Volume" in df.columns:
+        agg["Volume"] = "sum"
+    try:
+        return df.resample(rule).agg(agg).dropna()
+    except Exception:
+        return None
+
+
+def _normalize_yield_df(df):
+    """Scale-normalize a yield OHLC frame to percent (legacy x10 -> /10), 0<y<25."""
+    try:
+        last = float(df["Close"].iloc[-1])
+        scale = 10.0 if last > 25 else 1.0
+        if scale != 1.0:
+            df = df.copy()
+            for c in ("Open", "High", "Low", "Close"):
+                if c in df.columns:
+                    df[c] = df[c] / scale
+        return df[(df["Close"] > 0) & (df["Close"] < 25)]
+    except Exception:
+        return None
+
+
+def build_tf_chart(ticker, interval, period, rule, dp, now, is_yield=False):
+    """Build a charts[tf] block from a resampled OHLC series. None on failure."""
+    try:
+        df = fetch_ohlc_history(ticker, interval, period)
+        if df is None or len(df) < 10:
+            return None
+        df = resample_ohlc(df, rule)
+        if df is not None and is_yield:
+            df = _normalize_yield_df(df)
+        if df is None or len(df) < 10:
+            return None
+        chart = build_1d_chart_from_ohlc(df, dp, now)   # BB48/288 + CCI48/288
+        if chart.get("available") is not True:
+            return None
+        chart["source"] = "yfinance"
+        chart["source_ticker"] = ticker
+        chart["note"] = "Chart and indicators are market context only."
+        return chart
+    except Exception:
+        return None
+
+
+def attach_multitimeframe_charts(row, source_ticker, is_yield, dp, now):
+    """Attach 4h (1h→4h) and 1w (1d→1w) charts for an allowlist row; keep 1d."""
+    c4 = build_tf_chart(source_ticker, "1h", "60d", "4h", dp, now, is_yield)
+    if c4:
+        row["charts"]["4h"] = c4
+    c1w = build_tf_chart(source_ticker, "1d", "5y", "1W", dp, now, is_yield)
+    if c1w:
+        row["charts"]["1w"] = c1w
+    return row
+
+
+def attach_mtf_for_allowlist(market_groups):
+    """For each allowlist symbol with an available 1d chart, add 4h/1w charts."""
+    print("\n[Multi-timeframe] 4h/1w for allowlist symbols…")
+    now = datetime.now(JST).isoformat()
+    for grp in market_groups:
+        for r in grp:
+            spec = MTF_ALLOWLIST.get(r.get("symbol"))
+            if not spec:
+                continue
+            if not ((r.get("charts") or {}).get("1d") or {}).get("available"):
+                continue
+            src, is_yield = spec
+            price = r.get("yield") if is_yield else r.get("price")
+            dp = 3 if is_yield else (5 if (price or 0) < 10 else 3 if (price or 0) < 100 else 2)
+            try:
+                attach_multitimeframe_charts(r, src, is_yield, dp, now)
+                ch = r["charts"]
+                print(f"  {r['symbol']:9s} 4h={ch['4h'].get('available')} 1w={ch['1w'].get('available')}")
+            except Exception as exc:
+                print(f"  {r['symbol']}: mtf skipped ({str(exc)[:50]})")
+
 # ─── SUMMARY ─────────────────────────────────────────────
 
 def build_summary(rows):
@@ -1120,6 +1227,9 @@ def main():
             _usdjpy["edge_context"] = _edge
             print(f"\n[Edge v1] USDJPY=X -> {_edge['overall']} ({_edge['confidence']}), "
                   f"sup={len(_edge['supporting_factors'])} con={len(_edge['conflicting_factors'])}")
+
+    # v3.2: 4h / 1w charts for a small allowlist (reuses existing chart builder)
+    attach_mtf_for_allowlist((fx_results, vol_results, crypto_results, rates_results))
 
     next_run = (now_jst + timedelta(days=1)).replace(
         hour=8, minute=0, second=0, microsecond=0)
