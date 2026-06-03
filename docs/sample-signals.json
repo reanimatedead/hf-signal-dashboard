@@ -232,7 +232,7 @@
               }
             },
             "cci": {
-              "48": { "value": 112.0, "state": "overbought_context", "comment": "Shorter cycle momentum context." },
+              "48": { "value": 112.0, "state": "neutral", "comment": "Shorter cycle momentum context (within ±200)." },
               "288": { "value": 78.0, "state": "trend_strengthening", "comment": "Longer cycle momentum context." }
             }
           },

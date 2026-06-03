@@ -794,7 +794,7 @@ function cciChartSVG(c){
   const l48=cciInd["48"]?_n(cciInd["48"].value):null;
   const l288=cciInd["288"]?_n(cciInd["288"].value):null;
   const ser48 = ohlc.length>=48 ? _rollingCCI(ohlc,48) : null;
-  let vals=[100,-100];
+  let vals=[200,-200];
   if(ser48) ser48.forEach(v=>{ if(v!=null) vals.push(v); });
   if(l48!=null) vals.push(l48);
   if(l288!=null) vals.push(l288);
@@ -806,7 +806,7 @@ function cciChartSVG(c){
   const hl=(yv,css)=>`<line x1="${L}" y1="${yv}" x2="${W-R}" y2="${yv}" style="${css}"/>`;
   let svg=`<svg class="dt-cci-svg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="1d CCI momentum context">`;
   svg+=hl(Y(0).toFixed(1),"stroke:var(--border2);stroke-width:0.6");
-  [100,-100].forEach(g=>{ svg+=hl(Y(g).toFixed(1),"stroke:var(--text-faint);stroke-width:0.5;stroke-dasharray:3 2"); });
+  [200,-200].forEach(g=>{ svg+=hl(Y(g).toFixed(1),"stroke:var(--text-faint);stroke-width:0.5;stroke-dasharray:3 2"); });
   if(l288!=null) svg+=hl(Y(l288).toFixed(1),"stroke:var(--yellow);stroke-width:0.8;opacity:0.75;stroke-dasharray:2 2");
   if(ser48){
     const pts=ser48.map((v,i)=> v==null?null:`${X(i).toFixed(1)},${Y(v).toFixed(1)}`).filter(Boolean).join(" ");
@@ -815,7 +815,7 @@ function cciChartSVG(c){
     const yv=Y(l48).toFixed(1);
     svg+=`<line x1="${(W-R-7).toFixed(1)}" y1="${yv}" x2="${(W-R).toFixed(1)}" y2="${yv}" style="stroke:var(--accent);stroke-width:2"/>`;
   }
-  svg+=`</svg><div class="dt-cap">CCI 48 ${l48==null?"—":l48.toFixed(0)} &middot; CCI 288 ${l288==null?"—":l288.toFixed(0)} &middot; guides &plusmn;100 &middot; scale &plusmn;${cap} &middot; momentum context only, not a trading signal</div>`;
+  svg+=`</svg><div class="dt-cap">CCI 48 ${l48==null?"—":l48.toFixed(0)} &middot; CCI 288 ${l288==null?"—":l288.toFixed(0)} &middot; guides &plusmn;200 &middot; scale &plusmn;${cap} &middot; CCI &plusmn;200 is extended momentum context only, not a trading signal</div>`;
   return svg;
 }
 

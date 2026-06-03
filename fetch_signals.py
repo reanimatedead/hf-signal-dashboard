@@ -237,7 +237,7 @@ def _cci_block(high, low, close, period):
                 "comment": f"{period}-period CCI. Not enough OHLC data for this period."}
     s = calc_cci(high, low, close, period)
     v = float(s.iloc[-1]) if not np.isnan(s.iloc[-1]) else 0.0
-    state = "overbought_context" if v >= 100 else "oversold_context" if v <= -100 else "neutral"
+    state = "overbought_context" if v >= 200 else "oversold_context" if v <= -200 else "neutral"
     cycle = "Shorter" if period == 48 else "Longer"
     return {"value": round(v, 1), "state": state, "comment": f"{cycle} cycle momentum context."}
 

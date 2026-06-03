@@ -188,7 +188,7 @@ Adds an optional per-signal `charts` block for the symbol detail panel across **
 
 - **OHLC** series (or graceful `available:false` fallback)
 - **Bollinger Bands** period 48 and 288, each with **2σ and 3σ** deviation bands (v2.2.1) — volatility context only, not trading signals
-- **CCI** period 48 and 288 — momentum context (`overbought_context` / `oversold_context` are state labels, not buy/sell)
+- **CCI** period 48 and 288 — momentum context with a **±200** reference (`overbought_context` ≥ 200 / `oversold_context` ≤ -200 are state labels, not buy/sell; ±200 is extended momentum context only)
 - **Elliott** candidate per timeframe — heuristic only, `confidence: low`, no price target, no buy/sell
 
 See [DATA_CONTRACT.md](DATA_CONTRACT.md) §4–§5 and the populated USDJPY 1d example in

@@ -303,6 +303,11 @@ CCI `state`: `overbought_context`, `oversold_context`, `neutral`, `trend_strengt
 `trend_weakening`, `divergence_watch`, `placeholder`.
 `overbought` / `oversold` are **state descriptions, not buy/sell instructions**.
 
+**Reference threshold (±200):** across all symbols, `overbought_context` is `CCI ≥ 200` and
+`oversold_context` is `CCI ≤ -200`; otherwise `neutral`. The detail-panel CCI subpanel draws
+±200 reference lines. CCI ±200 is shown as **extended momentum context only** (the ±100 level
+is intentionally not used here, to reduce noise). It is not investment advice or a trading signal.
+
 ### indicators.bollinger_bands (v2.2.1: 2σ / 3σ)
 
 Periods `48` and `288`; each carries both `std_2` and `std_3` deviation bands:
