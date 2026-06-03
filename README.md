@@ -53,13 +53,13 @@ without leaving the portfolio incomplete.
   are present, the Japan curve and US-JP spread compute and the USDJPY edge picks up the spread.
 - **Cross-asset macro layer** (data contract) — rates, volatility (VIX/MOVE), commodities incl.
   Gold/Silver & Copper/Gold ratios, regime labels, and an `edge_context` analytical summary.
-- **Valuation (v4.0–v4.1) — Buffett Indicator** — long-term equity-market valuation context
-  (market cap ÷ GDP × 100) for US & Japan, supplied via a **user-verified**
-  `data/valuation_metrics.csv` (`data_status: manual_csv`; see `docs/sample-valuation-metrics.csv`);
-  without it, rows stay an explicit placeholder (no fabricated market-cap/GDP). When the CSV holds a
-  **multi-date series** (≥ 2 dated points), the detail panel renders a long-term **valuation chart**
-  of the value over time (BB288 / CCI where enough history exists). Shown as a long-term valuation
-  regime label / context only — **not market timing**, not a trading signal.
+- **Valuation (v4.x) — Buffett Indicator** — long-term equity-market valuation context
+  (market cap ÷ GDP × 100). **US** ships a verified series (301 quarters, 1947→present) computed from
+  two official **keyless** FRED downloads (`NCBEILQ027S` Z.1 corporate equities ÷ nominal `GDP`),
+  committed to `data/valuation_metrics.csv` (`data_status: manual_csv`, `source` shows FRED) and
+  rendered as a long-term valuation chart (BB288/CCI computed over the long history). **Japan** stays
+  an explicit placeholder (no current keyless, definition-aligned source — no fabrication). Shown as a
+  long-term valuation regime / context only — **not market timing**, not a trading signal.
 - **Watchlist, search, signal filters, CSV export, dark/light theme** in the UI.
 - **Graceful degradation** — symbols without chart data, errored tickers, and placeholder rows
   all fall back cleanly; the daily pipeline never fails on a single bad ticker.
@@ -79,7 +79,7 @@ Markets/symbols without computed charts (e.g. equities, IMM, Japan rates) show a
 | VIX | CBOE Volatility Index (live) | Close + BB288 + CCI ±200 (live) |
 | IMM | CFTC currency positioning (JPY/EUR/GBP/AUD/CAD/CHF) | **Auto-ingested from the official CFTC COT report** (`auto_cftc`, no API key) → net position / state / crowding; verified manual CSV (`data/imm_positions.csv`) / placeholder fallback |
 | Crypto | BTC, ETH, XRP, BCH (live) | Close + BB288 + CCI ±200 (live) |
-| Valuation | Buffett Indicator — US, Japan (market cap ÷ GDP) | Verified manual CSV (`data/valuation_metrics.csv`) → value + long-term valuation context; a multi-date series (≥2 points) also renders a valuation chart. Else placeholder (no fabrication). |
+| Valuation | Buffett Indicator — US (verified FRED data), Japan (placeholder) | **US**: 301-quarter series from official keyless FRED (`NCBEILQ027S` ÷ `GDP`) in `data/valuation_metrics.csv` → value + long-term valuation chart (BB288/CCI). **Japan**: explicit placeholder (no current keyless definition-aligned source; no fabrication). |
 
 ---
 

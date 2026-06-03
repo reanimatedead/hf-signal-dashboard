@@ -160,16 +160,19 @@ external auto-source, and supply charts for the remaining manual series — **wi
   current yield. Japan curve / US-JP 10Y spread compute automatically and the USDJPY edge picks up the
   spread. Timeout + `try/except` falls back to a verified `data/jp_rates.csv` (`manual_csv`) then
   `placeholder` (no fabrication). `fetch_jp_rate_yield_live()` remains a hook for any future live tick.
-- **Buffett charts (confirmed, v4.1):** multi-date `data/valuation_metrics.csv` → `charts.1d`. No
-  keyless source aligns US/JP market-cap **and** GDP definitions, so Buffett stays manual-CSV (no
-  single-side fabrication).
+- **Buffett charts + verified US data (v4.1 + v4.4):** `data/valuation_metrics.csv` now ships a real
+  **US** series (301 quarters, 1947→present) from two official **keyless** FRED downloads
+  (`fredgraph.csv`): `NCBEILQ027S` (Z.1 nonfinancial corporate equities, $M)→$B ÷ `GDP` (nominal SAAR,
+  $B) × 100, matched by quarter. US → `manual_csv` (verified offline import; `source` shows FRED),
+  value ≈ 232.7%, `charts.1d` with BB288/CCI288 computed (301-pt series). **Japan stays placeholder**
+  (World Bank ratio ends 2020; no current keyless definition-aligned source — no fabrication).
 - **No design change:** `docs/index.html`, CSS, layout, tabs, and the detail panel are unchanged —
-  the new data/charts flow into the existing renderer. `manual_csv` = offline verified import,
+  the new data/charts flow into the existing renderer. `manual_csv` = verified offline import,
   `placeholder` = intentional no-fabrication fallback.
 
-**Deferred:** a definition-aligned **keyless** market-cap + GDP source for the Buffett Indicator
-(FRED needs an API key; no keyless source aligns both definitions/timing) — Buffett stays CSV/
-placeholder rather than show unverified or single-side data. (JGB yields are now auto via MoF, v4.3.)
+**Deferred:** a current, definition-aligned **keyless** source for the **Japan** Buffett Indicator
+(World Bank GFDD ended 2020; JPX market cap + Cabinet-Office nominal GDP are not cleanly keyless-
+alignable). Japan stays placeholder rather than show stale or single-side data. US is shipped (FRED).
 
 ---
 
