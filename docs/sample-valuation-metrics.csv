@@ -1,3 +1,5 @@
 date,region,metric,market_cap,gdp,value,source,note
-2026-06-03,US,buffett_indicator,,,190.5,SAMPLE,"SAMPLE ONLY — illustrative value, NOT verified. Replace with a verified figure and copy to data/valuation_metrics.csv. Do not commit unverified values."
-2026-06-03,Japan,buffett_indicator,750000000000000,600000000000000,,SAMPLE,"SAMPLE ONLY — illustrative market_cap/gdp, NOT verified. When value is blank but market_cap and gdp are present, value is computed as market_cap/gdp*100. Verified figures required."
+2025-09-30,US,buffett_indicator,,,185.2,SAMPLE,"SAMPLE ONLY — illustrative value, NOT verified. Two or more dated rows per region enable the v4.1 valuation chart. Replace with verified figures and copy to data/valuation_metrics.csv."
+2025-12-31,US,buffett_indicator,,,191.4,SAMPLE,"SAMPLE ONLY — illustrative value, NOT verified."
+2026-03-31,US,buffett_indicator,,,188.7,SAMPLE,"SAMPLE ONLY — illustrative value, NOT verified. The latest dated row is the table value; all dated rows form the chart series."
+2026-03-31,Japan,buffett_indicator,750000000000000,600000000000000,,SAMPLE,"SAMPLE ONLY — illustrative market_cap/gdp, NOT verified. When value is blank but market_cap and gdp are present, value is computed as market_cap/gdp*100. Verified figures required."

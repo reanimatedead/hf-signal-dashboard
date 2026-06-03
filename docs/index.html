@@ -695,7 +695,7 @@ function toggleDetail(ev,sym){
 }
 function detailHTML(r){
   const f=(v,d=2)=> (v==null||v==="")?"—":(typeof v==="number"?v.toFixed(d):v);
-  if(r.market==="Valuation"||r.metric==="market_cap_to_gdp") return valuationDetailHTML(r);
+  if(r.market==="Valuation"||r.metric==="market_cap_to_gdp") return valuationDetailHTML(r, f);
   const score=r.composite_score??r.score;
   const cci=(r.cci_daily!==undefined||r.cci_4h!==undefined)
     ? `<div class="dt-tf"><b>CCI(288)</b>&nbsp;&nbsp;Daily ${f(r.cci_daily,0)}&nbsp;&middot;&nbsp;4H ${f(r.cci_4h,0)}</div>` : "";
@@ -719,14 +719,22 @@ function detailHTML(r){
     <div class="dt-disc">Charts, indicators, Elliott candidates, and edge context are provided for market context and portfolio demonstration only. They are not investment advice or trading signals.</div>
   </div>`;
 }
-// v4.0 Buffett Indicator detail panel — long-term valuation context only (no charts).
-function valuationDetailHTML(r){
+// v4.0 Buffett Indicator detail panel + v4.1 optional long-term valuation chart.
+function valuationDetailHTML(r, f){
+  f = f || ((v,d=2)=> (v==null||v==="")?"—":(typeof v==="number"?v.toFixed(d):v));
   const big=v=>v==null?"—":Number(v).toLocaleString();
   const val=(r.value==null)?"—":`${Number(r.value).toFixed(1)}${esc(r.unit||"%")}`;
   const ph=(r.data_status==="placeholder");
   const note=ph
     ? "Verified market cap / GDP data is not configured yet (manual CSV). Showing a placeholder — no fabricated values."
     : "";
+  // v4.1: long-term valuation context chart when a verified multi-date series exists.
+  const c1d=(r.charts&&r.charts["1d"])||null;
+  const chartBlock=(c1d&&c1d.available)
+    ? `<div class="dt-note" style="margin-top:8px;color:var(--text)"><b style="color:var(--accent)">Valuation series — Buffett Indicator (1d)</b></div>
+       <div class="dt-cap">The line is the Buffett Indicator value (market cap &divide; GDP &times; 100) over time — long-term valuation context, not a price and not a timing signal.</div>
+       <div class="dt-tfwrap">${chart1dHTML(c1d, f, "Valuation series (1d)")}</div>`
+    : `<div class="dt-note" style="margin-top:8px">Valuation chart — ${esc((c1d&&c1d.note)||"not available.")}<br>A verified multi-date <code>data/valuation_metrics.csv</code> (two or more dated points) enables a long-term context chart.</div>`;
   return `<div class="dt-wrap">
     <div class="dt-hd"><b>${esc(r.symbol||"—")}</b> &nbsp;${esc(r.name||"")}&nbsp;&middot;&nbsp;${esc(r.region||"")}&nbsp;&middot;&nbsp;${ph?"placeholder":"manual CSV"}</div>
     <div class="dt-note" style="margin-top:8px">The <b>Buffett Indicator</b> = total stock-market capitalization &divide; GDP &times; 100. It is a long-term equity-market <b>valuation context</b> measure — a big-picture gauge of how richly a whole market is valued relative to the size of its economy. It is slow-moving and is not a timing tool.</div>
@@ -739,7 +747,8 @@ function valuationDetailHTML(r){
       <span><b>Source</b> ${esc(r.source||"—")}</span>
     </div>
     ${note?`<div class="dt-note" style="margin-top:8px">${esc(note)}</div>`:""}
-    <div class="dt-disc">Buffett Indicator is shown as long-term equity market valuation context only. It is not a trading signal, a market timing tool, or investment advice. No buy/sell recommendation, and no entry/exit, take-profit, or stop-loss.</div>
+    ${chartBlock}
+    <div class="dt-disc">Buffett Indicator chart is shown as long-term equity market valuation context only. It is not a trading signal, a market timing tool, or investment advice. No buy/sell recommendation, and no entry/exit, take-profit, or stop-loss.</div>
   </div>`;
 }
 // Render the chart block for a given timeframe (4h / 1d / 1w); graceful fallback.

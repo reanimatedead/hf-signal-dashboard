@@ -1071,22 +1071,34 @@ def classify_valuation_context(value):
 
 
 def load_valuation_metrics_from_csv(path="data/valuation_metrics.csv"):
-    """Load user-verified Buffett Indicator inputs from a manual CSV (v4.0).
+    """Load user-verified Buffett Indicator inputs from a manual CSV (v4.0 / v4.1).
 
     CSV columns: date,region,metric,market_cap,gdp,value,source,note
-    Only metric == buffett_indicator and region in {US, Japan} are used; the latest
-    dated row per region wins. Returns {REGION: {value, market_cap, gdp, date, source}}
-    with `value` resolved via compute_buffett_indicator (value, else market_cap/gdp).
-    Rows that resolve to no plausible value are skipped. {} if absent/empty/invalid.
-    Only real, user-verified data belongs in data/valuation_metrics.csv (samples in
-    docs/). Never breaks the run."""
+    Only metric == buffett_indicator and region in {US, Japan} are used. Returns
+    {REGION: {date, value, market_cap, gdp, source, series}} where the latest dated
+    row gives the current value/market_cap/gdp/source, and `series` is the full
+    chronological [{date, value}, ...] (one point per date) used for charting (v4.1).
+    `value` is resolved via compute_buffett_indicator (explicit value, else
+    market_cap/gdp). Rows that resolve to no plausible value are skipped. {} if
+    absent/empty/invalid. Only real, user-verified data belongs in
+    data/valuation_metrics.csv (samples in docs/). Never breaks the run."""
     p = Path(path)
     if not p.exists():
         return {}
     try:
         with open(p, newline="", encoding="utf-8") as f:
             rows = [r for r in csv.DictReader(f)]
-        out = {}
+
+        def _opt_num(r, k):
+            try:
+                x = r.get(k)
+                if x is None or (isinstance(x, str) and not x.strip()):
+                    return None
+                return float(x)
+            except (TypeError, ValueError):
+                return None
+
+        byreg = {}  # region -> {date -> {value, market_cap, gdp, source}}
         for r in rows:
             region = (r.get("region") or "").strip()
             metric = (r.get("metric") or "").strip().lower()
@@ -1096,36 +1108,106 @@ def load_valuation_metrics_from_csv(path="data/valuation_metrics.csv"):
             if value is None:
                 continue
             d = (r.get("date") or "").strip()
-            key = region.upper()
-            if key in out and d <= out[key]["date"]:
+            if not d:
                 continue
-            def _opt_num(k):
-                try:
-                    x = r.get(k)
-                    if x is None or (isinstance(x, str) and not x.strip()):
-                        return None
-                    return float(x)
-                except (TypeError, ValueError):
-                    return None
-            out[key] = {"date": d, "value": value,
-                        "market_cap": _opt_num("market_cap"), "gdp": _opt_num("gdp"),
-                        "source": (r.get("source") or "").strip() or None}
+            byreg.setdefault(region.upper(), {})[d] = {
+                "value": value, "market_cap": _opt_num(r, "market_cap"),
+                "gdp": _opt_num(r, "gdp"), "source": (r.get("source") or "").strip() or None,
+            }
+
+        out = {}
+        for key, datemap in byreg.items():
+            dates = sorted(datemap.keys())
+            lr = datemap[dates[-1]]
+            out[key] = {
+                "date": dates[-1], "value": lr["value"], "market_cap": lr["market_cap"],
+                "gdp": lr["gdp"], "source": lr["source"],
+                "series": [{"date": d, "value": datemap[d]["value"]} for d in dates],
+            }
         return out
     except Exception:
         return {}
 
 
+_VAL_CHART_NOTE = ("Buffett Indicator chart is shown as long-term equity market valuation "
+                   "context only. It is not a trading signal, market timing tool, or "
+                   "investment advice.")
+_VAL_ELLIOTT = {"candidate": "unknown", "confidence": "low",
+                "note": "Not applicable. Buffett Indicator is not a trading wave signal."}
+
+
+def _valuation_1d_unavailable(note):
+    """An explicit unavailable charts['1d'] block for valuation (no fabrication)."""
+    return {"available": False, "source": None, "updated_at": None, "ohlc": [],
+            "indicators": None, "elliott": _VAL_ELLIOTT, "note": note}
+
+
+def _valuation_side_charts():
+    """4h / 1w blocks for valuation — intentionally not applicable / not configured."""
+    return {
+        "4h": {"available": False, "source": None, "updated_at": None, "ohlc": [],
+               "indicators": None, "elliott": _VAL_ELLIOTT,
+               "note": "Intraday valuation chart is not applicable."},
+        "1w": {"available": False, "source": None, "updated_at": None, "ohlc": [],
+               "indicators": None, "elliott": _VAL_ELLIOTT,
+               "note": "Weekly valuation chart is not configured."},
+    }
+
+
+def build_valuation_chart_1d(series, updated_at, dp=1):
+    """charts['1d'] from a verified Buffett Indicator value time series (v4.1).
+
+    Needs >= 2 verified dated points to render a close line. Each point becomes a flat
+    OHLC bar (open=high=low=close=value). BB 48/288 (2σ/3σ) and CCI 48/288 reuse the
+    shared blocks, which report `insufficient_data` until their full period of points
+    exists, so a short series still shows the value line only. Long-term valuation
+    context only — not a timing signal. No fabrication (one point draws no line).
+    Never raises."""
+    try:
+        pts = [(s.get("date"), float(s.get("value")))
+               for s in (series or []) if s.get("value") is not None and s.get("date")]
+        if len(pts) < 2:
+            return _valuation_1d_unavailable(
+                "Verified valuation time series needs at least two dated points; not configured yet.")
+        # Indicators use the full series; OHLC is capped to the last OHLC_MAX_BARS bars
+        # for payload (same convention as build_1d_chart_from_ohlc).
+        close = pd.Series([v for _, v in pts], dtype="float64")
+        ohlc = [{"time": d, "open": round(v, dp), "high": round(v, dp),
+                 "low": round(v, dp), "close": round(v, dp), "volume": None}
+                for d, v in pts[-OHLC_MAX_BARS:]]
+        indicators = {
+            "bollinger_bands": {
+                "48": {"std_2": _bb_block(close, 48, 2, dp), "std_3": _bb_block(close, 48, 3, dp)},
+                "288": {"std_2": _bb_block(close, 288, 2, dp), "std_3": _bb_block(close, 288, 3, dp)},
+            },
+            "cci": {"48": _cci_block(close, close, close, 48),
+                    "288": _cci_block(close, close, close, 288)},
+        }
+        return {"available": True, "source": "data/valuation_metrics.csv", "updated_at": updated_at,
+                "ohlc": ohlc, "indicators": indicators, "elliott": _VAL_ELLIOTT,
+                "note": _VAL_CHART_NOTE}
+    except Exception:
+        return _valuation_1d_unavailable("Valuation chart could not be built from the series.")
+
+
 def build_valuation_market():
-    """Valuation rows (v4.0 Buffett Indicator). Uses a verified manual CSV
-    (data/valuation_metrics.csv) if present, else placeholder. No market-cap / GDP
-    auto-fetch and no fabrication. Long-term valuation context only — not a timing
-    signal or investment advice."""
+    """Valuation rows (v4.0 Buffett Indicator + v4.1 charts). Uses a verified manual
+    CSV (data/valuation_metrics.csv) if present, else placeholder. A multi-date value
+    series yields charts.1d (>= 2 points); otherwise charts.1d is explicitly
+    unavailable. No market-cap / GDP auto-fetch and no fabrication. Long-term
+    valuation context only — not a timing signal or investment advice."""
     data = load_valuation_metrics_from_csv()
-    print(f"\n[Valuation] {'manual CSV (' + str(len(data)) + ' region)' if data else 'placeholder (no verified CSV)'}")
+    now = datetime.now(JST).isoformat()
+    if data:
+        npts = {k: len(v.get("series") or []) for k, v in data.items()}
+        print(f"\n[Valuation] manual CSV ({len(data)} region) series points={npts}")
+    else:
+        print("\n[Valuation] placeholder (no verified CSV)")
     rows = []
     for sym, region, name in VALUATION:
         d = data.get(region.upper())
         if d:
+            charts = {"1d": build_valuation_chart_1d(d.get("series"), now), **_valuation_side_charts()}
             row = {
                 "symbol": sym, "name": name, "market": "Valuation", "region": region,
                 "metric": "market_cap_to_gdp", "value": d["value"], "unit": "%",
@@ -1133,15 +1215,19 @@ def build_valuation_market():
                 "valuation_context": classify_valuation_context(d["value"]),
                 "data_status": "manual_csv",
                 "source": d["source"] or "data/valuation_metrics.csv",
-                "date": d["date"], "note": _VAL_NOTE, "error": None,
+                "date": d["date"], "charts": charts, "note": _VAL_NOTE, "error": None,
             }
         else:
+            charts = {"1d": _valuation_1d_unavailable(
+                          "Verified valuation time series is not configured yet."),
+                      **_valuation_side_charts()}
             row = {
                 "symbol": sym, "name": name, "market": "Valuation", "region": region,
                 "metric": "market_cap_to_gdp", "value": None, "unit": "%",
                 "market_cap": None, "gdp": None,
                 "valuation_context": "placeholder",
                 "data_status": "placeholder", "source": None, "date": None,
+                "charts": charts,
                 "note": "Verified market cap / GDP data is not configured yet. "
                         "Add a verified data/valuation_metrics.csv to enable. " + _VAL_NOTE,
                 "error": None,

@@ -601,17 +601,37 @@ plausible value are skipped. Without the file (or with no usable rows), both row
 These are **long-term valuation-regime labels, not timing signals** — deliberately no
 undervalued/overvalued verdicts and no buy/sell wording.
 
+### charts (v4.1 — optional valuation time series)
+
+When `data/valuation_metrics.csv` carries **two or more dated rows** for a region, that region's
+row gains a `charts` block (same shape as every other chart in this contract):
+
+- `charts["1d"].available = true`, `source = "data/valuation_metrics.csv"`, `updated_at`, an `ohlc`
+  array of flat bars (`open = high = low = close = value`, `volume: null`, capped at 120 bars), an
+  `indicators` block (`bollinger_bands` 48/288 with `std_2`/`std_3`, `cci` 48/288), and an `elliott`
+  block fixed to `candidate: unknown` / `confidence: low` ("not a trading wave signal").
+- Indicators are computed on the **full** verified series; BB288 / CCI288 (and BB48 / CCI48) report
+  `insufficient_data` until their full period of points exists, so a short series still renders the
+  value line only.
+- `charts["4h"]` and `charts["1w"]` are always `available: false` ("Intraday valuation chart is not
+  applicable." / "Weekly valuation chart is not configured.").
+- With fewer than two verified points (or no CSV), `charts["1d"].available = false` with an explicit
+  note — **no fabricated series, no single-point line**.
+
+The chart line is the **Buffett Indicator value over time** (market cap ÷ GDP × 100), reusing the
+shared 1d chart renderer — it is long-term valuation context, not a price and not a timing signal.
+
 ### UI
 
 A **Valuation** tab lists Symbol / Region / Metric / Value / Context / Data / Source. The detail
-panel explains the Buffett Indicator, shows value / market_cap / GDP / context / source, and carries
-the disclaimer. No charts in v4.0 (valuation is slow-moving; `charts` not provided). Automated live
-market-cap / GDP feeds (e.g. World Bank / FRED / official GDP, reliable total-market-cap source) are
-a deferred later phase.
+panel explains the Buffett Indicator, shows value / market_cap / GDP / context / source, renders the
+optional v4.1 valuation chart when available (else an explicit "needs two or more dated points"
+fallback), and carries the disclaimer. Automated live market-cap / GDP feeds (e.g. World Bank /
+FRED / official GDP, reliable total-market-cap source) are a deferred later phase.
 
-> **Disclaimer:** the Buffett Indicator is shown as long-term equity market valuation context only.
-> It is **not** a trading signal, a market timing tool, or investment advice. No buy/sell
-> recommendation, and no entry/exit, take-profit, or stop-loss.
+> **Disclaimer:** the Buffett Indicator (and its chart) is shown as long-term equity market
+> valuation context only. It is **not** a trading signal, a market timing tool, or investment
+> advice. No buy/sell recommendation, and no entry/exit, take-profit, or stop-loss.
 
 ---
 
@@ -656,3 +676,4 @@ financial advice, price targets, trade execution, or buy/sell recommendations.
 | 3.4 | 2026-06-03 | IMM positioning via verified manual CSV (`data/imm_positions.csv`): JPY/EUR/GBP/AUD/CAD/CHF gain net_position / weekly_change / long & short contracts / positioning_state / crowding_risk / `data_status: manual_csv`; else `placeholder` (no fabrication). USDJPY edge gains a JPY-IMM positioning-context factor when present. long/short are CFTC categories only, not trade instructions. CFTC auto-download deferred. |
 | 3.5 | 2026-06-03 | Equity charts: index proxies (^N225/^DJI/^NDX/^GSPC, scored + charted, pinned atop each equity tab) and a small constituent allowlist (AAPL/MSFT/NVDA/AMZN/GOOGL/META/TSLA/JPM/UNH/7203.T/9984.T/8035.T) gain `charts.1d` (BB288 2σ/3σ + CCI ±200). Equity 4h/1w deferred (payload). All other constituents stay chart-less (fallback). yfinance only; payload kept under ~1.5MB. Context only. |
 | 4.0 | 2026-06-03 | Macro Valuation Extension: add `markets.valuation` + Valuation UI tab with the **Buffett Indicator** (market_cap/GDP×100) for US & Japan via verified manual CSV (`data/valuation_metrics.csv`; see `docs/sample-valuation-metrics.csv`). `value` from explicit value or market_cap/gdp; plausibility 0<v<1000; else `placeholder` (no fabrication). `valuation_context` ∈ historically_extreme/elevated/neutral_to_elevated/moderate/low_valuation/placeholder — long-term valuation context only, not a timing signal. No auto-fetch, no API key. Live market-cap/GDP feed deferred. |
+| 4.1 | 2026-06-03 | Buffett Indicator **charts**: a multi-date `data/valuation_metrics.csv` (≥ 2 dated points per region) yields `charts.1d` (flat OHLC of the value series, BB 48/288 + CCI 48/288 computed on the full series, OHLC capped at 120 bars) rendered via the shared 1d chart in the Valuation detail panel; 4h/1w stay `available:false`. Fewer than two points (or no CSV) → `charts.1d.available:false` with an explicit note (no fabricated/single-point line). Valuation chart line is the Buffett Indicator value over time — long-term context only, not a price or timing signal. |

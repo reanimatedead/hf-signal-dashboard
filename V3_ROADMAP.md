@@ -105,7 +105,7 @@ live feeds, lazy loading) — each would add payload/fragility without proportio
 **Shipped (v4.0):**
 - `markets.valuation` + a **Valuation** UI tab (Symbol / Region / Metric / Value / Context / Data /
   Source) with a dedicated detail panel (explanation + value / market_cap / GDP / context / source
-  + disclaimer). No charts (valuation is slow-moving).
+  + disclaimer). Charts arrive in v4.1 (below).
 - Buffett Indicator = total market capitalization / GDP × 100, for **US** and **Japan**
   (`US_BUFFETT_INDICATOR`, `JP_BUFFETT_INDICATOR`).
 - **Manual CSV** path: a verified `data/valuation_metrics.csv`
@@ -118,13 +118,28 @@ live feeds, lazy loading) — each would add payload/fragility without proportio
   **long-term valuation context, not a timing signal**; no undervalued/overvalued verdicts.
 - No API keys, no auto-fetch, per-region `try/except` via the loader; never breaks the workflow.
 
+### v4.1 — Buffett Indicator charts  ✅ (manual-CSV time series shipped)
+
+**Goal:** when the CSV holds a time series, render the long-term valuation history as a chart.
+
+- **Shipped:** a multi-date `data/valuation_metrics.csv` (**≥ 2 dated points** per region) gives the
+  region a `charts.1d` — flat OHLC of the value series (`open = high = low = close = value`, capped
+  at 120 bars), with BB 48/288 (2σ/3σ) + CCI 48/288 computed on the **full** series (so BB288/CCI288
+  show `insufficient_data` until 288 points exist; a short series renders the value line only). The
+  shared 1d chart renderer draws it in the Valuation detail panel (clearly captioned as the Buffett
+  Indicator value over time — long-term context, not a price or timing signal). 4h/1w stay
+  `available:false`. Fewer than two verified points (or no CSV) → `charts.1d.available:false` with an
+  explicit note — **no fabricated or single-point line**.
+- **Deferred:** same as v4.0 — automated live market-cap / GDP feeds. The chart activates the moment
+  a verified multi-date CSV is committed; until then the placeholder fallback shows.
+
 **Deferred (later phase):**
 - Automated live market-cap / GDP feeds (World Bank / FRED / official GDP; a reliable total
-  market-cap source; Japan via TSE market cap / nominal GDP). v4.0 stays manual-CSV until a verified,
+  market-cap source; Japan via TSE market cap / nominal GDP). v4.x stays manual-CSV until a verified,
   scale-validated live source is confirmed.
 
-**Disclaimer:** the Buffett Indicator is long-term valuation context only. It is not a trading
-signal, a market-timing tool, or investment advice.
+**Disclaimer:** the Buffett Indicator (and its chart) is long-term valuation context only. It is not
+a trading signal, a market-timing tool, or investment advice.
 
 ---
 
