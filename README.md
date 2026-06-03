@@ -215,6 +215,8 @@ Adds four market tabs beyond the equity and FX/Commodities tabs:
   JGB). Live yields are fetched via yfinance where available (US10Y ^TNX, US2Y 2YY=F, normalized to
   percent); Japan rates remain placeholder to avoid unreliable data. A `data_status` column shows
   live vs placeholder. Missing rates stay placeholder rather than show fabricated values.
+  US2Y/US10Y also carry a `charts.1d` (yield line + Bollinger 288 2σ/3σ + CCI ±200) in the detail
+  panel; Japan rates remain chart-less placeholders. Yield charts are macro context only.
 - **VIX** — live (yfinance ^VIX) with Close + BB288 2σ/3σ + CCI ±200.
 - **IMM** — CFTC currency positioning (JPY/EUR/GBP/AUD/CAD/CHF), v1 placeholder table. `long`/`short`
   refer to CFTC positioning categories only, not trade instructions.

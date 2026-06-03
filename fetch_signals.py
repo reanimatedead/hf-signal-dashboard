@@ -768,48 +768,74 @@ def _normalize_yield(v):
     return round(y, 3) if 0 < y < 25 else None
 
 
-def fetch_rate_yield(tickers):
-    """Try candidate tickers; return (yield, change, ticker) or (None, None, None)."""
+def fetch_rate_history(tickers):
+    """Return (normalized daily OHLC df, ticker) or (None, None).
+
+    Yields are normalized to percent (legacy x10 -> /10) and plausibility-gated
+    (0 < y < 25). The whole OHLC frame is scaled so charts/indicators are consistent.
+    """
     for t in tickers:
         try:
-            df = fetch_batch([t], period="3mo").get(t)
-            if df is None or len(df) < 2:
+            df = fetch_batch([t], period="2y").get(t)
+            if df is None or len(df) < 60:
                 continue
-            close = df["Close"].squeeze()
-            last = _normalize_yield(float(close.iloc[-1]))
-            if last is None:
+            df = df.copy()
+            raw_last = float(df["Close"].squeeze().iloc[-1])
+            scale = 10.0 if raw_last > 25 else 1.0           # legacy x10 detection
+            for col in ("Open", "High", "Low", "Close"):
+                if col in df.columns:
+                    df[col] = df[col] / scale
+            df = df[(df["Close"] > 0) & (df["Close"] < 25)]   # plausibility gate
+            if len(df) < 60 or _normalize_yield(float(df["Close"].iloc[-1])) is None:
                 continue
-            prev = _normalize_yield(float(close.iloc[-2]))
-            change = round(last - prev, 3) if prev is not None else None
-            return last, change, t
+            return df, t
         except Exception:
             continue
-    return None, None, None
+    return None, None
 
 
 def build_rates_market():
-    """Rates rows (v1 live where available). yfinance only; failures fall back to
-    placeholder so the run never fails. Context only, not investment advice."""
-    print("\n[Rates] live yield (yfinance; unavailable tenors stay placeholder)")
+    """Rates rows (v1). US2Y/US10Y get live yield + charts.1d (BB288/CCI) from the
+    daily yield series; Japan stays placeholder. yfinance only; failures fall back
+    so the run never fails. Context only, not investment advice."""
+    print("\n[Rates] live yield + charts (yfinance; Japan stays placeholder)")
+    now = datetime.now(JST).isoformat()
     rows = []
     for sym, name, region, tenor, role, tickers in RATE_TICKERS:
-        y, chg, src_t = fetch_rate_yield(tickers) if tickers else (None, None, None)
-        live = y is not None
+        df, src_t = fetch_rate_history(tickers) if tickers else (None, None)
+        live = df is not None and len(df) >= 60
+        if live:
+            close = df["Close"].squeeze()
+            y = round(float(close.iloc[-1]), 3)
+            chg = round(y - float(close.iloc[-2]), 3) if len(close) > 1 else None
+            chart = build_1d_chart_from_ohlc(df, 3, now)      # BB48/288 + CCI48/288
+            chart["source"] = "yfinance"
+            chart["source_ticker"] = src_t
+            chart["note"] = "Yield chart and indicators are market context only."
+            charts = {"4h": build_empty_chart("4h"), "1d": chart, "1w": build_empty_chart("1w")}
+            note = "Yield chart and indicators are market context only, not investment advice."
+        else:
+            y, chg = None, None
+            charts = {"4h": build_empty_chart("4h"), "1d": build_empty_chart("1d"),
+                      "1w": build_empty_chart("1w")}
+            charts["1d"]["note"] = ("Japan rates live chart source is not configured yet."
+                                    if region == "JP" else
+                                    "Rates chart unavailable for this symbol.")
+            note = ("Japan rates live chart source is not configured yet."
+                    if region == "JP" else
+                    "Yield data unavailable. Placeholder row retained for macro context.")
         rows.append({
             "symbol": sym, "name": name, "market": "Rates", "region": region,
             "tenor": tenor, "yield": y, "change": chg, "curve_role": role,
             "risk": "medium" if live else "unknown",
             "data_status": "live" if live else "placeholder",
             "source": "yfinance" if live else None,
-            "source_ticker": src_t,
-            "charts": {"4h": build_empty_chart("4h"), "1d": build_empty_chart("1d"),
-                       "1w": build_empty_chart("1w")},
-            "note": ("Yield data is market context only, not investment advice."
-                     if live else
-                     "Yield data unavailable. Placeholder row retained for macro context."),
+            "source_ticker": src_t if live else None,
+            "charts": charts,
+            "note": note,
             "error": None,
         })
-        print(f"  {sym}: {'live '+str(y)+' ('+str(src_t)+')' if live else 'placeholder'}")
+        print(f"  {sym}: {'live '+str(y)+' ('+str(src_t)+') chart ohlc='+str(len(charts['1d'].get('ohlc') or [])) if live else 'placeholder'}")
     return rows
 
 

@@ -478,7 +478,13 @@ Each row carries a `market` label and (where data exists) the same `charts` bloc
 `US2Y`, `US10Y`, `JP2Y`, `JP10Y` — fields: `symbol`, `name`, `market: "Rates"`, `region`
 (`US`/`JP`), `tenor`, `yield` (number|null, percent), `change` (number|null, daily Δ),
 `curve_role` (`short_end`/`long_end`), `risk`, `data_status` (`live`/`placeholder`),
-`source` (`yfinance`|null), `source_ticker`, `charts` (`available:false` in v1), `note`.
+`source` (`yfinance`|null), `source_ticker`, `charts`, `note`.
+
+**Rates charts (US2Y / US10Y):** the daily yield series (normalized to percent) powers a
+`charts.1d` block identical to FX/VIX/Crypto — Close(=yield) line + Bollinger Bands 288 (2σ/3σ)
++ CCI 48/288 (±200). `charts.1d.source_ticker` records the source. Japan (JP2Y/JP10Y) keeps
+`charts.1d.available:false` (no stable free source). Yield charts/indicators are macro context
+only, not investment advice or trading signals.
 
 **Live yield sourcing (yfinance only, no API key):**
 - `US10Y` → `^TNX` (fallback `10YY=F`); `US2Y` → `2YY=F`.
@@ -564,3 +570,4 @@ financial advice, price targets, trade execution, or buy/sell recommendations.
 | 2.4 | 2026-06-03 | Add per-signal `edge_context` analytical summary (overall / technical / macro / cross_asset / risk_adjusted / confidence / supporting & conflicting factors). Schema + placeholder/sample only; analytical context, never a trading advantage or signal. |
 | 2.5 | 2026-06-03 | Add `markets.rates` / `markets.volatility` / `markets.imm` / `markets.crypto` groups + UI tabs. VIX & Crypto live (yfinance); Rates & IMM placeholder. `meta.yield_curve` skeleton (US/Japan assessed separately). Context only, not trading signals. |
 | 2.5.1 | 2026-06-03 | Rates live yield v1: US10Y (^TNX) / US2Y (2YY=F) fetched via yfinance with ×10 scale normalization + plausibility gate; `data_status`/`source`/`source_ticker` added. Japan stays placeholder (no stable free source). yield_curve thresholds add flat zone (`< 0.25`). |
+| 2.5.2 | 2026-06-03 | Rates `charts.1d` for US2Y/US10Y: daily yield series (normalized) → Close line + Bollinger 288 (2σ/3σ) + CCI 48/288 (±200), reusing the shared chart builder. Japan charts stay `available:false`. Context only. |
