@@ -5,7 +5,7 @@ HF Signal Scanner Pro v2 - Daily Signal Generator
 - FX     : CCI(288) + BB(288, 2σ/3σ) on Daily + 4H, Monte Carlo ≥55% filter
 """
 
-import json, sys, time, warnings, csv
+import json, sys, time, warnings, csv, math
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 
@@ -14,6 +14,19 @@ import pandas as pd
 import yfinance as yf
 
 warnings.filterwarnings("ignore")
+
+
+def _json_safe(obj):
+    """Recursively replace non-finite floats (NaN / Infinity) with None so the output
+    is strict, browser-parseable JSON. Python's json emits NaN/Infinity by default, but
+    JavaScript's JSON.parse rejects them — one NaN would break the whole dashboard."""
+    if isinstance(obj, float):
+        return obj if math.isfinite(obj) else None
+    if isinstance(obj, dict):
+        return {k: _json_safe(v) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [_json_safe(v) for v in obj]
+    return obj
 
 # ─── CONFIG ──────────────────────────────────────────────
 OUTPUT_DIR  = Path(__file__).parent / "docs"
@@ -1839,6 +1852,10 @@ def main():
         },
     }
 
+    # Strict-JSON guard: Python's json writes NaN/Infinity, but the browser's
+    # JSON.parse rejects them — a single NaN (e.g. a ticker that returned no price)
+    # would break the entire dashboard load. Sanitize non-finite floats to null.
+    payload = _json_safe(payload)
     with open(OUTPUT_FILE, "w", encoding="utf-8") as f:
         json.dump(payload, f, ensure_ascii=False, separators=(",", ":"))
 
