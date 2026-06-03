@@ -46,11 +46,11 @@ without leaving the portfolio incomplete.
   - Heuristic **Elliott** candidate (badge/note only, `confidence: low`)
 - **Live yields & yield curve** — US2Y / US10Y fetched and normalized from Yahoo; **US and Japan
   curves are assessed separately** (US recession-inversion logic is never applied to JGB);
-  US-JP 10Y spread as USDJPY context. Japan (JP2Y/JP10Y) has no stable free live source, so it can
-  be supplied via a **user-verified** `data/jp_rates.csv` (`data_status: manual_csv`; see
-  `docs/sample-jp-rates.csv`); without it, Japan stays an explicit placeholder rather than show
-  unverified data. When JP yields are present, the Japan curve and US-JP spread compute and the
-  USDJPY edge context picks up the spread automatically.
+  US-JP 10Y spread as USDJPY context. Japan (JP2Y/JP10Y) is **auto-ingested from the official Japan
+  Ministry of Finance JGB historical CSV** (`data_status: auto_mof`, no API key) with a yield chart;
+  on failure it falls back to a **user-verified** `data/jp_rates.csv` (`manual_csv`; see
+  `docs/sample-jp-rates.csv`) then an explicit placeholder rather than unverified data. When JP yields
+  are present, the Japan curve and US-JP spread compute and the USDJPY edge picks up the spread.
 - **Cross-asset macro layer** (data contract) — rates, volatility (VIX/MOVE), commodities incl.
   Gold/Silver & Copper/Gold ratios, regime labels, and an `edge_context` analytical summary.
 - **Valuation (v4.0–v4.1) — Buffett Indicator** — long-term equity-market valuation context
@@ -75,7 +75,7 @@ Markets/symbols without computed charts (e.g. equities, IMM, Japan rates) show a
 |---|---|---|
 | Nikkei 225 / Dow 30 / Nasdaq 100 / S&P 500 | Major index constituents (380+ symbols) | Signal table; index proxy (^N225/^DJI/^NDX/^GSPC) + selected constituents have 1d charts (BB288 + CCI ±200); others fall back |
 | FX / Commodities | Major & minor pairs, Gold, Silver | Close + BB288 + CCI ±200 (live) |
-| Rates / Bonds | US2Y, US10Y (live) · JP2Y, JP10Y (verified CSV) + yield curve | US2Y/US10Y yield charts (live); JP2Y/JP10Y charts when `data/jp_rates.csv` has a multi-date series |
+| Rates / Bonds | US2Y, US10Y (live) · JP2Y, JP10Y (**auto: MoF official**) + yield curve | US2Y/US10Y yield charts (live); **JP2Y/JP10Y auto-ingested from the official Japan MoF JGB CSV** (`auto_mof`, no API key) with charts; verified `data/jp_rates.csv` / placeholder fallback |
 | VIX | CBOE Volatility Index (live) | Close + BB288 + CCI ±200 (live) |
 | IMM | CFTC currency positioning (JPY/EUR/GBP/AUD/CAD/CHF) | **Auto-ingested from the official CFTC COT report** (`auto_cftc`, no API key) → net position / state / crowding; verified manual CSV (`data/imm_positions.csv`) / placeholder fallback |
 | Crypto | BTC, ETH, XRP, BCH (live) | Close + BB288 + CCI ±200 (live) |

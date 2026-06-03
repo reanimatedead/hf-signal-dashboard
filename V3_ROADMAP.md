@@ -154,10 +154,12 @@ external auto-source, and supply charts for the remaining manual series — **wi
   contract-market codes; `net = noncomm long − short`, `data_status: auto_cftc`. Timeout + `try/except`
   → falls back to verified `manual_csv` → `placeholder` (never breaks the run). Feeds the USDJPY edge
   JPY-IMM context factor. `long`/`short` are CFTC categories only, not trade instructions.
-- **JP rates charts (shipped):** a multi-date `data/jp_rates.csv` (≥ 2 dated points) gives JP2Y/JP10Y
-  a `charts.1d` via the shared chart builder; the Japan curve and US-JP 10Y spread already compute when
-  JP yields exist. No verified keyless **live** JGB source confirmed, so live stays a hook
-  (`fetch_jp_rate_yield_live()`); CSV is the offline-import fallback.
+- **JP rates auto-ingestion (shipped, v4.3):** JP2Y/JP10Y are auto-ingested from the **official Japan
+  Ministry of Finance** JGB historical CSV (`data/jgbcm_all.csv`, daily since 1974, Shift-JIS, **no API
+  key**) → `data_status: auto_mof`, with the daily series driving `charts.1d` and the latest row the
+  current yield. Japan curve / US-JP 10Y spread compute automatically and the USDJPY edge picks up the
+  spread. Timeout + `try/except` falls back to a verified `data/jp_rates.csv` (`manual_csv`) then
+  `placeholder` (no fabrication). `fetch_jp_rate_yield_live()` remains a hook for any future live tick.
 - **Buffett charts (confirmed, v4.1):** multi-date `data/valuation_metrics.csv` → `charts.1d`. No
   keyless source aligns US/JP market-cap **and** GDP definitions, so Buffett stays manual-CSV (no
   single-side fabrication).
@@ -165,8 +167,9 @@ external auto-source, and supply charts for the remaining manual series — **wi
   the new data/charts flow into the existing renderer. `manual_csv` = offline verified import,
   `placeholder` = intentional no-fabrication fallback.
 
-**Deferred:** verified keyless live JGB yields; a definition-aligned keyless market-cap + GDP source
-for Buffett. Until then, those stay CSV/​placeholder rather than show unverified data.
+**Deferred:** a definition-aligned **keyless** market-cap + GDP source for the Buffett Indicator
+(FRED needs an API key; no keyless source aligns both definitions/timing) — Buffett stays CSV/
+placeholder rather than show unverified or single-side data. (JGB yields are now auto via MoF, v4.3.)
 
 ---
 

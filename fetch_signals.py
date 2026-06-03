@@ -829,7 +829,7 @@ def load_jp_rates_from_csv(path="data/jp_rates.csv"):
     """Load user-verified Japan yields from a manual CSV (v3.3 + time series).
 
     Returns {sym: {"value": latest_float, "series": [{date, value}, ...]}} for
-    JP2Y / JP10Y, keeping plausible (0 <= y < 25) numeric points chronologically, or
+    JP2Y / JP10Y, keeping plausible (-2 <= y < 25) numeric points chronologically, or
     {} if the file is absent/empty/invalid. The series feeds an optional charts.1d
     (>= 2 points). Only real, user-verified data should live in data/jp_rates.csv
     (samples go in docs/sample-jp-rates.csv). Never breaks the run.
@@ -852,12 +852,87 @@ def load_jp_rates_from_csv(path="data/jp_rates.csv"):
                     v = float(r.get(k))
                 except (TypeError, ValueError):
                     continue
-                if 0 <= v < 25:
+                if -2 <= v < 25:   # admit real negative JGB yields (2016–2024 era)
                     series.append({"date": (r.get("date") or "").strip(), "value": round(v, 3)})
             if series:
                 out[k] = {"value": series[-1]["value"], "series": series}
         return out
     except Exception:
+        return {}
+
+
+# Official Japan Ministry of Finance JGB historical interest rates (daily, since
+# 1974). Public CSV, Shift-JIS, no API key. Tenors in years (1..40), yields in %.
+MOF_JGB_URL = "https://www.mof.go.jp/jgbs/reference/interest_rate/data/jgbcm_all.csv"
+
+
+def _jp_era_to_iso(s):
+    """Japanese-era date ('R8.5.29' / 'H31.4.1' / 'S49.9.24') -> ISO 'YYYY-MM-DD',
+    or None if unparseable. R=Reiwa(+2018), H=Heisei(+1988), S=Showa(+1925)."""
+    s = (s or "").strip()
+    if len(s) < 2 or s[0] not in "SHR":
+        return None
+    try:
+        parts = s[1:].split(".")
+        yy, mm, dd = int(parts[0]), int(parts[1]), int(parts[2])
+    except (ValueError, IndexError):
+        return None
+    base = {"S": 1925, "H": 1988, "R": 2018}[s[0]]
+    if not (1 <= mm <= 12 and 1 <= dd <= 31):
+        return None
+    return f"{base + yy:04d}-{mm:02d}-{dd:02d}"
+
+
+def _parse_mof_jgb_csv(text, max_points):
+    """Pure parser for the MoF JGB CSV text -> {sym: {value, series}} for JP2Y/JP10Y.
+    Plausibility-gated (-2 <= y < 25, admits real negative JGB yields); series
+    chronological, capped to max_points for
+    charting; latest row provides the current value. {} if the header is missing."""
+    rows = list(csv.reader(text.splitlines()))
+    hdr_idx = next((i for i, r in enumerate(rows) if r and "基準日" in r[0]), None)
+    if hdr_idx is None:
+        return {}
+    hdr = rows[hdr_idx]
+    try:
+        want = {"JP2Y": hdr.index("2年"), "JP10Y": hdr.index("10年")}
+    except ValueError:
+        return {}
+    series = {"JP2Y": [], "JP10Y": []}
+    for r in rows[hdr_idx + 1:]:
+        if not r or not r[0].strip():
+            continue
+        iso = _jp_era_to_iso(r[0])
+        if not iso:
+            continue
+        for sym, idx in want.items():
+            if idx < len(r):
+                try:
+                    v = float(r[idx])
+                except (TypeError, ValueError):
+                    continue
+                if -2 <= v < 25:   # admit real negative JGB yields (2016–2024 era)
+                    series[sym].append({"date": iso, "value": round(v, 3)})
+    out = {}
+    for sym in ("JP2Y", "JP10Y"):
+        s = series[sym]
+        if s:
+            out[sym] = {"value": s[-1]["value"], "series": s[-max_points:]}
+    return out
+
+
+def fetch_mof_jgb_yields(timeout=40, max_points=OHLC_MAX_BARS):
+    """Auto-ingest JGB 2Y/10Y yields from the official Japan MoF historical CSV
+    (no API key, Shift-JIS). Returns {sym: {value, series}} or {} on any failure so
+    the caller falls back to manual CSV / placeholder. No fabrication; never raises.
+    Macro context only, not a trading signal."""
+    try:
+        import requests
+        resp = requests.get(MOF_JGB_URL, timeout=timeout,
+                            headers={"User-Agent": "hf-signal-dashboard (market context)"})
+        resp.raise_for_status()
+        return _parse_mof_jgb_csv(resp.content.decode("shift_jis", errors="replace"), max_points)
+    except Exception as e:
+        print(f"  [MoF JGB] auto-ingest unavailable ({type(e).__name__}); falling back to CSV/placeholder")
         return {}
 
 
@@ -867,11 +942,11 @@ _JP_CHART_NOTE = ("Japan yield chart is macro context only. It is not investment
                   "or a trading signal.")
 
 
-def build_jp_rate_chart_1d(series, updated_at):
-    """charts['1d'] from a verified multi-date JP yield series (data/jp_rates.csv).
+def build_jp_rate_chart_1d(series, updated_at, source="data/jp_rates.csv"):
+    """charts['1d'] from a multi-date JP yield series (MoF auto or verified CSV).
     >= 2 dated points render the yield line (BB/CCI where enough history exists);
     otherwise an explicit unavailable block. Macro context only. No fabrication."""
-    chart = _build_value_series_chart_1d(series, updated_at, 3, "data/jp_rates.csv",
+    chart = _build_value_series_chart_1d(series, updated_at, 3, source,
                                          _JP_CHART_NOTE, dict(_JP_RATE_ELLIOTT))
     if chart:
         return chart
@@ -893,18 +968,27 @@ def fetch_jp_rate_yield_live():
 
 
 def build_rates_market():
-    """Rates rows (v3.3). US2Y/US10Y get live yield + charts.1d (BB288/CCI) from the
-    daily yield series. Japan uses a verified manual CSV (data/jp_rates.csv) if
-    present, else placeholder. yfinance only; failures fall back so the run never
-    fails. Context only, not investment advice."""
-    print("\n[Rates] US live yield + charts; Japan via manual CSV or placeholder")
+    """Rates rows. US2Y/US10Y get live yield + charts.1d (BB288/CCI) from yfinance.
+    Japan JP2Y/JP10Y are auto-ingested from the official MoF JGB historical CSV
+    (data_status: auto_mof, with charts.1d from the yield series); on failure they
+    fall back to a verified manual CSV (data/jp_rates.csv -> manual_csv), then
+    placeholder. No fabrication; failures never break the run. Context only."""
+    print("\n[Rates] US live yield + charts; Japan via MoF auto / manual CSV / placeholder")
     now = datetime.now(JST).isoformat()
-    jp_yields = fetch_jp_rate_yield_live() or load_jp_rates_from_csv()
+    jp_auto = fetch_jp_rate_yield_live() or fetch_mof_jgb_yields()
+    jp_csv = load_jp_rates_from_csv()
+    if jp_auto:
+        print(f"  [JP] auto_mof ({len(jp_auto)} tenor)")
     rows = []
     for sym, name, region, tenor, role, tickers in RATE_TICKERS:
         df, src_t = fetch_rate_history(tickers) if tickers else (None, None)
         live = df is not None and len(df) >= 60
-        csv_y = jp_yields.get(sym) if region == "JP" else None
+        jp_rec, jp_src = None, None
+        if region == "JP":
+            if jp_auto.get(sym):
+                jp_rec, jp_src = jp_auto[sym], "auto_mof"
+            elif jp_csv.get(sym):
+                jp_rec, jp_src = jp_csv[sym], "manual_csv"
         if live:
             close = df["Close"].squeeze()
             y = round(float(close.iloc[-1]), 3)
@@ -916,22 +1000,29 @@ def build_rates_market():
             charts = {"4h": build_empty_chart("4h"), "1d": chart, "1w": build_empty_chart("1w")}
             data_status, source, ticker_out, risk = "live", "yfinance", src_t, "medium"
             note = "Yield chart and indicators are market context only, not investment advice."
-        elif csv_y is not None:
-            y, chg = csv_y["value"], None
-            jp_chart = build_jp_rate_chart_1d(csv_y.get("series"), now)
+        elif jp_rec is not None:
+            ser = jp_rec.get("series") or []
+            y = jp_rec["value"]
+            chg = round(ser[-1]["value"] - ser[-2]["value"], 3) if len(ser) >= 2 else None
+            src_label = ("MoF JGB (mof.go.jp, jgbcm_all.csv)" if jp_src == "auto_mof"
+                         else "data/jp_rates.csv")
+            jp_chart = build_jp_rate_chart_1d(ser, now, source=src_label)
             charts = {"4h": build_empty_chart("4h"), "1d": jp_chart, "1w": build_empty_chart("1w")}
-            data_status, source, ticker_out, risk = "manual_csv", "data/jp_rates.csv", None, "medium"
-            note = "Japan yield data loaded from a user-verified manual CSV. Market context only, not investment advice."
+            data_status, source, ticker_out, risk = jp_src, src_label, None, "medium"
+            note = ("Japan yields auto-ingested from the official MoF JGB historical CSV. "
+                    "Macro context only, not investment advice." if jp_src == "auto_mof"
+                    else "Japan yield data loaded from a user-verified manual CSV. "
+                         "Market context only, not investment advice.")
         else:
             y, chg = None, None
             charts = {"4h": build_empty_chart("4h"), "1d": build_empty_chart("1d"),
                       "1w": build_empty_chart("1w")}
-            charts["1d"]["note"] = ("Japan rates source is not configured yet."
+            charts["1d"]["note"] = ("Japan rates source (MoF auto / verified CSV) is not configured yet."
                                     if region == "JP" else
                                     "Rates chart unavailable for this symbol.")
             data_status, source, ticker_out, risk = "placeholder", None, None, "unknown"
-            note = ("Japan yield data unavailable. Add a verified data/jp_rates.csv to enable. "
-                    "Placeholder retained for macro context."
+            note = ("Japan yield data unavailable (MoF auto-ingest failed and no verified "
+                    "data/jp_rates.csv). Placeholder retained for macro context."
                     if region == "JP" else
                     "Yield data unavailable. Placeholder row retained for macro context.")
         rows.append({
