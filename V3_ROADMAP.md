@@ -60,12 +60,17 @@ Other symbols keep the `unknown_context` placeholder ("No clear edge context" in
 
 ---
 
-## v3.4 — IMM positioning (deferred)
+## v3.4 — IMM positioning  ✅ (manual-CSV path shipped)
 
 **Goal:** move JPY/EUR/GBP/AUD/CAD/CHF IMM rows from placeholder to real data.
 
-- Start with **manual CSV input**, then consider automated CFTC weekly data.
-- `long` / `short` are CFTC positioning categories only — never trade instructions.
+- **Shipped:** a verified `data/imm_positions.csv` (see `docs/sample-imm-positions.csv`) populates
+  net_position / weekly_change / long & short contracts / positioning_state / crowding_risk
+  (`data_status: manual_csv`, latest dated row per currency). Without it, rows stay `placeholder`
+  (no fabrication). When `JPY_IMM` is present, the USDJPY edge cross-asset dimension gains a
+  (non-trade) positioning-context factor. A `Data` column shows live/manual_csv/placeholder.
+- **Deferred:** automated CFTC weekly download (fragile; needs verification). `long` / `short` are
+  CFTC positioning categories only — never trade instructions.
 
 ---
 

@@ -70,7 +70,7 @@ Markets/symbols without computed charts (e.g. equities, IMM, Japan rates) show a
 | FX / Commodities | Major & minor pairs, Gold, Silver | Close + BB288 + CCI ±200 (live) |
 | Rates / Bonds | US2Y, US10Y (live) · JP2Y, JP10Y (placeholder) + yield curve | US2Y/US10Y yield charts (live) |
 | VIX | CBOE Volatility Index (live) | Close + BB288 + CCI ±200 (live) |
-| IMM | CFTC currency positioning (JPY/EUR/GBP/AUD/CAD/CHF) | Placeholder (weekly data; later phase) |
+| IMM | CFTC currency positioning (JPY/EUR/GBP/AUD/CAD/CHF) | Verified manual CSV (`data/imm_positions.csv`) → net position / state / crowding; else placeholder |
 | Crypto | BTC, ETH, XRP, BCH (live) | Close + BB288 + CCI ±200 (live) |
 
 ---

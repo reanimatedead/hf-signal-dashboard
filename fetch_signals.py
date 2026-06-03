@@ -931,18 +931,92 @@ IMM = [("JPY_IMM", "JPY", "JPY IMM Positioning"), ("EUR_IMM", "EUR", "EUR IMM Po
        ("CAD_IMM", "CAD", "CAD IMM Positioning"), ("CHF_IMM", "CHF", "CHF IMM Positioning")]
 
 
-def build_imm_placeholder():
-    """IMM/CFTC positioning rows (v1 placeholder; weekly data, charts later)."""
-    print(f"\n[IMM] {len(IMM)} placeholders (weekly CFTC; auto-fetch is a later phase)")
+_IMM_NOTE = ("IMM positioning is weekly market context only. long/short refer to CFTC "
+             "positioning categories and are not trade instructions.")
+_IMM_CCY = {"JPY", "EUR", "GBP", "AUD", "CAD", "CHF"}
+
+
+def load_imm_positions_from_csv(path="data/imm_positions.csv"):
+    """Load user-verified CFTC/IMM positioning from a manual CSV (v3.4).
+
+    Returns {ccy: {net_position, weekly_change, long_contracts, short_contracts, date}}
+    using the latest dated row per currency, or {} if absent/empty/invalid. Only
+    real, user-verified data belongs in data/imm_positions.csv (samples in docs/).
+    Never breaks the run.
+    """
+    p = Path(path)
+    if not p.exists():
+        return {}
+    try:
+        with open(p, newline="", encoding="utf-8") as f:
+            rows = [r for r in csv.DictReader(f)]
+        out = {}
+        for r in rows:
+            ccy = (r.get("currency") or "").strip().upper()
+            if ccy not in _IMM_CCY:
+                continue
+            try:
+                net = int(round(float(r.get("net_position"))))
+            except (TypeError, ValueError):
+                continue
+            d = (r.get("date") or "").strip()
+            if ccy in out and d <= out[ccy]["date"]:
+                continue
+            def _opt_int(k):
+                try:
+                    return int(round(float(r.get(k))))
+                except (TypeError, ValueError):
+                    return None
+            out[ccy] = {"date": d, "net_position": net,
+                        "weekly_change": _opt_int("weekly_change"),
+                        "long_contracts": _opt_int("long_contracts"),
+                        "short_contracts": _opt_int("short_contracts")}
+        return out
+    except Exception:
+        return {}
+
+
+def classify_imm_positioning(net):
+    """(positioning_state, crowding_risk) from net position. Context, not a signal."""
+    if not isinstance(net, (int, float)):
+        return "invalid_data", "unknown"
+    a = abs(net)
+    crowd = "high" if a >= 100000 else "medium" if a >= 50000 else "low"
+    state = ("net_long_context" if net > 10000 else
+             "net_short_context" if net < -10000 else "neutral_context")
+    return state, crowd
+
+
+def build_imm_market():
+    """IMM rows (v3.4). Uses a verified manual CSV (data/imm_positions.csv) if
+    present, else placeholder. CFTC auto-download is a later phase. Context only."""
+    data = load_imm_positions_from_csv()
+    print(f"\n[IMM] {'manual CSV (' + str(len(data)) + ' ccy)' if data else 'placeholder (no verified CSV)'}")
     rows = []
     for sym, ccy, name in IMM:
-        rows.append({
-            "symbol": sym, "name": name, "market": "IMM", "currency": ccy,
-            "net_position": None, "weekly_change": None, "positioning_state": "placeholder",
-            "crowding_risk": "unknown",
-            "note": "IMM positioning is weekly market context, not a trading signal. long/short refer to CFTC positioning categories only, not trade instructions.",
-            "error": None,
-        })
+        d = data.get(ccy)
+        if d:
+            state, crowd = classify_imm_positioning(d["net_position"])
+            row = {
+                "symbol": sym, "name": name, "market": "IMM", "currency": ccy,
+                "date": d["date"], "net_position": d["net_position"],
+                "weekly_change": d["weekly_change"],
+                "long_contracts": d["long_contracts"], "short_contracts": d["short_contracts"],
+                "positioning_state": state, "crowding_risk": crowd,
+                "data_status": "manual_csv", "source": "data/imm_positions.csv",
+                "note": _IMM_NOTE, "error": None,
+            }
+        else:
+            row = {
+                "symbol": sym, "name": name, "market": "IMM", "currency": ccy,
+                "date": None, "net_position": None, "weekly_change": None,
+                "long_contracts": None, "short_contracts": None,
+                "positioning_state": "placeholder", "crowding_risk": "unknown",
+                "data_status": "placeholder", "source": None,
+                "note": _IMM_NOTE + " Add a verified data/imm_positions.csv to enable.",
+                "error": None,
+            }
+        rows.append(row)
     return rows
 
 # ─── EDGE SCORING v1 (v3.1) ──────────────────────────────
@@ -1006,7 +1080,7 @@ def classify_macro_edge(rates, yield_curve):
     return state, sup, con
 
 
-def classify_cross_asset_edge(usdjpy_row, fx, vol, yield_curve):
+def classify_cross_asset_edge(usdjpy_row, fx, vol, yield_curve, imm=None):
     # sup/con = market context (counted in overall); gaps = data-availability notes
     # (shown for transparency but NOT counted as market conflicts).
     sup, con, gaps = [], [], []
@@ -1024,6 +1098,13 @@ def classify_cross_asset_edge(usdjpy_row, fx, vol, yield_curve):
         gaps.append("US-JP 10Y spread unavailable (JP yields placeholder) — incomplete FX-rates context")
     else:
         sup.append("US-JP 10Y spread available — USDJPY yield-spread context")
+    # v3.4: JPY IMM positioning context (only when verified CSV data is present)
+    jpy_imm = next((r for r in (imm or []) if r.get("symbol") == "JPY_IMM"), {}) or {}
+    if jpy_imm.get("data_status") == "manual_csv" and jpy_imm.get("positioning_state") not in (None, "placeholder", "invalid_data"):
+        sup.append(f"JPY IMM positioning available — {jpy_imm.get('positioning_state')} "
+                   f"(crowding {jpy_imm.get('crowding_risk')}); CFTC category context only")
+    else:
+        gaps.append("JPY IMM positioning unavailable (no verified CSV) — positioning context incomplete")
     gaps.append("DXY not in dataset — USD-strength cross-check unavailable")
     state = "partially_aligned" if (sup and con) else ("favorable_context" if sup else "mixed_macro_context")
     return state, sup, con, gaps
@@ -1043,14 +1124,14 @@ def classify_risk_adjusted_edge(vol, conflict_count):
     return state, sup, con
 
 
-def build_usdjpy_edge_context(usdjpy_row, fx, rates, vol, yield_curve):
+def build_usdjpy_edge_context(usdjpy_row, fx, rates, vol, yield_curve, imm=None):
     """Populated edge_context for USDJPY=X (v3.1). Returns None to keep placeholder."""
     chart = (usdjpy_row.get("charts") or {}).get("1d") or {}
     if chart.get("available") is not True:
         return None
     t_state, t_sup, t_con = classify_technical_edge(chart)
     m_state, m_sup, m_con = classify_macro_edge(rates, yield_curve)
-    c_state, c_sup, c_con, c_gaps = classify_cross_asset_edge(usdjpy_row, fx, vol, yield_curve)
+    c_state, c_sup, c_con, c_gaps = classify_cross_asset_edge(usdjpy_row, fx, vol, yield_curve, imm)
     r_state, r_sup, r_con = classify_risk_adjusted_edge(vol, len(t_con + m_con + c_con))
     # supporting/conflicting drive `overall`; data-availability gaps are shown on the
     # cross_asset dimension only (not counted as market conflicts).
@@ -1215,14 +1296,14 @@ def main():
     # v2.5: macro / crypto categories (yfinance only; failures fall back)
     rates_results = build_rates_market()
     vol_results   = process_volatility()
-    imm_results   = build_imm_placeholder()
+    imm_results   = build_imm_market()
     crypto_results = process_crypto()
     yield_curve   = build_yield_curve_state(rates_results)
 
     # v3.1: populate USDJPY=X edge_context from integrated context (USDJPY only)
     _usdjpy = next((r for r in fx_results if r.get("symbol") == "USDJPY=X"), None)
     if _usdjpy is not None:
-        _edge = build_usdjpy_edge_context(_usdjpy, fx_results, rates_results, vol_results, yield_curve)
+        _edge = build_usdjpy_edge_context(_usdjpy, fx_results, rates_results, vol_results, yield_curve, imm_results)
         if _edge:
             _usdjpy["edge_context"] = _edge
             print(f"\n[Edge v1] USDJPY=X -> {_edge['overall']} ({_edge['confidence']}), "

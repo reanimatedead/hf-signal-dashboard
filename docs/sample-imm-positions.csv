@@ -1,0 +1,7 @@
+date,currency,net_position,weekly_change,long_contracts,short_contracts,source,note
+2026-06-03,JPY,-85000,12000,45000,130000,sample,"SAMPLE ONLY — replace with verified CFTC/IMM data and copy to data/imm_positions.csv. Do not commit unverified values."
+2026-06-03,EUR,42000,-5000,150000,108000,sample,"SAMPLE ONLY — verified CFTC/IMM data required."
+2026-06-03,GBP,-12000,3000,60000,72000,sample,"SAMPLE ONLY"
+2026-06-03,AUD,28000,-2000,90000,62000,sample,"SAMPLE ONLY"
+2026-06-03,CAD,-34000,4000,40000,74000,sample,"SAMPLE ONLY"
+2026-06-03,CHF,-9000,1000,18000,27000,sample,"SAMPLE ONLY"

@@ -531,6 +531,18 @@ Weekly CFTC data; auto-fetch and weekly charts are a later phase.
 > **IMM `long` / `short` refer to CFTC positioning categories only. They are not trade
 > instructions.**
 
+**v3.4 — IMM via verified manual CSV:** a committed `data/imm_positions.csv`
+(`date,currency,net_position,weekly_change,long_contracts,short_contracts,source,note`; see
+`docs/sample-imm-positions.csv`) populates IMM rows: `net_position`, `weekly_change`,
+`long_contracts`, `short_contracts`, `positioning_state`, `crowding_risk`, `data_status:
+manual_csv` (latest dated row per currency, currencies limited to JPY/EUR/GBP/AUD/CAD/CHF).
+Without the file, rows stay `placeholder` (no fabrication). `positioning_state` ∈
+`net_long_context` (net > 10000) / `net_short_context` (net < -10000) / `neutral_context` /
+`placeholder` / `invalid_data`; `crowding_risk` = high (|net| ≥ 100000) / medium (≥ 50000) / low.
+When `JPY_IMM` is `manual_csv`, the USDJPY `edge_context` cross-asset dimension gains a (non-trade)
+positioning-context factor. CFTC auto-download is a later phase. Positioning is market context
+only, not investment advice or a trading signal.
+
 ### markets.crypto (v1: live)
 
 `BTC-USD`, `ETH-USD`, `XRP-USD`, `BCH-USD` (yfinance) — `price`, `change_pct`, `risk`,
@@ -583,3 +595,4 @@ financial advice, price targets, trade execution, or buy/sell recommendations.
 | 3.1 | 2026-06-03 | Edge Scoring v1: populate `USDJPY=X` `edge_context` (1d) from BB288/CCI + US rates/yield_curve + VIX + Gold. overall ∈ moderate/limited/neutral/conflicting/insufficient (no strong); confidence low/medium; data gaps shown but not counted as conflicts. Analytical context only. See V3_ROADMAP.md. |
 | 3.3 | 2026-06-03 | Japan rates via verified manual CSV (`data/jp_rates.csv`): JP2Y/JP10Y become `data_status: manual_csv` when present, else `placeholder` (no fabrication). Japan curve (`jp_10y_2y_spread`) and `us_jp_10y_spread` compute when JP yields exist; USDJPY `edge_context` cross-asset then gains the US-JP spread factor automatically. Japan assessed separately from US. |
 | 3.2 | 2026-06-03 | Multi-timeframe charts for an allowlist (USDJPY, EURUSD, XAUUSD, XAGUSD, VIX, BTC, ETH, US2Y, US10Y): `charts.4h` (1h→4h resample) and `charts.1w` (1d→1w resample) reuse the 1d chart builder (BB288 2σ/3σ + CCI ±200). OHLC capped at 120 bars; insufficient periods → `insufficient_data` (close line still shows). Other symbols/timeframes stay `available:false`. UI timeframe tabs switch between 4h/1d/1w. Context only. |
+| 3.4 | 2026-06-03 | IMM positioning via verified manual CSV (`data/imm_positions.csv`): JPY/EUR/GBP/AUD/CAD/CHF gain net_position / weekly_change / long & short contracts / positioning_state / crowding_risk / `data_status: manual_csv`; else `placeholder` (no fabrication). USDJPY edge gains a JPY-IMM positioning-context factor when present. long/short are CFTC categories only, not trade instructions. CFTC auto-download deferred. |
