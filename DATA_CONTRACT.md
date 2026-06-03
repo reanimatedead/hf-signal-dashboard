@@ -457,10 +457,14 @@ the existing technical / macro / cross-asset / risk context into one review summ
 
 ### Determination
 
-This release ships **schema + placeholder/sample only** — no real scoring from indicators.
-The export engine and `fetch_signals.py` emit an `overall: "unknown"` placeholder; the populated
-USDJPY example in `docs/sample-signals.json` demonstrates the shape. Real scoring (mapping
-indicator states into edge states) is a later phase and must remain context-only.
+Most symbols emit an `overall: "unknown"` placeholder. **Edge Scoring v1 (v3.1)** populates
+`USDJPY=X` only (1d, when `charts.1d.available`) by integrating its BB288/CCI, US2Y/US10Y +
+`meta.yield_curve`, VIX, and Gold into the four dimensions. v3.1 uses only
+`moderate_contextual_edge` / `limited_contextual_edge` / `neutral_context` /
+`conflicting_context` / `insufficient_data` for `overall` (never `strong_contextual_edge`) and
+`confidence` `low`/`medium` only. Data-availability gaps (e.g. US-JP spread / DXY unavailable)
+are shown on the `cross_asset` dimension but are **not** counted as market conflicts. See the
+[V3_ROADMAP.md](V3_ROADMAP.md). Scoring is **analytical context**, never a trade view.
 
 **Mandatory disclaimer (verbatim):**
 "Edge context is an analytical summary for market review only. It is not investment advice, a
@@ -571,3 +575,4 @@ financial advice, price targets, trade execution, or buy/sell recommendations.
 | 2.5 | 2026-06-03 | Add `markets.rates` / `markets.volatility` / `markets.imm` / `markets.crypto` groups + UI tabs. VIX & Crypto live (yfinance); Rates & IMM placeholder. `meta.yield_curve` skeleton (US/Japan assessed separately). Context only, not trading signals. |
 | 2.5.1 | 2026-06-03 | Rates live yield v1: US10Y (^TNX) / US2Y (2YY=F) fetched via yfinance with ×10 scale normalization + plausibility gate; `data_status`/`source`/`source_ticker` added. Japan stays placeholder (no stable free source). yield_curve thresholds add flat zone (`< 0.25`). |
 | 2.5.2 | 2026-06-03 | Rates `charts.1d` for US2Y/US10Y: daily yield series (normalized) → Close line + Bollinger 288 (2σ/3σ) + CCI 48/288 (±200), reusing the shared chart builder. Japan charts stay `available:false`. Context only. |
+| 3.1 | 2026-06-03 | Edge Scoring v1: populate `USDJPY=X` `edge_context` (1d) from BB288/CCI + US rates/yield_curve + VIX + Gold. overall ∈ moderate/limited/neutral/conflicting/insufficient (no strong); confidence low/medium; data gaps shown but not counted as conflicts. Analytical context only. See V3_ROADMAP.md. |

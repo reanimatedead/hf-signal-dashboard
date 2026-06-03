@@ -895,6 +895,138 @@ def build_imm_placeholder():
         })
     return rows
 
+# ─── EDGE SCORING v1 (v3.1) ──────────────────────────────
+# USDJPY-only analytical edge context: integrate technical / macro / cross-asset
+# / risk context into one summary. "Edge" = clarity of the analytical picture,
+# NOT a trading advantage. No buy/sell, entry/exit, target, TP/SL, or automation.
+
+_EDGE_NOTE = ("Edge context is an analytical summary for market review only. "
+              "It is not investment advice or a trading signal.")
+
+
+def classify_technical_edge(chart1d):
+    sup, con = [], []
+    ind = (chart1d or {}).get("indicators") or {}
+    bb = (ind.get("bollinger_bands") or {}).get("288") or {}
+    cci = ind.get("cci") or {}
+    c48, c288 = (cci.get("48") or {}), (cci.get("288") or {})
+    ohlc = (chart1d or {}).get("ohlc") or []
+    if not ohlc or c48.get("value") is None or c288.get("value") is None:
+        return "insufficient_data", sup, con
+    dir_of = {"overbought_context": 1, "oversold_context": -1}.get
+    d48, d288 = dir_of(c48.get("state")), dir_of(c288.get("state"))
+    if c48.get("state") == "neutral" and c288.get("state") == "neutral":
+        state = "neutral_context"; sup.append("CCI 48/288 both neutral — no extreme momentum")
+    elif d48 is not None and d48 == d288:
+        state = "favorable_context"; sup.append("CCI 48/288 aligned — clear momentum-context read")
+    elif d48 is not None and d288 is not None and d48 != d288:
+        state = "neutral_context"; con.append("CCI 48/288 divergent — mixed momentum context")
+    else:
+        state = "neutral_context"
+    last = ohlc[-1].get("close")
+    s2, s3 = (bb.get("std_2") or {}), (bb.get("std_3") or {})
+    up2, lo2, up3, lo3 = s2.get("upper"), s2.get("lower"), s3.get("upper"), s3.get("lower")
+    if isinstance(last, (int, float)):
+        if isinstance(up3, (int, float)) and last >= up3:
+            con.append("Close above BB288 3σ — extreme stretch (caution)")
+        elif isinstance(lo3, (int, float)) and last <= lo3:
+            con.append("Close below BB288 3σ — extreme stretch (caution)")
+        elif isinstance(up2, (int, float)) and isinstance(lo2, (int, float)) and lo2 <= last <= up2:
+            sup.append("Close within BB288 2σ band — contained volatility context")
+    return state, sup, con
+
+
+def classify_macro_edge(rates, yield_curve):
+    sup, con = [], []
+    by = {r["symbol"]: r for r in (rates or [])}
+    us2, us10 = by.get("US2Y", {}).get("yield"), by.get("US10Y", {}).get("yield")
+    if not isinstance(us2, (int, float)) or not isinstance(us10, (int, float)):
+        return "insufficient_data", sup, con
+    st = ((yield_curve or {}).get("us_10y_2y_spread") or {}).get("state")
+    if st == "inverted":
+        con.append("US 10Y-2Y inverted — recession / policy-stress context"); state = "mixed_macro_context"
+    elif st == "normal_or_steepening":
+        sup.append("US 10Y-2Y normal/steepening — non-recessionary curve context"); state = "favorable_context"
+    elif st == "flat_or_watch":
+        con.append("US 10Y-2Y flat — late-cycle watch"); state = "mixed_macro_context"
+    else:
+        state = "neutral_context"
+    if us10 >= 4.0:
+        sup.append("US10Y elevated (>=4%) — yield context supportive for USD")
+    return state, sup, con
+
+
+def classify_cross_asset_edge(usdjpy_row, fx, vol, yield_curve):
+    # sup/con = market context (counted in overall); gaps = data-availability notes
+    # (shown for transparency but NOT counted as market conflicts).
+    sup, con, gaps = [], [], []
+    vix = (vol[0] if vol else {}) or {}
+    if vix.get("risk") in ("high", "medium") and vix.get("price") is not None:
+        con.append("VIX elevated — risk-off pressure (yen safe-haven context)")
+    elif vix.get("risk") == "low":
+        sup.append("Volatility contained (VIX low) — calm risk environment")
+    gold = next((r for r in (fx or []) if r.get("symbol") in ("XAUUSD", "XAUUSD=X")), {}) or {}
+    gch, uch = gold.get("change_pct"), usdjpy_row.get("change_pct")
+    if isinstance(gch, (int, float)) and isinstance(uch, (int, float)) and gch > 0 and uch > 0:
+        con.append("Gold and USDJPY both firming — cross-asset risk-on/off tension")
+    usjp = (yield_curve or {}).get("us_jp_10y_spread") or {}
+    if usjp.get("value") is None:
+        gaps.append("US-JP 10Y spread unavailable (JP yields placeholder) — incomplete FX-rates context")
+    else:
+        sup.append("US-JP 10Y spread available — USDJPY yield-spread context")
+    gaps.append("DXY not in dataset — USD-strength cross-check unavailable")
+    state = "partially_aligned" if (sup and con) else ("favorable_context" if sup else "mixed_macro_context")
+    return state, sup, con, gaps
+
+
+def classify_risk_adjusted_edge(vol, conflict_count):
+    sup, con = [], []
+    vix = (vol[0] if vol else {}) or {}
+    if vix.get("risk") == "high":
+        con.append("Volatility regime elevated — wider risk band")
+    if conflict_count >= 3:
+        con.append("Multiple cross-context conflicts — mixed risk picture"); state = "mixed_risk_context"
+    elif conflict_count <= 1 and vix.get("risk") == "low":
+        sup.append("Few conflicts and contained volatility — steadier risk context"); state = "favorable_risk_context"
+    else:
+        state = "mixed_risk_context"
+    return state, sup, con
+
+
+def build_usdjpy_edge_context(usdjpy_row, fx, rates, vol, yield_curve):
+    """Populated edge_context for USDJPY=X (v3.1). Returns None to keep placeholder."""
+    chart = (usdjpy_row.get("charts") or {}).get("1d") or {}
+    if chart.get("available") is not True:
+        return None
+    t_state, t_sup, t_con = classify_technical_edge(chart)
+    m_state, m_sup, m_con = classify_macro_edge(rates, yield_curve)
+    c_state, c_sup, c_con, c_gaps = classify_cross_asset_edge(usdjpy_row, fx, vol, yield_curve)
+    r_state, r_sup, r_con = classify_risk_adjusted_edge(vol, len(t_con + m_con + c_con))
+    # supporting/conflicting drive `overall`; data-availability gaps are shown on the
+    # cross_asset dimension only (not counted as market conflicts).
+    supporting = t_sup + m_sup + c_sup + r_sup
+    conflicting = t_con + m_con + c_con + r_con
+    if "insufficient_data" in (t_state, m_state):
+        overall, conf = "insufficient_data", "low"
+    elif len(supporting) >= 3 and len(conflicting) <= 1:
+        overall, conf = "moderate_contextual_edge", "medium"
+    elif len(supporting) >= 1 and len(conflicting) <= 2:
+        overall, conf = "limited_contextual_edge", "medium" if len(supporting) >= 3 else "low"
+    elif supporting and conflicting:
+        overall, conf = "conflicting_context", "low"
+    else:
+        overall, conf = "neutral_context", "low"
+    return {
+        "overall": overall, "confidence": conf,
+        "technical": {"state": t_state, "factors": t_sup + t_con},
+        "macro": {"state": m_state, "factors": m_sup + m_con},
+        "cross_asset": {"state": c_state, "factors": c_sup + c_con + c_gaps},
+        "risk_adjusted": {"state": r_state, "factors": r_sup + r_con},
+        "supporting_factors": supporting,
+        "conflicting_factors": conflicting,
+        "note": _EDGE_NOTE,
+    }
+
 # ─── SUMMARY ─────────────────────────────────────────────
 
 def build_summary(rows):
@@ -929,6 +1061,15 @@ def main():
     imm_results   = build_imm_placeholder()
     crypto_results = process_crypto()
     yield_curve   = build_yield_curve_state(rates_results)
+
+    # v3.1: populate USDJPY=X edge_context from integrated context (USDJPY only)
+    _usdjpy = next((r for r in fx_results if r.get("symbol") == "USDJPY=X"), None)
+    if _usdjpy is not None:
+        _edge = build_usdjpy_edge_context(_usdjpy, fx_results, rates_results, vol_results, yield_curve)
+        if _edge:
+            _usdjpy["edge_context"] = _edge
+            print(f"\n[Edge v1] USDJPY=X -> {_edge['overall']} ({_edge['confidence']}), "
+                  f"sup={len(_edge['supporting_factors'])} con={len(_edge['conflicting_factors'])}")
 
     next_run = (now_jst + timedelta(days=1)).replace(
         hour=8, minute=0, second=0, microsecond=0)
