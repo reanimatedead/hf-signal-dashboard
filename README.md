@@ -171,6 +171,12 @@ include a 1d chart with BB288 (2σ / 3σ) and CCI ±200; non-allowlist symbols f
 
 ![HF Signal Dashboard — S&P 500 equity (AAPL) 1d chart with BB288 and CCI ±200](docs/assets/hf-signal-dashboard-v3-equity.png)
 
+### Valuation / Buffett Indicator view
+
+The Valuation tab adds long-term equity market valuation context through the Buffett Indicator framework. Verified market-cap/GDP data can be supplied through a manual CSV, while missing data remains explicit placeholder rather than fabricated.
+
+![HF Signal Dashboard v4 valuation view](docs/assets/hf-signal-dashboard-v4-valuation.png)
+
 ---
 
 ## Quick start (local)
