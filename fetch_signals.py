@@ -666,6 +666,144 @@ def process_fx_advanced(fx_dict):
     print(f"  ✓ {ok}/{len(fx_dict)} FX pairs processed (CCI288+BB288+MC)")
     return results
 
+# ─── MACRO / CRYPTO CATEGORIES (v2.5) ────────────────────
+# Rates / Volatility / IMM / Crypto. yfinance only, no API key. Failures fall
+# back to placeholder rows so the GitHub Actions run never fails. All outputs
+# are market context only, not trading signals.
+
+def _risk_from_change(chg):
+    a = abs(chg)
+    return "high" if a >= 5 else "medium" if a >= 2 else "low"
+
+
+def _vix_risk(v):
+    return "high" if v >= 30 else "medium" if v >= 20 else "low"
+
+
+def build_chart_row(yf_sym, display_sym, name, market, risk_fn=None, extra=None):
+    """Generic daily row + charts.1d (BB288/CCI, BB48 computed but UI-excluded).
+
+    Falls back to a placeholder row (available:false) on any fetch/calc error.
+    """
+    try:
+        df = fetch_batch([yf_sym], period="2y").get(yf_sym)
+        if df is None or len(df) < 60:
+            raise ValueError("no daily data")
+        close = df["Close"].squeeze()
+        price = float(close.iloc[-1])
+        prev = float(close.iloc[-2]) if len(close) > 1 else price
+        chg = (price - prev) / abs(prev) * 100 if prev else 0.0
+        dp = 5 if price < 10 else (3 if price < 100 else 2)
+        row = {
+            "symbol": display_sym, "name": name, "market": market,
+            "price": round(price, dp), "change_pct": round(chg, 2),
+            "risk": risk_fn(price) if risk_fn else _risk_from_change(chg),
+            "error": None,
+        }
+        if extra:
+            row.update(extra)
+        attach_charts_to_symbol(row, df, dp, datetime.now(JST).isoformat())
+        row["edge_context"] = build_empty_edge_context()
+        return row
+    except Exception as exc:
+        row = {"symbol": display_sym, "name": name, "market": market,
+               "price": None, "change_pct": None, "risk": "unknown",
+               "charts": {"4h": build_empty_chart("4h"), "1d": build_empty_chart("1d"),
+                          "1w": build_empty_chart("1w")},
+               "error": str(exc)[:60]}
+        if extra:
+            row.update(extra)
+        return row
+
+
+def process_volatility():
+    print("\n[Volatility] VIX…")
+    return [build_chart_row(
+        "^VIX", "VIX", "CBOE Volatility Index", "Volatility", risk_fn=_vix_risk,
+        extra={"relation": "Equity risk gauge; rises in risk-off. Cross-check USDJPY / Gold. Context only."},
+    )]
+
+
+CRYPTO = [("BTC-USD", "Bitcoin"), ("ETH-USD", "Ethereum"),
+          ("XRP-USD", "XRP"), ("BCH-USD", "Bitcoin Cash")]
+
+
+def process_crypto():
+    print(f"\n[Crypto] {len(CRYPTO)} assets…")
+    return [build_chart_row(sym, sym, name, "Crypto",
+                            extra={"relation": "High-volatility asset; cross-check risk / liquidity regime. Context only."})
+            for sym, name in CRYPTO]
+
+
+RATES = [
+    ("US2Y", "US 2Y Treasury Yield", "US", "2Y", "short_end"),
+    ("US10Y", "US 10Y Treasury Yield", "US", "10Y", "long_end"),
+    ("JP2Y", "Japan 2Y JGB Yield", "JP", "2Y", "short_end"),
+    ("JP10Y", "Japan 10Y JGB Yield", "JP", "10Y", "long_end"),
+]
+
+
+def build_rates_placeholder():
+    """Rates rows (v1 placeholder). Live yield wiring + curve scoring: later phase."""
+    print("\n[Rates] placeholder (live yield wiring is a later phase)")
+    rows = []
+    for sym, name, region, tenor, role in RATES:
+        rows.append({
+            "symbol": sym, "name": name, "market": "Rates", "region": region,
+            "tenor": tenor, "yield": None, "change": None, "curve_role": role,
+            "risk": "unknown",
+            "charts": {"4h": build_empty_chart("4h"), "1d": build_empty_chart("1d"),
+                       "1w": build_empty_chart("1w")},
+            "note": "Yield data is market context only. Live yield wiring is a later phase.",
+            "error": None,
+        })
+    return rows
+
+
+def build_yield_curve_state(rates_rows):
+    """Yield-curve skeleton. US and Japan are assessed SEPARATELY; US recession
+    inversion logic is not applied to JGB. Context only, not a trade view."""
+    y = {r["symbol"]: r.get("yield") for r in rates_rows}
+
+    def spread(a, b):
+        return round(a - b, 3) if isinstance(a, (int, float)) and isinstance(b, (int, float)) else None
+
+    us = spread(y.get("US10Y"), y.get("US2Y"))
+    jp = spread(y.get("JP10Y"), y.get("JP2Y"))
+    usjp = spread(y.get("US10Y"), y.get("JP10Y"))
+    us_state = "unknown" if us is None else ("inverted" if us < 0 else "normal_or_steepening")
+    jp_state = "unknown" if jp is None else ("inverted_watch" if jp < 0 else "normal_or_watch")
+    return {
+        "us_10y_2y_spread": {"value": us, "state": us_state,
+                             "risk": "unknown" if us is None else ("high" if us < 0 else "low_or_medium"),
+                             "comment": "US curve. Inversion is a recession/policy-stress context, not a trade signal."},
+        "jp_10y_2y_spread": {"value": jp, "state": jp_state,
+                             "risk": "unknown" if jp is None else ("medium_or_high" if jp < 0 else "low_or_medium"),
+                             "comment": "Japan curve assessed separately (BOJ policy / JGB). US inversion logic is not applied."},
+        "us_jp_10y_spread": {"value": usjp, "relation": "USDJPY yield-spread context",
+                             "comment": "Context only, not investment advice."},
+    }
+
+
+IMM = [("JPY_IMM", "JPY", "JPY IMM Positioning"), ("EUR_IMM", "EUR", "EUR IMM Positioning"),
+       ("GBP_IMM", "GBP", "GBP IMM Positioning"), ("AUD_IMM", "AUD", "AUD IMM Positioning"),
+       ("CAD_IMM", "CAD", "CAD IMM Positioning"), ("CHF_IMM", "CHF", "CHF IMM Positioning")]
+
+
+def build_imm_placeholder():
+    """IMM/CFTC positioning rows (v1 placeholder; weekly data, charts later)."""
+    print(f"\n[IMM] {len(IMM)} placeholders (weekly CFTC; auto-fetch is a later phase)")
+    rows = []
+    for sym, ccy, name in IMM:
+        rows.append({
+            "symbol": sym, "name": name, "market": "IMM", "currency": ccy,
+            "net_position": None, "weekly_change": None, "positioning_state": "placeholder",
+            "crowding_risk": "unknown",
+            "note": "IMM positioning is weekly market context, not a trading signal. long/short refer to CFTC positioning categories only, not trade instructions.",
+            "error": None,
+        })
+    return rows
+
 # ─── SUMMARY ─────────────────────────────────────────────
 
 def build_summary(rows):
@@ -694,6 +832,13 @@ def main():
     sp_results  = process_market(sp500_dict, "S&P500")
     fx_results  = process_fx_advanced(FX_PAIRS)
 
+    # v2.5: macro / crypto categories (yfinance only; failures fall back)
+    rates_results = build_rates_placeholder()
+    vol_results   = process_volatility()
+    imm_results   = build_imm_placeholder()
+    crypto_results = process_crypto()
+    yield_curve   = build_yield_curve_state(rates_results)
+
     next_run = (now_jst + timedelta(days=1)).replace(
         hour=8, minute=0, second=0, microsecond=0)
 
@@ -706,8 +851,11 @@ def main():
             "counts": {
                 "nikkei225": len(nk_results), "dow30": len(dj_results),
                 "nasdaq100": len(nq_results), "sp500": len(sp_results),
-                "fx": len(fx_results),
+                "fx": len(fx_results), "rates": len(rates_results),
+                "volatility": len(vol_results), "imm": len(imm_results),
+                "crypto": len(crypto_results),
             },
+            "yield_curve": yield_curve,
         },
         "summary": {
             "nikkei225": build_summary(nk_results),
@@ -720,6 +868,8 @@ def main():
             "nikkei225": nk_results, "dow30": dj_results,
             "nasdaq100": nq_results, "sp500": sp_results,
             "fx":        fx_results,
+            "rates":      rates_results, "volatility": vol_results,
+            "imm":        imm_results,   "crypto":     crypto_results,
         },
     }
 

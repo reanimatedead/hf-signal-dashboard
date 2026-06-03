@@ -468,6 +468,56 @@ trading signal, or an instruction to enter or exit positions."
 
 ---
 
+## 8. v2.5 — Rates / Volatility / IMM / Crypto market groups
+
+`data.json` adds four market groups under `markets`, each surfaced as a UI tab.
+Each row carries a `market` label and (where data exists) the same `charts` block as FX.
+
+### markets.rates (v1: placeholder)
+
+`US2Y`, `US10Y`, `JP2Y`, `JP10Y` — fields: `symbol`, `name`, `market: "Rates"`, `region`
+(`US`/`JP`), `tenor`, `yield` (number|null), `change` (number|null), `curve_role`
+(`short_end`/`long_end`), `risk`, `charts` (placeholder `available:false` in v1), `note`.
+Live yield wiring (ticker/scale validation) and charts are a later phase.
+
+**Yield curve (`meta.yield_curve`)** — US and Japan are assessed **separately**:
+
+| Key | Logic |
+|---|---|
+| `us_10y_2y_spread` | `US10Y - US2Y`; `< 0` → `inverted` (recession/policy-stress context) else `normal_or_steepening`. `unknown` when a yield is null. |
+| `jp_10y_2y_spread` | `JP10Y - JP2Y`; assessed on its own (BOJ policy / JGB) — **US inversion logic is not applied to JGB**. |
+| `us_jp_10y_spread` | `US10Y - JP10Y` — USDJPY yield-spread context. |
+
+US recession-inversion logic is **never** applied to Japanese bonds. Context only, not a trade view.
+
+### markets.volatility (v1: live)
+
+`VIX` (^VIX via yfinance) — `price`, `change_pct`, `risk` (`low`<20 / `medium`20–30 / `high`≥30),
+`charts.1d` (Close + BB288 2σ/3σ + CCI ±200), `relation` (equity gauge; cross-check USDJPY/Gold).
+
+### markets.imm (v1: placeholder)
+
+`JPY_IMM`, `EUR_IMM`, `GBP_IMM`, `AUD_IMM`, `CAD_IMM`, `CHF_IMM` — `currency`, `net_position`
+(null), `weekly_change` (null), `positioning_state` (`placeholder`), `crowding_risk`, `note`.
+Weekly CFTC data; auto-fetch and weekly charts are a later phase.
+
+> **IMM `long` / `short` refer to CFTC positioning categories only. They are not trade
+> instructions.**
+
+### markets.crypto (v1: live)
+
+`BTC-USD`, `ETH-USD`, `XRP-USD`, `BCH-USD` (yfinance) — `price`, `change_pct`, `risk`,
+`charts.1d` (Close + BB288 2σ/3σ + CCI ±200), `relation` (risk / liquidity regime context).
+
+All four groups use yfinance only (no API key); fetch failures fall back to placeholder rows so
+the pipeline never fails. Charts render BB288 only (BB48 excluded) and CCI ±200, like FX.
+
+**Disclaimer:** Rates, yield curves, VIX, IMM positioning, crypto prices, charts, and indicators
+are provided for market context and portfolio demonstration only. They are not investment advice,
+financial advice, or trading signals.
+
+---
+
 ## Forbidden fields
 
 The following must never appear in signals.json:
@@ -500,3 +550,4 @@ financial advice, price targets, trade execution, or buy/sell recommendations.
 | 2.2.1 | 2026-06-03 | Bollinger Bands gain explicit `std_2` and `std_3` deviation bands per period (48/288), with 2σ/3σ touch states. |
 | 2.3 | 2026-06-03 | `fetch_signals.py` supplies computed `charts.1d` (Bollinger 48/288 2σ/3σ, CCI 48/288) into `docs/data.json` for **all FX / Commodities pairs** (initially a 3-symbol allowlist; expanded to every FX row so the FX tab renders charts consistently). Equities fall back. 4h/1w placeholder. No new external API. |
 | 2.4 | 2026-06-03 | Add per-signal `edge_context` analytical summary (overall / technical / macro / cross_asset / risk_adjusted / confidence / supporting & conflicting factors). Schema + placeholder/sample only; analytical context, never a trading advantage or signal. |
+| 2.5 | 2026-06-03 | Add `markets.rates` / `markets.volatility` / `markets.imm` / `markets.crypto` groups + UI tabs. VIX & Crypto live (yfinance); Rates & IMM placeholder. `meta.yield_curve` skeleton (US/Japan assessed separately). Context only, not trading signals. |

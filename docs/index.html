@@ -98,7 +98,7 @@ body:not(.light)::before{
    TABS
 ══════════════════════════════════════════════════ */
 #tabs{background:var(--bg2);border-bottom:1px solid var(--border);
-      padding:0 16px;display:flex}
+      padding:0 16px;display:flex;overflow-x:auto}
 .tab{font-family:var(--cond);font-weight:700;font-size:13px;
      letter-spacing:0.06em;text-transform:uppercase;
      color:var(--text-dim);padding:11px 18px;
@@ -339,6 +339,10 @@ body.light .cname{color:var(--text-dim)}
     <button class="tab" onclick="sw('nasdaq100',this)">Nasdaq 100</button>
     <button class="tab" onclick="sw('sp500',this)">S&amp;P 500</button>
     <button class="tab" onclick="sw('fx',this)">FX / Commodities</button>
+    <button class="tab" onclick="sw('rates',this)">Rates / Bonds</button>
+    <button class="tab" onclick="sw('volatility',this)">VIX</button>
+    <button class="tab" onclick="sw('imm',this)">IMM</button>
+    <button class="tab" onclick="sw('crypto',this)">Crypto</button>
   </div>
   <div id="toolbar">
     <div id="srch-wrap">
@@ -413,7 +417,40 @@ const C_FX=[
   {k:"ema_signal",    l:"EMA",      a:"center",w:68},
   {k:"atr",           l:"ATR",      a:"right", w:65},
 ];
-const cols=()=>tab==="fx"?C_FX:C_STOCK;
+const C_RATES=[
+  {k:"symbol",     l:"Symbol",   a:"left",  w:120},
+  {k:"name",       l:"Name",     a:"left",  w:210},
+  {k:"region",     l:"Region",   a:"center",w:70},
+  {k:"tenor",      l:"Tenor",    a:"center",w:70},
+  {k:"yield",      l:"Yield",    a:"right", w:90},
+  {k:"change",     l:"Δ",        a:"right", w:70},
+  {k:"curve_role", l:"Curve",    a:"center",w:110},
+  {k:"risk",       l:"Risk",     a:"center",w:90},
+];
+const C_VOL=[
+  {k:"symbol",     l:"Symbol",   a:"left",  w:100},
+  {k:"name",       l:"Name",     a:"left",  w:220},
+  {k:"price",      l:"Value",    a:"right", w:100},
+  {k:"change_pct", l:"Chg%",     a:"right", w:80},
+  {k:"risk",       l:"Risk",     a:"center",w:100},
+];
+const C_IMM=[
+  {k:"symbol",            l:"Symbol",   a:"left",  w:120},
+  {k:"name",              l:"Name",     a:"left",  w:200},
+  {k:"currency",          l:"Ccy",      a:"center",w:70},
+  {k:"net_position",      l:"Net Pos",  a:"right", w:100},
+  {k:"weekly_change",     l:"Δ wk",     a:"right", w:90},
+  {k:"positioning_state", l:"State",    a:"center",w:120},
+  {k:"crowding_risk",     l:"Crowding", a:"center",w:110},
+];
+const C_CRYPTO=[
+  {k:"symbol",     l:"Symbol",   a:"left",  w:120},
+  {k:"name",       l:"Name",     a:"left",  w:160},
+  {k:"price",      l:"Price",    a:"right", w:120},
+  {k:"change_pct", l:"Chg%",     a:"right", w:80},
+  {k:"risk",       l:"Risk",     a:"center",w:100},
+];
+const cols=()=>({fx:C_FX,rates:C_RATES,volatility:C_VOL,imm:C_IMM,crypto:C_CRYPTO})[tab]||C_STOCK;
 
 // ══ Boot ═══════════════════════════════════════════
 window.addEventListener("DOMContentLoaded",()=>{
@@ -556,7 +593,8 @@ function sw(key,btn){
 // ══ Filters ════════════════════════════════════════
 function renderFBtns(){
   const fg=document.getElementById("fgrp");
-  const sigs=tab==="fx"?S_FX:S_STK;
+  const EQ=["nikkei225","dow30","nasdaq100","sp500"];
+  const sigs=tab==="fx"?S_FX:(EQ.includes(tab)?S_STK:[]);
   fg.innerHTML=`<button class="fbtn${fsig===null?" active":""}" onclick="setF(null,this)">ALL</button>`;
   sigs.forEach(s=>{
     const sh=s.replace("STRONG ","S.").replace(" ","\u00a0");

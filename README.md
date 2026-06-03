@@ -206,6 +206,21 @@ no charts and fall back gracefully. Computed values appear after the next GitHub
 Charts and indicators are provided for market context and portfolio demonstration only. They
 are not trading signals or investment advice.
 
+### v2.5 — Rates / VIX / IMM / Crypto tabs
+
+Adds four market tabs beyond the equity and FX/Commodities tabs:
+
+- **Rates / Bonds** — US2Y/US10Y/JP2Y/JP10Y with a yield-curve skeleton (`meta.yield_curve`);
+  US and Japan curves are assessed **separately** (US recession-inversion logic is not applied to
+  JGB). v1 placeholder; live yields are a later phase.
+- **VIX** — live (yfinance ^VIX) with Close + BB288 2σ/3σ + CCI ±200.
+- **IMM** — CFTC currency positioning (JPY/EUR/GBP/AUD/CAD/CHF), v1 placeholder table. `long`/`short`
+  refer to CFTC positioning categories only, not trade instructions.
+- **Crypto** — live (yfinance BTC/ETH/XRP/BCH-USD) with Close + BB288 2σ/3σ + CCI ±200.
+
+Rates, yield curves, VIX, IMM positioning, crypto prices, charts, and indicators are provided for
+market context and portfolio demonstration only. They are not investment advice or trading signals.
+
 ### v2.4 — edge_context (analytical summary)
 
 Adds an optional per-signal `edge_context` that **organises** the existing technical / macro /
