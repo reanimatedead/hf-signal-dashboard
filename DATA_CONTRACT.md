@@ -473,22 +473,34 @@ trading signal, or an instruction to enter or exit positions."
 `data.json` adds four market groups under `markets`, each surfaced as a UI tab.
 Each row carries a `market` label and (where data exists) the same `charts` block as FX.
 
-### markets.rates (v1: placeholder)
+### markets.rates (v1: live where available)
 
 `US2Y`, `US10Y`, `JP2Y`, `JP10Y` — fields: `symbol`, `name`, `market: "Rates"`, `region`
-(`US`/`JP`), `tenor`, `yield` (number|null), `change` (number|null), `curve_role`
-(`short_end`/`long_end`), `risk`, `charts` (placeholder `available:false` in v1), `note`.
-Live yield wiring (ticker/scale validation) and charts are a later phase.
+(`US`/`JP`), `tenor`, `yield` (number|null, percent), `change` (number|null, daily Δ),
+`curve_role` (`short_end`/`long_end`), `risk`, `data_status` (`live`/`placeholder`),
+`source` (`yfinance`|null), `source_ticker`, `charts` (`available:false` in v1), `note`.
+
+**Live yield sourcing (yfinance only, no API key):**
+- `US10Y` → `^TNX` (fallback `10YY=F`); `US2Y` → `2YY=F`.
+- Values are normalized to percent: a raw value `> 25` is treated as a legacy ×10 quote and
+  divided by 10; the result must be a plausible yield `0 < y < 25` or it is rejected (no
+  fabrication / no guessing).
+- `JP2Y` / `JP10Y` have **no stable free Yahoo source**, so they remain `placeholder` rather than
+  show unreliable values.
+- Any fetch failure falls back to `data_status: "placeholder"` (`yield: null`) so the pipeline
+  never fails.
 
 **Yield curve (`meta.yield_curve`)** — US and Japan are assessed **separately**:
 
 | Key | Logic |
 |---|---|
-| `us_10y_2y_spread` | `US10Y - US2Y`; `< 0` → `inverted` (recession/policy-stress context) else `normal_or_steepening`. `unknown` when a yield is null. |
-| `jp_10y_2y_spread` | `JP10Y - JP2Y`; assessed on its own (BOJ policy / JGB) — **US inversion logic is not applied to JGB**. |
+| `us_10y_2y_spread` | `US10Y - US2Y`: `< 0` → `inverted`/high; `< 0.25` → `flat_or_watch`/medium; else `normal_or_steepening`. `unknown` if a yield is null. |
+| `jp_10y_2y_spread` | `JP10Y - JP2Y`: `< 0` → `inverted_watch`; `< 0.25` → `flat_or_policy_watch`; else `normal_or_watch`. Assessed on its own (BOJ / JGB). |
 | `us_jp_10y_spread` | `US10Y - JP10Y` — USDJPY yield-spread context. |
 
-US recession-inversion logic is **never** applied to Japanese bonds. Context only, not a trade view.
+US recession-inversion logic is **never** applied to Japanese bonds. Rates and yield-curve states
+are macro context only — not investment advice, financial advice, a trading signal, or a USDJPY
+trade instruction.
 
 ### markets.volatility (v1: live)
 
@@ -551,3 +563,4 @@ financial advice, price targets, trade execution, or buy/sell recommendations.
 | 2.3 | 2026-06-03 | `fetch_signals.py` supplies computed `charts.1d` (Bollinger 48/288 2σ/3σ, CCI 48/288) into `docs/data.json` for **all FX / Commodities pairs** (initially a 3-symbol allowlist; expanded to every FX row so the FX tab renders charts consistently). Equities fall back. 4h/1w placeholder. No new external API. |
 | 2.4 | 2026-06-03 | Add per-signal `edge_context` analytical summary (overall / technical / macro / cross_asset / risk_adjusted / confidence / supporting & conflicting factors). Schema + placeholder/sample only; analytical context, never a trading advantage or signal. |
 | 2.5 | 2026-06-03 | Add `markets.rates` / `markets.volatility` / `markets.imm` / `markets.crypto` groups + UI tabs. VIX & Crypto live (yfinance); Rates & IMM placeholder. `meta.yield_curve` skeleton (US/Japan assessed separately). Context only, not trading signals. |
+| 2.5.1 | 2026-06-03 | Rates live yield v1: US10Y (^TNX) / US2Y (2YY=F) fetched via yfinance with ×10 scale normalization + plausibility gate; `data_status`/`source`/`source_ticker` added. Japan stays placeholder (no stable free source). yield_curve thresholds add flat zone (`< 0.25`). |

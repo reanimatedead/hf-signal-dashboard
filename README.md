@@ -210,9 +210,11 @@ are not trading signals or investment advice.
 
 Adds four market tabs beyond the equity and FX/Commodities tabs:
 
-- **Rates / Bonds** — US2Y/US10Y/JP2Y/JP10Y with a yield-curve skeleton (`meta.yield_curve`);
+- **Rates / Bonds** — US2Y/US10Y/JP2Y/JP10Y with a yield-curve view (`meta.yield_curve`);
   US and Japan curves are assessed **separately** (US recession-inversion logic is not applied to
-  JGB). v1 placeholder; live yields are a later phase.
+  JGB). Live yields are fetched via yfinance where available (US10Y ^TNX, US2Y 2YY=F, normalized to
+  percent); Japan rates remain placeholder to avoid unreliable data. A `data_status` column shows
+  live vs placeholder. Missing rates stay placeholder rather than show fabricated values.
 - **VIX** — live (yfinance ^VIX) with Close + BB288 2σ/3σ + CCI ±200.
 - **IMM** — CFTC currency positioning (JPY/EUR/GBP/AUD/CAD/CHF), v1 placeholder table. `long`/`short`
   refer to CFTC positioning categories only, not trade instructions.

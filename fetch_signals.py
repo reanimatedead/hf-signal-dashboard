@@ -740,52 +740,112 @@ def process_crypto():
             for sym, name in CRYPTO]
 
 
-RATES = [
-    ("US2Y", "US 2Y Treasury Yield", "US", "2Y", "short_end"),
-    ("US10Y", "US 10Y Treasury Yield", "US", "10Y", "long_end"),
-    ("JP2Y", "Japan 2Y JGB Yield", "JP", "2Y", "short_end"),
-    ("JP10Y", "Japan 10Y JGB Yield", "JP", "10Y", "long_end"),
+# Rates: (symbol, name, region, tenor, curve_role, [candidate yfinance tickers]).
+# US10Y -> ^TNX (CBOE 10Y yield; may quote x10, normalized below). US2Y -> 2YY=F
+# (CBOT 2-Year Yield futures). Japan has no stable free Yahoo yield source, so
+# JP rows stay placeholder rather than show fabricated values.
+RATE_TICKERS = [
+    ("US2Y", "US 2Y Treasury Yield", "US", "2Y", "short_end", ["2YY=F"]),
+    ("US10Y", "US 10Y Treasury Yield", "US", "10Y", "long_end", ["^TNX", "10YY=F"]),
+    ("JP2Y", "Japan 2Y JGB Yield", "JP", "2Y", "short_end", []),
+    ("JP10Y", "Japan 10Y JGB Yield", "JP", "10Y", "long_end", []),
 ]
 
 
-def build_rates_placeholder():
-    """Rates rows (v1 placeholder). Live yield wiring + curve scoring: later phase."""
-    print("\n[Rates] placeholder (live yield wiring is a later phase)")
+def _normalize_yield(v):
+    """Normalize a raw Yahoo rate value to a percent yield, or None if implausible.
+
+    Some Yahoo rate tickers (legacy ^TNX) quote yield x10 (e.g. 42.5 = 4.25%).
+    Values > 25 are treated as x10-scaled and divided by 10; the result must be a
+    plausible yield (0 < y < 25) or it is rejected. No fabrication / no guessing.
+    """
+    try:
+        y = float(v)
+    except (TypeError, ValueError):
+        return None
+    if y > 25:
+        y = y / 10.0
+    return round(y, 3) if 0 < y < 25 else None
+
+
+def fetch_rate_yield(tickers):
+    """Try candidate tickers; return (yield, change, ticker) or (None, None, None)."""
+    for t in tickers:
+        try:
+            df = fetch_batch([t], period="3mo").get(t)
+            if df is None or len(df) < 2:
+                continue
+            close = df["Close"].squeeze()
+            last = _normalize_yield(float(close.iloc[-1]))
+            if last is None:
+                continue
+            prev = _normalize_yield(float(close.iloc[-2]))
+            change = round(last - prev, 3) if prev is not None else None
+            return last, change, t
+        except Exception:
+            continue
+    return None, None, None
+
+
+def build_rates_market():
+    """Rates rows (v1 live where available). yfinance only; failures fall back to
+    placeholder so the run never fails. Context only, not investment advice."""
+    print("\n[Rates] live yield (yfinance; unavailable tenors stay placeholder)")
     rows = []
-    for sym, name, region, tenor, role in RATES:
+    for sym, name, region, tenor, role, tickers in RATE_TICKERS:
+        y, chg, src_t = fetch_rate_yield(tickers) if tickers else (None, None, None)
+        live = y is not None
         rows.append({
             "symbol": sym, "name": name, "market": "Rates", "region": region,
-            "tenor": tenor, "yield": None, "change": None, "curve_role": role,
-            "risk": "unknown",
+            "tenor": tenor, "yield": y, "change": chg, "curve_role": role,
+            "risk": "medium" if live else "unknown",
+            "data_status": "live" if live else "placeholder",
+            "source": "yfinance" if live else None,
+            "source_ticker": src_t,
             "charts": {"4h": build_empty_chart("4h"), "1d": build_empty_chart("1d"),
                        "1w": build_empty_chart("1w")},
-            "note": "Yield data is market context only. Live yield wiring is a later phase.",
+            "note": ("Yield data is market context only, not investment advice."
+                     if live else
+                     "Yield data unavailable. Placeholder row retained for macro context."),
             "error": None,
         })
+        print(f"  {sym}: {'live '+str(y)+' ('+str(src_t)+')' if live else 'placeholder'}")
     return rows
 
 
 def build_yield_curve_state(rates_rows):
-    """Yield-curve skeleton. US and Japan are assessed SEPARATELY; US recession
-    inversion logic is not applied to JGB. Context only, not a trade view."""
+    """Yield-curve states (v1). US and Japan are assessed SEPARATELY; US recession
+    inversion logic is NOT applied to JGB. Context only, not a trade view."""
     y = {r["symbol"]: r.get("yield") for r in rates_rows}
 
-    def spread(a, b):
-        return round(a - b, 3) if isinstance(a, (int, float)) and isinstance(b, (int, float)) else None
+    def us_curve(ten, two):
+        if not isinstance(ten, (int, float)) or not isinstance(two, (int, float)):
+            return None, "unknown", "unknown"
+        s = round(ten - two, 3)
+        if s < 0:      return s, "inverted", "high"
+        if s < 0.25:   return s, "flat_or_watch", "medium"
+        return s, "normal_or_steepening", "low_or_medium"
 
-    us = spread(y.get("US10Y"), y.get("US2Y"))
-    jp = spread(y.get("JP10Y"), y.get("JP2Y"))
-    usjp = spread(y.get("US10Y"), y.get("JP10Y"))
-    us_state = "unknown" if us is None else ("inverted" if us < 0 else "normal_or_steepening")
-    jp_state = "unknown" if jp is None else ("inverted_watch" if jp < 0 else "normal_or_watch")
+    def jp_curve(ten, two):
+        if not isinstance(ten, (int, float)) or not isinstance(two, (int, float)):
+            return None, "unknown", "unknown"
+        s = round(ten - two, 3)
+        if s < 0:      return s, "inverted_watch", "medium_or_high"
+        if s < 0.25:   return s, "flat_or_policy_watch", "medium"
+        return s, "normal_or_watch", "low_or_medium"
+
+    us_s, us_state, us_risk = us_curve(y.get("US10Y"), y.get("US2Y"))
+    jp_s, jp_state, jp_risk = jp_curve(y.get("JP10Y"), y.get("JP2Y"))
+    usjp = (round(y["US10Y"] - y["JP10Y"], 3)
+            if isinstance(y.get("US10Y"), (int, float)) and isinstance(y.get("JP10Y"), (int, float))
+            else None)
     return {
-        "us_10y_2y_spread": {"value": us, "state": us_state,
-                             "risk": "unknown" if us is None else ("high" if us < 0 else "low_or_medium"),
+        "us_10y_2y_spread": {"value": us_s, "state": us_state, "risk": us_risk,
                              "comment": "US curve. Inversion is a recession/policy-stress context, not a trade signal."},
-        "jp_10y_2y_spread": {"value": jp, "state": jp_state,
-                             "risk": "unknown" if jp is None else ("medium_or_high" if jp < 0 else "low_or_medium"),
+        "jp_10y_2y_spread": {"value": jp_s, "state": jp_state, "risk": jp_risk,
                              "comment": "Japan curve assessed separately (BOJ policy / JGB). US inversion logic is not applied."},
-        "us_jp_10y_spread": {"value": usjp, "relation": "USDJPY yield-spread context",
+        "us_jp_10y_spread": {"value": usjp, "state": "unknown" if usjp is None else "computed",
+                             "relation": "USDJPY yield-spread context",
                              "comment": "Context only, not investment advice."},
     }
 
@@ -838,7 +898,7 @@ def main():
     fx_results  = process_fx_advanced(FX_PAIRS)
 
     # v2.5: macro / crypto categories (yfinance only; failures fall back)
-    rates_results = build_rates_placeholder()
+    rates_results = build_rates_market()
     vol_results   = process_volatility()
     imm_results   = build_imm_placeholder()
     crypto_results = process_crypto()
