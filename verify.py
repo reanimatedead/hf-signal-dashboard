@@ -1,0 +1,246 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+verify.py — Macro レイヤー自己点検ハーネス（BUILD_SPEC v4 §A5 増築版）
+
+- 既存 docs/data.json を破壊していないこと（回帰ゼロ）
+- 新規 docs/data/macro.json が契約（meta/flow/tiles）を満たし、健全であること
+- 既存 per-symbol タブ（テーブル）が docs/index.html 内に残っていること（DOM 文字列検査）
+
+PASS なら 0 終了、FAIL なら 1。stdout は verify_report.json と同じ JSON。
+"""
+
+import json
+import os
+import math
+import pathlib
+import datetime
+import sys
+import re
+
+ROOT = pathlib.Path(__file__).resolve().parent
+DOCS = ROOT / "docs"
+MACRO = DOCS / "data" / "macro.json"
+EXISTING_DATA = DOCS / "data.json"
+INDEX = DOCS / "index.html"
+HOME_STORE = pathlib.Path(os.path.expanduser("~/hf-data-store"))
+
+REQUIRED_FILES = [
+    "docs/index.html",
+    "docs/data.json",
+    "docs/data/macro.json",
+    "docs/assets/macro/flow.js",
+    "docs/assets/macro/macro.js",
+    "pipeline/build_macro.py",
+    "verify.py",
+    "verify_render.mjs",
+    "MACRO_INTEGRATION_NOTES.md",
+]
+
+EXPECTED_LAG = {
+    "walcl": 7, "rrp": 7, "real_yield": 7, "hy_spread": 7, "vix": 7,
+    "net_liquidity": 7, "cot_jpy": 10, "tga": 7,
+    "btc_price": 2, "stablecoin_peg": 2,
+    "usdjpy_carry": 3,
+    "valuation_us": 95,
+}
+REGIME_SENSITIVE = ["real_yield"]   # ok/stale なら崩れ注記必須
+FORBIDDEN = ["cesi", "economic_surprise", "bloomberg_fci", "gs_fci", "move_intraday", "65month", "cycle65"]
+
+gates = {}
+failed = []
+
+
+def fail(gate, msg):
+    gates[gate] = "FAIL"
+    failed.append(f"{gate}: {msg}")
+
+
+def ok(gate):
+    gates[gate] = "PASS"
+
+
+def days_since(d):
+    try:
+        return (datetime.date.today() - datetime.date.fromisoformat(str(d)[:10])).days
+    except Exception:
+        return None
+
+
+# Gate-0: ファイル存在
+missing_files = [f for f in REQUIRED_FILES if not (ROOT / f).exists()]
+if missing_files:
+    fail("gate0_files", f"missing {missing_files}")
+else:
+    ok("gate0_files")
+
+# Gate-1: 既存 docs/data.json が壊れていない（回帰ゼロ）
+existing = None
+try:
+    existing = json.loads(EXISTING_DATA.read_text(encoding="utf-8"))
+    must_have = ["markets", "meta"]
+    bad = [k for k in must_have if k not in existing]
+    if bad:
+        fail("gate1_regression_data", f"existing data.json missing keys: {bad}")
+    else:
+        markets = existing.get("markets", {})
+        expected = {"nikkei225", "fx", "rates", "imm", "volatility", "valuation"}
+        missing_mkt = expected - set(markets.keys())
+        if missing_mkt:
+            fail("gate1_regression_data", f"existing markets missing: {missing_mkt}")
+        else:
+            ok("gate1_regression_data")
+except Exception as e:
+    fail("gate1_regression_data", f"existing data.json parse fail: {e}")
+
+# Gate-1b: 既存 index.html の per-symbol タブが消えていない
+try:
+    html = INDEX.read_text(encoding="utf-8")
+    needles = ["sw('nikkei225'", "sw('fx'", "sw('rates'", "sw('imm'", "sw('valuation'"]
+    miss = [n for n in needles if n not in html]
+    if miss:
+        fail("gate1_regression_index", f"per-symbol tabs missing in index.html: {miss}")
+    else:
+        ok("gate1_regression_index")
+except Exception as e:
+    fail("gate1_regression_index", str(e))
+
+
+def finish():
+    result = "PASS" if not failed else "FAIL"
+    out = {
+        "harness": "verify.py",
+        "result": result,
+        "gates": gates,
+        "failed": failed,
+        "generated_at": datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0).isoformat(),
+    }
+    (ROOT / "verify_report.json").write_text(json.dumps(out, ensure_ascii=False, indent=2), encoding="utf-8")
+    print(json.dumps(out, ensure_ascii=False, indent=2))
+    sys.exit(0 if result == "PASS" else 1)
+
+
+# 続行のためには macro.json が必要
+data = None
+if not MACRO.exists():
+    fail("gate0_files", f"macro.json missing: {MACRO}")
+    finish()
+try:
+    data = json.loads(MACRO.read_text(encoding="utf-8"))
+except Exception as e:
+    fail("gate0_files", f"macro.json parse error: {e}")
+    finish()
+
+tiles = data.get("tiles", {})
+flow = data.get("flow", {})
+
+# Gate-2: ストア健全性（任意。~/hf-data-store の容量上限）
+try:
+    used = (data.get("meta", {}).get("store", {}) or {}).get("used_gb", 0) or 0
+    if used >= 250:
+        fail("gate2_store", f"store over 250GB: {used}")
+    else:
+        ok("gate2_store")
+except Exception as e:
+    fail("gate2_store", str(e))
+
+# Gate-3: schema (meta/flow/tiles、basin_tilt 合計=1、flow キー)
+try:
+    assert "meta" in data and "flow" in data and "tiles" in data, "top-level missing"
+    bt = flow.get("basin_tilt", {})
+    s = sum(bt.values()) if bt else 0
+    assert abs(s - 1.0) < 0.02, f"basin_tilt sum={s}"
+    for k in ("net_liquidity", "clock_phase", "policy_rate_friction", "currents"):
+        assert k in flow, f"flow.{k} missing"
+    ok("gate3_schema")
+except Exception as e:
+    fail("gate3_schema", str(e))
+
+# Gate-4: 単位健全性（net_liquidity 兆ドル想定 0-20）
+try:
+    nl = flow.get("net_liquidity", {}).get("value_usd_tn")
+    assert nl is not None and 0 <= nl <= 20, f"net_liquidity={nl} (兆ドル想定)"
+    ok("gate4_units")
+except Exception as e:
+    fail("gate4_units", str(e))
+
+# Gate-5: 鮮度（ok は期待ラグ内、超過なら stale でなければ FAIL）
+try:
+    bad = []
+    for tid, t in tiles.items():
+        st = t.get("status")
+        if st == "ok":
+            lag = t.get("lag_days")
+            exp = EXPECTED_LAG.get(tid)
+            if exp is not None and lag is not None and lag > exp:
+                bad.append(f"{tid} ok but lag {lag}>{exp} (should be stale)")
+    if bad:
+        fail("gate5_freshness", "; ".join(bad))
+    else:
+        ok("gate5_freshness")
+except Exception as e:
+    fail("gate5_freshness", str(e))
+
+# Gate-6: 欠損の正直さ（missing は value=None）
+try:
+    bad = [tid for tid, t in tiles.items() if t.get("status") == "missing" and t.get("value") not in (None,)]
+    if bad:
+        fail("gate6_honesty", f"missing tiles with fabricated value: {bad}")
+    else:
+        ok("gate6_honesty")
+except Exception as e:
+    fail("gate6_honesty", str(e))
+
+# Gate-7: z 健全性
+try:
+    bad = []
+    for tid, t in tiles.items():
+        if t.get("status") in ("ok", "stale"):
+            z = t.get("z")
+            if z is None or not math.isfinite(z) or abs(z) > 6:
+                bad.append(f"{tid}:z={z}")
+    if bad:
+        fail("gate7_zhealth", "; ".join(bad))
+    else:
+        ok("gate7_zhealth")
+except Exception as e:
+    fail("gate7_zhealth", str(e))
+
+# Gate-8: 説明/注意の存在
+try:
+    bad = [tid for tid, t in tiles.items() if not t.get("explain") or not t.get("caveat")]
+    if bad:
+        fail("gate8_docs", f"empty explain/caveat: {bad}")
+    else:
+        ok("gate8_docs")
+except Exception as e:
+    fail("gate8_docs", str(e))
+
+# Gate-9: レジーム注記（ok/stale の regime-sensitive タイルは崩れ注記）
+try:
+    bad = []
+    for tid in REGIME_SENSITIVE:
+        t = tiles.get(tid)
+        if t and t.get("status") in ("ok", "stale"):
+            cav = t.get("caveat", "")
+            if ("崩れ" not in cav) and ("regime" not in cav.lower()) and ("decoupl" not in cav.lower()):
+                bad.append(tid)
+    if bad:
+        fail("gate9_regime", f"missing regime note: {bad}")
+    else:
+        ok("gate9_regime")
+except Exception as e:
+    fail("gate9_regime", str(e))
+
+# Gate-10: 除外厳守（HFT/CESI/65か月/Bloomberg/有料系の単語不在）
+try:
+    blob = json.dumps(data, ensure_ascii=False).lower()
+    hit = [w for w in FORBIDDEN if w in blob]
+    if hit:
+        fail("gate10_exclusions", f"forbidden keys: {hit}")
+    else:
+        ok("gate10_exclusions")
+except Exception as e:
+    fail("gate10_exclusions", str(e))
+
+finish()

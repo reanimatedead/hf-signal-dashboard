@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HF Signal Dashboard — お金の流れ</title>
+<style>
+  :root{--bg:#0a0e14;--panel:#0f1722;--line:#1c2733;--txt:#c7d2dd;--dim:#6b7c8f;
+        --acc:#39d0d8;--warn:#e0a93b;--hot:#e05a5a;--cool:#5a8fe0;--good:#5ad07a;}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--txt);font-family:-apple-system,"Hiragino Kaku Gothic ProN",system-ui,sans-serif;font-size:13px;line-height:1.5}
+  .wrap{max-width:1040px;margin:0 auto;padding:14px}
+  header{border-bottom:1px solid var(--line);padding-bottom:10px;margin-bottom:12px}
+  h1{font-size:15px;letter-spacing:.04em}
+  .sub{color:var(--dim);font-size:11px;margin-top:4px}
+  .tag{display:inline-block;border:1px solid var(--warn);color:var(--warn);font-size:10px;padding:1px 6px;border-radius:3px;margin-left:6px;vertical-align:middle}
+  .grid{display:grid;grid-template-columns:1fr;gap:12px}
+  @media(min-width:820px){.grid{grid-template-columns:1fr 360px}}
+  canvas{width:100%;height:auto;display:block;background:radial-gradient(ellipse at 50% 18%,#101a26,#0a0e14);border:1px solid var(--line);border-radius:6px}
+  .legend{display:flex;gap:12px;flex-wrap:wrap;font-size:10px;color:var(--dim);margin-top:8px}
+  .dot{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:4px;vertical-align:middle}
+  .tiles{display:grid;grid-template-columns:1fr;gap:8px}
+  .tile{background:var(--panel);border:1px solid var(--line);border-left-width:3px;border-radius:6px;padding:9px 11px}
+  .tile.green{border-left-color:var(--good)} .tile.amber{border-left-color:var(--warn)}
+  .tile.red{border-left-color:var(--hot)} .tile.neutral{border-left-color:var(--dim)}
+  .tile .top{display:flex;justify-content:space-between;align-items:baseline}
+  .tile .label{font-size:12px} .tile .val{font-variant-numeric:tabular-nums;color:#e7eef5}
+  .tile .meta{font-size:10px;color:var(--dim);margin-top:2px}
+  .tile .explain{font-size:10px;color:#9fb0c2;margin-top:5px;line-height:1.5}
+  .tile .caveat{font-size:9.5px;color:var(--dim);margin-top:3px;line-height:1.45}
+  .st{font-size:9px;padding:0 5px;border-radius:3px;border:1px solid var(--line);margin-left:6px}
+  .st.ok{color:var(--good)} .st.stale{color:var(--warn)} .st.missing{color:var(--hot)}
+  .src{font-size:9px;color:var(--dim);margin-left:4px}
+  .disc{margin-top:14px;font-size:10px;color:var(--warn);border-top:1px solid var(--line);padding-top:8px}
+  #updated{color:var(--dim);font-size:10px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>HF Signal Dashboard — お金の流れ<span class="tag" id="seedtag">SEED</span></h1>
+    <div class="sub">中央銀行→4つの器(株/金/原油/現金)に、流動性・景気局面・金利・フローで水(お金)が動く。<span id="updated"></span></div>
+  </header>
+
+  <div class="grid">
+    <div>
+      <canvas id="cv" width="660" height="470"></canvas>
+      <div class="legend">
+        <span><span class="dot" style="background:var(--cool)"></span>水=お金</span>
+        <span><span class="dot" style="background:var(--acc)"></span>中央銀行</span>
+        <span id="flowmeta"></span>
+      </div>
+    </div>
+    <div>
+      <div class="tiles" id="tiles"></div>
+    </div>
+  </div>
+
+  <div class="disc">⚠ これは相場「環境」の可視化であり、<b>売買助言ではありません (not investment advice)</b>。</div>
+</div>
+<script src="flow.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

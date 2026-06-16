@@ -710,3 +710,82 @@ financial advice, price targets, trade execution, or buy/sell recommendations.
 | 4.2 | 2026-06-03 | **External data ingestion (no UI/design change).** (1) **IMM auto-ingestion** from the official CFTC COT report (legacy futures-only, `publicreporting.cftc.gov` Socrata, no API key) → `data_status: auto_cftc` for JPY/EUR/GBP/AUD/CAD/CHF (net = noncomm long−short), with timeout + `try/except` fallback to `manual_csv` → `placeholder`; `auto_cftc` also feeds the USDJPY edge JPY-IMM factor. (2) **JP rates charts** from a multi-date `data/jp_rates.csv` (≥ 2 dated points) → JP2Y/JP10Y `charts.1d` via the shared chart (Japan curve / US-JP spread already compute when JP yields exist). (3) Buffett charts confirmed (v4.1). No `docs/index.html` / CSS / layout changes — data flows into the existing renderer. `long`/`short` are CFTC categories only; all rows remain market context only. |
 | 4.3 | 2026-06-04 | **JP rates auto-ingestion (MoF, no UI change).** JP2Y/JP10Y are now auto-ingested from the **official Japan Ministry of Finance** JGB historical CSV (`data/jgbcm_all.csv`, daily since 1974, Shift-JIS, no API key): Japanese-era dates parsed to ISO, plausibility-gated (`-2<=y<25`), latest row → current yield, daily series → `charts.1d` (`data_status: auto_mof`, `source: MoF JGB (mof.go.jp, jgbcm_all.csv)`). Japan curve (`jp_10y_2y_spread`) and US-JP 10Y spread now compute automatically; the USDJPY edge picks up the spread. Timeout + `try/except` falls back to verified `data/jp_rates.csv` (`manual_csv`) then `placeholder` — no fabrication, never breaks the run. Buffett stays manual-CSV (no keyless source aligns market-cap **and** GDP definitions). No `docs/index.html`/CSS/layout change. Macro context only. |
 | 4.4 | 2026-06-04 | **Verified US Buffett Indicator data (FRED, no UI change).** `data/valuation_metrics.csv` now holds a real US series (301 quarters, 1947→present) from two official keyless FRED downloads: `NCBEILQ027S` (Z.1 nonfinancial corporate equities, $M)→$B ÷ `GDP` (nominal SAAR, $B) × 100, matched by quarter. US row becomes `data_status: manual_csv` (verified offline import; `source` shows FRED provenance), `value` ≈ 232.7%, `valuation_context: historically_extreme_context`, with `charts.1d` (301-pt series → BB288/CCI288 computed, OHLC capped 120). Strict-JSON/NaN-safe. **Japan stays `placeholder`** (World Bank ratio ends 2020; no current keyless definition-aligned source — no fabrication). No `docs/index.html`/CSS/layout change; existing Valuation renderer used as-is. Long-term valuation context only. |
+
+---
+
+# Appendix M — Macro 環境レイヤー (`docs/data/macro.json`)
+
+> 追記拡張。既存節 (markets.rates / imm / valuation / volatility / yield_curve) には差分なし。
+> ブランチ: `feat/macro-environment`（BUILD_SPEC v4 §A3 準拠）。本番デプロイ前は人手ゲート待ち。
+
+## ファイル
+- パス: `docs/data/macro.json`（Cloudflare publish root 配下、`.gitignore` 対象 = 生成物）
+- ビルダ: `pipeline/build_macro.py`（既存 `fetch_signals.py` には触らない）
+- 入力（再利用）: `docs/data.json` の `markets.rates / markets.imm / markets.volatility / meta.yield_curve`
+- 追加取得（gap のみ）: 米財務省 TGA（fiscaldata.treasury.gov, キーレス）/ CoinGecko BTC + ステーブルコイン（キーレス）/ FRED（WALCL/RRPONTSYD/DFII10/BAMLH0A0HYM2、`FRED_API_KEY` 設定時のみ live、未設定は `status:"missing"`）。
+
+## ルート構造
+```json
+{
+  "meta":  { ... },
+  "flow":  { ... },   // お金の流れアニメ駆動契約
+  "tiles": { "<id>": { ... }, ... }
+}
+```
+
+## `meta`
+| key | 型 | 説明 |
+| --- | --- | --- |
+| `generated_at` | ISO8601 | 生成 UTC タイムスタンプ |
+| `pipeline_version` | str | 例: `macro-0.1` |
+| `reference_seed` | bool | 参照シードか否か（本番は false） |
+| `branch` | str | `feat/macro-environment` |
+| `note` | str | 来歴の説明 |
+| `sources_as_of` | obj | ソース別 as_of |
+| `store` | obj | `~/hf-data-store/` の `used_gb`/`limit_gb` (250) |
+| `inputs` | obj | `existing_data_json` / `valuation_csv` / `fred_key_set` |
+
+## `flow`（アニメ駆動・常に契約充足）
+```json
+{
+  "net_liquidity": { "value_usd_tn": 6.0, "wow_change_tn": 0.0, "z": 0.0,
+                     "trend": "expand|contract", "status": "ok|stale|missing" },
+  "clock_phase": "recovery|reflation|overheat|stagflation",
+  "policy_rate_friction": 0.0..1.0,
+  "basin_tilt": { "stocks": 0.55, "gold": 0.20, "oil": 0.15, "cash": 0.10 },  // sum=1.0
+  "currents":  { "foreign_jp_flow_z": 0.0, "cot_jpy_z": 0.0, "risk_off": 0.0..1.0 }
+}
+```
+- `basin_tilt` 合計は 1.0 ±0.02 を保証（verify.py gate3）。
+- 未配線項目は安全な既定値（`recovery` / `nl=6.0兆` / `risk_off=0`）でアニメは止まらない。
+
+## `tiles[<id>]`
+| key | 説明 |
+| --- | --- |
+| `label` | 表示名 |
+| `value` | 数値 or 構造（例: `{"USDT":0.999,"USDC":1.0}`）。missing 時は `null` |
+| `unit` | "%"/"USD兆"/"pt"/"contracts" 等 |
+| `z` | 履歴 z スコア（ストア未配線時は 0.0） |
+| `color` | "green"/"amber"/"red"/"neutral" |
+| `as_of` | YYYY-MM-DD or ISO |
+| `lag_days` | 日数 |
+| `status` | `"ok"` / `"stale"` / `"missing"` |
+| `source` | 例: `"FRED:WALCL"` / `"docs/data.json (再利用)"` |
+| `explain` | 1〜2文の意味づけ |
+| `caveat` | 注意・regime シフト・前提崩れ |
+
+### 標準タイル ID
+- `usdjpy_carry`（既存 `meta.yield_curve.us_jp_10y_spread` を再利用）
+- `cot_jpy`（既存 `markets.imm[JPY_IMM]` を再利用）
+- `vix`（既存 `markets.volatility[0].price` を再利用）
+- `valuation_us`（既存 `data/valuation_metrics.csv` を再利用）
+- `tga`（米財務省 DTS、新規取得）
+- `btc_price` / `stablecoin_peg`（CoinGecko、新規取得）
+- `walcl` / `rrp` / `real_yield` / `hy_spread`（FRED、`FRED_API_KEY` 有時のみ live）
+- `net_liquidity`（WALCL − TGA − RRP、合成）
+- `clock_phase_tile`（ナウキャスト未配線・現状 missing）
+
+## 互換性
+- 既存 `fetch_signals.py`/`docs/data.json`/`docs/index.html` の per-symbol 系/SVG/CSS セレクタは無改変。
+- フロントは `docs/assets/macro/{flow.js,macro.js}` の 2 ファイルを追加し、`#hf-macro-*` プレフィックスで完全分離。
+- 「概念可視化／売買助言ではない (not investment advice)」を Macro タブ上に常時表示。

@@ -5,3 +5,10 @@ __pycache__/
 .DS_Store
 *.egg-info/
 dist/
+
+# macro-environment (feat/macro-environment) — additive
+hf-data-store/
+data/macro.json
+verify_report.json
+seed/public/data.json
+node_modules/

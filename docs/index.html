@@ -346,6 +346,7 @@ body.light .cname{color:var(--text-dim)}
     <button class="tab" onclick="sw('imm',this)">IMM</button>
     <button class="tab" onclick="sw('crypto',this)">Crypto</button>
     <button class="tab" onclick="sw('valuation',this)">Valuation</button>
+    <button class="tab hf-macro-tab" id="hf-macro-tab-btn" onclick="hfMacroActivate(this)">Macro / お金の流れ</button>
   </div>
   <div id="toolbar">
     <div id="srch-wrap">
@@ -357,6 +358,24 @@ body.light .cname{color:var(--text-dim)}
     <div class="fgrp" id="fgrp"></div>
     <button class="fbtn" id="wlbtn" onclick="toggleWL()">☆ Watchlist</button>
     <div id="rowcount"></div>
+  </div>
+  <!-- ─── Macro / お金の流れ ペイン（増築・非破壊） ─── -->
+  <div id="hf-macro-pane" style="display:none">
+    <div class="hf-macro-disc">
+      ⚠ 概念可視化 / これは相場「環境」の可視化であり、<b>売買助言ではありません (not investment advice)</b>。
+    </div>
+    <div class="hf-macro-grid">
+      <div class="hf-macro-canvas-wrap">
+        <canvas id="hf-macro-cv" width="660" height="470"></canvas>
+        <div class="hf-macro-legend">
+          <span><span class="hf-macro-dot" style="background:#5a8fe0"></span>水=お金</span>
+          <span><span class="hf-macro-dot" style="background:#39d0d8"></span>中央銀行</span>
+          <span id="hf-macro-flowmeta"></span>
+        </div>
+        <div id="hf-macro-updated"></div>
+      </div>
+      <div class="hf-macro-tiles" id="hf-macro-tiles"></div>
+    </div>
   </div>
   <div class="tbl-wrap">
     <table><thead id="thead"></thead><tbody id="tbody"></tbody></table>
@@ -1103,6 +1122,74 @@ function bbColor(b){
   if(b>=0.65)return"var(--yellow)";
   return"var(--text-dim)";
 }
+</script>
+
+<!-- ════════════════════════════════════════════════════════════════
+     Macro / お金の流れ レイヤー（feat/macro-environment 増築）
+     既存セレクタ/スタイルは触らない。すべて .hf-macro-* で分離。
+══════════════════════════════════════════════════════════════════ -->
+<style>
+  .hf-macro-tab{color:var(--text-dim);}
+  .hf-macro-tab.active{color:var(--accent);}
+  #hf-macro-pane{padding:14px 16px;font-family:-apple-system,"Hiragino Kaku Gothic ProN",system-ui,sans-serif;font-size:13px;line-height:1.55;color:var(--text);}
+  .hf-macro-disc{font-size:11px;color:var(--yellow);border:1px solid var(--border);border-radius:4px;padding:6px 10px;margin-bottom:10px;background:var(--bg2);}
+  .hf-macro-grid{display:grid;grid-template-columns:1fr;gap:14px;}
+  @media(min-width:980px){.hf-macro-grid{grid-template-columns:680px 1fr;}}
+  .hf-macro-canvas-wrap{min-width:0;}
+  #hf-macro-cv{width:100%;height:auto;display:block;background:radial-gradient(ellipse at 50% 18%,#101a26,#0a0e14);border:1px solid var(--border);border-radius:6px;}
+  .hf-macro-legend{display:flex;gap:14px;flex-wrap:wrap;font-size:10px;color:var(--text-dim);margin-top:8px;}
+  .hf-macro-dot{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:4px;vertical-align:middle;}
+  #hf-macro-updated{font-size:10px;color:var(--text-dim);margin-top:6px;}
+  .hf-macro-tiles{display:grid;grid-template-columns:1fr;gap:8px;}
+  @media(min-width:560px){.hf-macro-tiles{grid-template-columns:1fr 1fr;}}
+  @media(min-width:980px){.hf-macro-tiles{grid-template-columns:1fr;}}
+  .hf-macro-tile{background:var(--bg2);border:1px solid var(--border);border-left:3px solid var(--text-dim);border-radius:6px;padding:9px 11px;}
+  .hf-macro-tile.green{border-left-color:var(--green);}
+  .hf-macro-tile.amber{border-left-color:var(--yellow);}
+  .hf-macro-tile.red{border-left-color:var(--red);}
+  .hf-macro-tile.neutral{border-left-color:var(--text-dim);}
+  .hf-macro-top{display:flex;justify-content:space-between;align-items:baseline;gap:8px;}
+  .hf-macro-label{font-size:12px;color:var(--text);}
+  .hf-macro-val{font-variant-numeric:tabular-nums;color:var(--text);font-size:12px;text-align:right;}
+  .hf-macro-meta{font-size:10px;color:var(--text-dim);margin-top:3px;}
+  .hf-macro-explain{font-size:10.5px;color:var(--text);opacity:.88;margin-top:5px;}
+  .hf-macro-caveat{font-size:9.5px;color:var(--text-dim);margin-top:3px;line-height:1.45;}
+  .hf-macro-st{font-size:9px;padding:0 5px;border-radius:3px;border:1px solid var(--border);margin-left:6px;}
+  .hf-macro-st.ok{color:var(--green);}
+  .hf-macro-st.stale{color:var(--yellow);}
+  .hf-macro-st.missing{color:var(--red);}
+  .hf-macro-src{font-size:9px;color:var(--text-dim);margin-left:4px;}
+</style>
+<script src="assets/macro/flow.js"></script>
+<script src="assets/macro/macro.js"></script>
+<script>
+/* Macro タブの開閉ロジック（既存 sw() を非破壊にラップ） */
+(function(){
+  const PANE_ID="hf-macro-pane", TAB_ID="hf-macro-tab-btn";
+  function getPane(){return document.getElementById(PANE_ID);}
+  function getTabBtn(){return document.getElementById(TAB_ID);}
+  function hideMacro(){
+    const p=getPane(); if(p) p.style.display="none";
+    const tb=getTabBtn(); if(tb) tb.classList.remove("active");
+    const tw=document.querySelector(".tbl-wrap"); if(tw) tw.style.display="";
+    const tb2=document.getElementById("toolbar"); if(tb2) tb2.style.display="";
+  }
+  function showMacro(){
+    const p=getPane(); if(p) p.style.display="block";
+    const tw=document.querySelector(".tbl-wrap"); if(tw) tw.style.display="none";
+    const tb2=document.getElementById("toolbar"); if(tb2) tb2.style.display="none";
+    document.querySelectorAll(".tab").forEach(t=>t.classList.remove("active"));
+    const tb=getTabBtn(); if(tb) tb.classList.add("active");
+    if (window.HFMacro && window.HFMacro.start) window.HFMacro.start();
+  }
+  window.hfMacroActivate=function(btn){ showMacro(); };
+  // 既存 sw() を一度だけ非破壊でラップ：他タブを押したら macro ペイン非表示に
+  if (typeof window.sw==="function" && !window.sw.__hfMacroWrapped){
+    const orig=window.sw;
+    window.sw=function(key, btn){ hideMacro(); return orig.apply(this, arguments); };
+    window.sw.__hfMacroWrapped=true;
+  }
+})();
 </script>
 </body>
 </html>
