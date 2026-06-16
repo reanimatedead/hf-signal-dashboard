@@ -56,20 +56,70 @@ def days_since(date_str):
         return None
 
 
-def fred_latest(series_id):
-    if not FRED_KEY:
-        return None
+def fred_latest_keyless(series_id):
+    """Fallback when FRED_API_KEY is not set: use fredgraph.csv (no key required).
+    Returns (latest_value, latest_date) of last non-null row, or None."""
     try:
-        url = ("https://api.stlouisfed.org/fred/series/observations"
-               f"?series_id={series_id}&api_key={FRED_KEY}&file_type=json"
-               "&sort_order=desc&limit=1")
-        d = json.loads(http_get(url))
-        obs = d.get("observations") or []
-        if obs and obs[0]["value"] not in (".", "", None):
-            return float(obs[0]["value"]), obs[0]["date"]
+        url = f"https://fred.stlouisfed.org/graph/fredgraph.csv?id={series_id}"
+        body = http_get(url, headers={"User-Agent": "curl/8 hf-macro"}, timeout=45)
+        last_val = None
+        last_date = None
+        for line in body.splitlines()[1:]:
+            parts = line.split(",")
+            if len(parts) < 2:
+                continue
+            d, v = parts[0].strip(), parts[1].strip()
+            if v in (".", "", None):
+                continue
+            try:
+                last_val = float(v)
+                last_date = d
+            except Exception:
+                continue
+        if last_val is not None and last_date:
+            return last_val, last_date
     except Exception as e:
-        print(f"  [FRED:{series_id}] fail {type(e).__name__}: {e}", file=sys.stderr)
+        print(f"  [FRED-CSV:{series_id}] fail {type(e).__name__}: {e}", file=sys.stderr)
     return None
+
+
+def fred_series_keyless(series_id):
+    """Return [(date, value), ...] for non-null rows from fredgraph.csv."""
+    try:
+        url = f"https://fred.stlouisfed.org/graph/fredgraph.csv?id={series_id}"
+        body = http_get(url, headers={"User-Agent": "curl/8 hf-macro"}, timeout=45)
+        rows = []
+        for line in body.splitlines()[1:]:
+            parts = line.split(",")
+            if len(parts) < 2:
+                continue
+            d, v = parts[0].strip(), parts[1].strip()
+            if v in (".", "", None):
+                continue
+            try:
+                rows.append((d, float(v)))
+            except Exception:
+                continue
+        return rows
+    except Exception as e:
+        print(f"  [FRED-CSV:{series_id}] fail {type(e).__name__}: {e}", file=sys.stderr)
+        return []
+
+
+def fred_latest(series_id):
+    """Prefer FRED API (FRED_API_KEY). Fallback to keyless fredgraph.csv."""
+    if FRED_KEY:
+        try:
+            url = ("https://api.stlouisfed.org/fred/series/observations"
+                   f"?series_id={series_id}&api_key={FRED_KEY}&file_type=json"
+                   "&sort_order=desc&limit=1")
+            d = json.loads(http_get(url))
+            obs = d.get("observations") or []
+            if obs and obs[0]["value"] not in (".", "", None):
+                return float(obs[0]["value"]), obs[0]["date"]
+        except Exception as e:
+            print(f"  [FRED:{series_id}] api fail {type(e).__name__}: {e}; trying keyless", file=sys.stderr)
+    return fred_latest_keyless(series_id)
 
 
 def tile(label, value, unit, z, color, as_of, lag_days, status, source, explain, caveat):
@@ -388,16 +438,85 @@ else:
         "WALCL/RRPはFREDキー必須。欠損時アニメは中立値(6.0兆)で動作。"))
 
 
-# ─── Clock phase（ナウキャスト未配線・現状 missing 表示） ─────────
+# ─── Clock phase: GDPNow (Atlanta Fed) + CPI YoY (BLS via FRED) ─────
+# どちらもキーレス公開（FRED の fredgraph.csv）から取得。
+clock_phase = "recovery"  # フォールバック既定（タイル側で明示）
+clock_phase_status = "missing"
+clock_phase_value = None
+clock_phase_as_of = None
+clock_phase_lag = None
+clock_phase_caveat = "GDPNow/CPI 取得不可のため missing。"
+
+gdpnow = fred_latest_keyless("GDPNOW")  # 現四半期GDP（年率%）
+cpi_series = fred_series_keyless("CPIAUCSL")
+cpi_yoy = None
+cpi_date = None
+if len(cpi_series) >= 13:
+    latest_date, latest_v = cpi_series[-1]
+    # 12ヶ月前を厳密に探す
+    try:
+        yr, mo, day = latest_date.split("-")
+        prev_key = f"{int(yr) - 1}-{mo}-{day}"
+    except Exception:
+        prev_key = None
+    prev_v = None
+    if prev_key:
+        for d, v in cpi_series:
+            if d == prev_key:
+                prev_v = v
+                break
+    if prev_v is None and len(cpi_series) >= 13:
+        prev_v = cpi_series[-13][1]
+    if prev_v and prev_v != 0:
+        cpi_yoy = (latest_v / prev_v - 1.0) * 100.0
+        cpi_date = latest_date
+
+if gdpnow is not None and cpi_yoy is not None:
+    gdp_v, gdp_d = gdpnow
+    # 2x2 分類: 成長 (>=2%) × インフレ (>=3% YoY)
+    growth_hi = gdp_v >= 2.0
+    infl_hi = cpi_yoy >= 3.0
+    clock_phase = {
+        (True,  True ): "overheat",
+        (True,  False): "recovery",
+        (False, True ): "stagflation",
+        (False, False): "reflation",
+    }[(growth_hi, infl_hi)]
+    clock_phase_value = {
+        "phase": clock_phase,
+        "gdpnow": round(gdp_v, 2),
+        "gdpnow_as_of": gdp_d,
+        "cpi_yoy": round(cpi_yoy, 2),
+        "cpi_as_of": cpi_date,
+    }
+    clock_phase_status = "ok"
+    clock_phase_as_of = max(gdp_d, cpi_date)
+    clock_phase_lag = days_since(clock_phase_as_of)
+    clock_phase_caveat = (
+        "GDPNow は四半期内で大きく改定される。CPI YoY は前年同月比で月次更新。"
+        "2軸分類は簡素化したもので、転換期(ピボット)では実体と乖離しうる。")
+elif gdpnow is not None:
+    gdp_v, gdp_d = gdpnow
+    clock_phase = "recovery" if gdp_v >= 2.0 else "reflation"
+    clock_phase_value = {"phase": clock_phase, "gdpnow": round(gdp_v, 2), "gdpnow_as_of": gdp_d}
+    clock_phase_status = "stale"
+    clock_phase_as_of = gdp_d
+    clock_phase_lag = days_since(gdp_d)
+    clock_phase_caveat = "CPI YoY 取得失敗のため成長軸のみで暫定判定。"
+
 record("clock_phase_tile", tile(
-    "景気局面", None, "phase", 0.0, "neutral", None, None, "missing",
-    "未配線 (GDPNow/Cleveland 予定)",
+    "景気局面 (GDPNow+CPI)", clock_phase_value, "phase", 0.0, "neutral",
+    clock_phase_as_of, clock_phase_lag, clock_phase_status,
+    "FRED:GDPNOW + FRED:CPIAUCSL (キーレスCSV)",
     "リフレ/回復/過熱/スタグ。お金がどの器に傾くかを決める。",
-    "本番ストアに GDPNow+ナウキャストを配線予定。現状は recovery を既定として flow を構成。"))
+    clock_phase_caveat))
+
+if clock_phase_status == "ok":
+    sources_as_of.setdefault("fred_gdpnow", gdpnow[1])
+    sources_as_of.setdefault("fred_cpi", cpi_date)
 
 
 # ─── flow ブロック（常に契約充足、アニメは止まらない） ───────────
-clock_phase = "recovery"  # ナウキャスト未配線時の既定（タイル側は missing 明示）
 basin_map = {
     "reflation":   {"stocks": 0.10, "gold": 0.45, "oil": 0.10, "cash": 0.35},
     "recovery":    {"stocks": 0.55, "gold": 0.20, "oil": 0.15, "cash": 0.10},

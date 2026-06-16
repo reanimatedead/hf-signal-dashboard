@@ -39,12 +39,18 @@ jobs:
       - name: Generate signals
         run: python fetch_signals.py
 
-      # ── 5. Commit updated data.json ────────────────────
+      # ── 4b. Generate macro layer (additive; reads docs/data.json) ──
+      - name: Generate macro layer
+        env:
+          FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
+        run: python pipeline/build_macro.py
+
+      # ── 5. Commit updated data.json + macro.json ───────
       - name: Commit data.json
         run: |
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name  "github-actions[bot]"
-          git add docs/data.json
+          git add docs/data.json docs/data/macro.json
           git diff --cached --quiet && echo "No changes to commit" || \
             git commit -m "chore: update signals $(date -u '+%Y-%m-%d %H:%M UTC')"
 
