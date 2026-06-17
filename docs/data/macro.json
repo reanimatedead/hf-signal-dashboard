@@ -1,31 +1,31 @@
 {
   "meta": {
-    "generated_at": "2026-06-16T18:51:54Z",
+    "generated_at": "2026-06-17T00:09:55Z",
     "pipeline_version": "macro-0.1",
     "reference_seed": false,
     "branch": "feat/macro-environment",
     "note": "JP rates / IMM(CFTC) / VIX / yield_curve は docs/data.json を再利用。FRED 系は FRED_API_KEY 設定時のみ live、未設定なら missing。捏造はしない。",
     "sources_as_of": {
-      "treasury_tga": "2026-06-12",
-      "coingecko": "2026-06-16T18:51:54Z",
+      "treasury_tga": "2026-06-15",
+      "coingecko": "2026-06-17T00:09:55Z",
       "fred": "2026-06-10",
       "fred_gdpnow": "2026-04-01",
       "fred_cpi": "2026-05-01"
     },
     "store": {
-      "path": "/Users/takahiroyamada/hf-data-store",
+      "path": "/home/runner/hf-data-store",
       "used_gb": 0.0,
       "limit_gb": 250
     },
     "inputs": {
       "existing_data_json": "docs/data.json",
       "valuation_csv": "data/valuation_metrics.csv",
-      "fred_key_set": false
+      "fred_key_set": true
     }
   },
   "flow": {
     "net_liquidity": {
-      "value_usd_tn": 5.915,
+      "value_usd_tn": 5.899,
       "wow_change_tn": 0.0,
       "z": 0.0,
       "trend": "expand",
@@ -48,12 +48,12 @@
   "tiles": {
     "usdjpy_carry": {
       "label": "ドル円 金利差（US10Y − JP10Y）",
-      "value": 1.812,
+      "value": 1.771,
       "unit": "%",
       "z": 0.0,
       "color": "neutral",
-      "as_of": "2026-06-16T09:22:38.768270+09:00",
-      "lag_days": 1,
+      "as_of": "2026-06-17T09:08:30.704674+09:00",
+      "lag_days": 0,
       "status": "ok",
       "source": "docs/data.json (再利用)",
       "explain": "差が縮むと円高→キャリー巻き戻し→世界的リスクオフ。",
@@ -78,12 +78,12 @@
     },
     "vix": {
       "label": "VIX",
-      "value": 16.2,
+      "value": 16.41,
       "unit": "pt",
       "z": 0.0,
       "color": "green",
-      "as_of": "2026-06-16T09:22:38.768270+09:00",
-      "lag_days": 1,
+      "as_of": "2026-06-17T09:08:30.704674+09:00",
+      "lag_days": 0,
       "status": "ok",
       "source": "docs/data.json (yfinance, 再利用)",
       "explain": "株の予想変動率=恐怖指数。",
@@ -104,12 +104,12 @@
     },
     "tga": {
       "label": "米財務省 TGA 残高",
-      "value": 799.5,
+      "value": 816.0,
       "unit": "USD十億",
       "z": 0.0,
       "color": "neutral",
-      "as_of": "2026-06-12",
-      "lag_days": 5,
+      "as_of": "2026-06-15",
+      "lag_days": 2,
       "status": "ok",
       "source": "fiscaldata.treasury.gov DTS",
       "explain": "TGA(政府預金)。増えると市場から流動性を吸う。WALCL/RRPと並ぶ純流動性の3要素。",
@@ -117,11 +117,11 @@
     },
     "btc_price": {
       "label": "BTC価格",
-      "value": 65837.0,
+      "value": 65673.0,
       "unit": "USD",
       "z": 0.0,
       "color": "neutral",
-      "as_of": "2026-06-16T18:51:54Z",
+      "as_of": "2026-06-17T00:09:55Z",
       "lag_days": 0,
       "status": "ok",
       "source": "CoinGecko (キーレス)",
@@ -131,13 +131,13 @@
     "stablecoin_peg": {
       "label": "ステーブルコイン ペグ",
       "value": {
-        "USDT": 0.999191,
-        "USDC": 0.999835
+        "USDT": 0.999121,
+        "USDC": 0.999737
       },
       "unit": "USD",
-      "z": 0.16,
+      "z": 0.18,
       "color": "green",
-      "as_of": "2026-06-16T18:51:54Z",
+      "as_of": "2026-06-17T00:09:55Z",
       "lag_days": 0,
       "status": "ok",
       "source": "CoinGecko (キーレス)",
@@ -172,12 +172,12 @@
     },
     "real_yield": {
       "label": "10年実質金利(DFII10)",
-      "value": 2.17,
+      "value": 2.15,
       "unit": "%",
       "z": 0.0,
       "color": "neutral",
-      "as_of": "2026-06-12",
-      "lag_days": 5,
+      "as_of": "2026-06-15",
+      "lag_days": 2,
       "status": "ok",
       "source": "FRED:DFII10",
       "explain": "実質金利が下がると金の魅力が増す。",
@@ -198,7 +198,7 @@
     },
     "net_liquidity": {
       "label": "米ネット流動性 (WALCL−TGA−RRP)",
-      "value": 5.915,
+      "value": 5.899,
       "unit": "USD兆",
       "z": 0.0,
       "color": "neutral",
