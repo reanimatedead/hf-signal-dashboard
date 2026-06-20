@@ -217,7 +217,45 @@ alignable). Japan stays placeholder rather than show stale or single-side data. 
 
 ---
 
-## v4.2 — SURVIVAL loop / Phase 1 (this release)
+## v4.3 — Weekend Autocollect / Phase 1.5 (this release)
+
+**Goal:** turn the dashboard into a self-running data collector for the weekend.
+Push once on Friday, by Monday morning the history directory has fresh samples.
+No human action. No learning yet (samples too thin); only the recording boxes.
+
+- **Two extra cron schedules (shipped).** `.github/workflows/collect.yml` adds
+  `0 15 * * 4,5,6` (= Fri/Sat/Sun 0:00 JST) and `0 18 * * 0` (= Mon 03:00 JST).
+  The existing `update_signals.yml` (daily 00:00 JST) is untouched — the two
+  workflows have different `name:` and different commit messages, so the
+  GitHub Actions UI shows them as separate jobs.
+- **`collector/` package (shipped).** Five focused modules:
+  - `collector.runtime` — `retry()` with exponential backoff + jitter,
+    `HostRateLimiter` enforcing ≥ 0.4 s between hits to the same host,
+    `USER_AGENT` referencing the public repo URL (politeness + traceability).
+  - `collector.snapshot` — `extract(data.json dict)` returns an abridged payload
+    (data_status counts, money_flow snapshot, survival_loop top-5 candidates +
+    mode_a positions) capped at ~6 KB per day; `write_snapshot()` is idempotent
+    via a *substantive diff* (everything except `as_of_utc`).
+  - `collector.log` — `data/collect_log.jsonl` append-only structured log with
+    per-source `ok/failed/ratelimited` counters and a 5-error cap.
+  - `collector.cli` — `python -m collector.cli --workflow=collect` is the single
+    entry point. A failure inside `fetch_signals.main()` is caught, classified
+    by source name, and recorded; the run still emits a snapshot and log row.
+- **History store layout (shipped).** `data/history/YYYY-MM-DD.json` per day plus
+  `data/history/index.jsonl` (one row per date, ordered, sorted on every write).
+  Committed to the repo (visible to anyone), so Phase 2 has a public sample.
+- **Phase 2/3 scope freeze.** No model training, no win/loss adjudication. The
+  snapshot contract includes a `mode_b_intents: []` placeholder array and a
+  `TODO(phase-3)` comment in `collector.snapshot` documenting where the
+  discretionary intent intake will hook in. The cross-day P&L adjudication
+  follows in Phase 3.
+- **GRC.** All sources keyless (yfinance / FRED CSV / fiscaldata / CFTC COT /
+  CoinGecko / MoF JGB CSV). No personal balance / P&L in the repo (still in
+  `localStorage` + `.gitignore`'d `config.local*`). Disclaimer text unchanged.
+
+---
+
+## v4.2 — SURVIVAL loop / Phase 1
 
 **Goal:** install a "死なない土台 + 嘘発見器" before any learning loop is built.
 External-condition-independent: hard ceilings cannot move with market state.
