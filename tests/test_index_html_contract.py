@@ -1,9 +1,10 @@
-"""index.html が SPEC_MONEYFLOW §3, §4 の構造を持つか静的検査。
+"""index.html が SPEC_MONEYFLOW §3-4 と SPEC_SURVIVAL §5-6 の構造を持つか静的検査。
 
-- 8 タブ厳格 (旧 11 タブ構成を残さない)。
+- 9 タブ厳格 (survival 既定先頭)。
 - 背景 canvas (#bg-fx) が body 直下に存在。
 - 共有粒子モジュール (assets/lib/particles.js) を読み込む。
 - お金の流れ pane に 3 地域分の canvas が宣言されている。
+- SURVIVAL pane / risk gate / survival.js を持つ。
 """
 import pathlib
 import re
@@ -20,16 +21,45 @@ def test_index_exists():
     assert INDEX.exists(), "docs/index.html must exist"
 
 
-def test_exactly_eight_main_tabs():
+def test_exactly_nine_main_tabs():
     html = _read()
-    # main tab buttons are `<button class="tab" ...>` (active variant allowed)
     tabs = re.findall(r'<button[^>]*class="tab(?:\s+active)?"[^>]*data-tab="([^"]+)"', html)
-    assert len(tabs) == 8, f"expected 8 main tabs, found {len(tabs)}: {tabs}"
+    assert len(tabs) == 9, f"expected 9 main tabs (incl. survival), found {len(tabs)}: {tabs}"
     expected = {
+        "survival",
         "nikkei225", "dow30", "nasdaq100", "sp500",
         "fx", "rates_vol", "pos_val", "moneyflow",
     }
     assert set(tabs) == expected, f"unexpected tab set: {set(tabs) ^ expected}"
+
+
+def test_survival_is_default_active_tab():
+    html = _read()
+    m = re.search(r'<button[^>]*class="tab\s+active"[^>]*data-tab="([^"]+)"', html)
+    assert m, "no active tab marker found"
+    assert m.group(1) == "survival", (
+        f"default active tab must be 'survival' (SPEC §5), got '{m.group(1)}'"
+    )
+
+
+def test_survival_pane_present():
+    html = _read()
+    assert 'id="survival-pane"' in html, "SURVIVAL pane (#survival-pane) missing"
+    assert 'id="sv-risk-gate"' in html, "risk-gate banner (#sv-risk-gate) missing"
+
+
+def test_survival_js_module_referenced():
+    html = _read()
+    assert 'assets/survival/survival.js' in html, "survival.js module must be loaded"
+    survival_js = pathlib.Path(__file__).resolve().parents[1] / "docs" / "assets" / "survival" / "survival.js"
+    assert survival_js.exists(), "docs/assets/survival/survival.js must exist"
+
+
+def test_localstorage_log_key_used():
+    html = _read()
+    assert "hf_survival_log_v1" in html, (
+        "localStorage key hf_survival_log_v1 must be referenced (SPEC §5.1)"
+    )
 
 
 def test_no_legacy_independent_tabs():
