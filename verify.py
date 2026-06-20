@@ -72,6 +72,20 @@ REQUIRED_FILES = [
     "tests/test_notify_bus.py",
     "tests/test_notify_receiver.py",
     "tests/test_notify_security.py",
+    "SPEC_BACKTEST.md",                     # v4.5 Phase 1.7 contract
+    "backtest/__init__.py",
+    "backtest/walk_forward.py",
+    "backtest/simulator.py",
+    "backtest/metrics.py",
+    "backtest/cli.py",
+    "collector/backfill.py",
+    "docs/assets/survival/backtest_panel.js",
+    "docs/assets/survival/backfill_panel.js",
+    "tests/test_walk_forward.py",
+    "tests/test_backtest_simulator.py",
+    "tests/test_backtest_metrics.py",
+    "tests/test_backfill_cli.py",
+    "tests/test_backtest_e2e_smoke.py",
 ]
 
 EXPECTED_LAG = {

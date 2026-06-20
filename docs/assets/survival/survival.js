@@ -431,6 +431,13 @@
     if (typeof window.__survivalNotifyRefresh === "function") {
       try { window.__survivalNotifyRefresh(); } catch (e) {}
     }
+    // Backtest + backfill panels (Phase 1.7).
+    if (typeof window.__survivalBacktestRefresh === "function") {
+      try { window.__survivalBacktestRefresh(); } catch (e) {}
+    }
+    if (typeof window.__survivalBackfillRefresh === "function") {
+      try { window.__survivalBackfillRefresh(); } catch (e) {}
+    }
   }
 
   window.__survivalShow = function(){

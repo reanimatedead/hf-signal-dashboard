@@ -16,6 +16,9 @@ bf = pytest.importorskip(
 def tmp_local(tmp_path, monkeypatch):
     monkeypatch.setattr(bf, "LOCAL_DIR", tmp_path, raising=True)
     monkeypatch.setattr(bf, "PROGRESS_PATH", tmp_path / "backfill_progress.json", raising=True)
+    # 公開抜粋もテスト用 tmp に逃がして、実リポを汚さない
+    monkeypatch.setattr(bf, "PUBLIC_PROGRESS_PATH", tmp_path / "backfill_progress_public.json", raising=True)
+    monkeypatch.setattr(bf, "DUCKDB_PATH", tmp_path / "history.duckdb", raising=True)
     return tmp_path
 
 
