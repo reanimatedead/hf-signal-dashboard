@@ -217,9 +217,50 @@ alignable). Japan stays placeholder rather than show stale or single-side data. 
 
 ---
 
+## v4.2 — SURVIVAL loop / Phase 1 (this release)
+
+**Goal:** install a "死なない土台 + 嘘発見器" before any learning loop is built.
+External-condition-independent: hard ceilings cannot move with market state.
+Zero human input. No learning. Risk in % only.
+
+- **Fixed hard ceilings (no learning).** `survival/risk_engine.py` ships `HARD_CAPS`:
+  per-trade risk ≤ 0.5%, DD shrink at -10%, DD stop at -15%, max concurrent positions = 3,
+  Kelly fraction = 1/4. Unit tests reject any input that would breach these ceilings.
+- **Inverse-vol × 1/4 Kelly position sizing (shipped).** `design_daily_risk()` outputs
+  `per_trade_pct` and `position_size_pct` clamped by `HARD_CAPS`. Win probability defaults to
+  0.50 in Phase 1 (no history-based estimator yet).
+- **Pattern-based exit table (shipped).** `survival/pattern_table.py` keys on
+  `(regime ∈ {high_vol, low_vol}) × (distortion ∈ {high, mid, low})`. `daily_update()`
+  EWMA-adjusts only the take-profit cell, clamped to `[0.5%, 6%]`. **Stop loss is never
+  touched** (asymmetric: missing profit ≠ death; loosening stop = death).
+- **Monte Carlo bankruptcy simulator (shipped).** `survival/bankruptcy.py` ships both
+  order-dependent MC RoR and the Kaufman/Vince closed-form. Heatmap walks risk options ×
+  balance-tier rows. Balance variation only affects the absolute-amount display layer.
+- **Edge-score candidate pipeline (shipped).** `survival/edge_score.py` reads each existing
+  market row and produces `stretch / positioning_fuel / vol_context / edge_score`.
+  Candidates ≥ 55 are surfaced (top 20); ≥ 70 become virtual Mode A entries (machine, ≤ 3).
+- **`data.json.survival_loop` (shipped).** Top-level block with `risk_gate`, `auto_risk`,
+  `pattern_table`, `candidates`, `mode_a_positions`, `bankruptcy_simulation`. Single ticker /
+  single fetch failure degrades to `placeholder`; the run never breaks.
+- **SURVIVAL tab is the default (shipped).** First thing a visitor sees is the risk-gate
+  banner, auto-risk card, edge candidate table (one-tap "take / skip" buttons writing **only**
+  to `localStorage.hf_survival_log_v1`), Mode A virtual positions, pattern table (stop-loss
+  column visually marked as fixed), bankruptcy heatmap, client-side aggregates.
+- **GRC.** Disclaimer remains on every pane. No execution advice text. `config.local*` is in
+  `.gitignore`; the public repo never sees P&L or balances.
+
+**Explicitly out of Phase 1 (deferred):**
+- Model weight re-learning, regime auto-switching, win-probability calibration from realized
+  results (Brier-based update). These are Phase 2/3 — Phase 1 deliberately freezes them out
+  to prevent over-fitting on a thin history.
+
+---
+
 ## Guardrails (all phases)
 
 - yfinance / free sources only; no API keys, no paid APIs.
 - Per-symbol `try/except`; a single bad ticker never fails the GitHub Actions run.
 - Indicators, charts, yields, curves, Elliott, and edge context are **market context only**.
 - No buy/sell/long/short signal values, no order/position/leverage/TP/SL fields, no secrets.
+- (v4.2 addition) Stop-loss / margin-call / DD ceilings are **fixed**. Daily updates only
+  move take-profit. Phase 1 implementations cannot bypass `survival.risk_engine.HARD_CAPS`.

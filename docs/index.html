@@ -356,6 +356,66 @@ body.light .mf-cv-wrap{background:radial-gradient(ellipse at 50% 18%,#e8edf3,#f7
 .mf-meta .mf-status{padding:1px 5px;border:1px solid var(--border);border-radius:3px;
                     color:var(--text-dim);font-family:var(--cond);font-weight:700}
 
+/* ══════════════════════════════════════════════════
+   SURVIVAL PANE (Agent A + Agent D, SPEC_SURVIVAL §5)
+══════════════════════════════════════════════════ */
+#survival-pane{padding:14px 16px;font-family:-apple-system,"Hiragino Kaku Gothic ProN",system-ui,sans-serif;font-size:13px;color:var(--text)}
+.sv-disc{font-size:11px;color:var(--yellow);border:1px solid var(--border);border-radius:4px;
+         padding:6px 10px;margin-bottom:10px;background:var(--bg2)}
+#sv-risk-gate{background:var(--bg2);border:1px solid var(--border);border-radius:6px;
+              padding:10px 14px;margin-bottom:12px;display:flex;flex-direction:column;gap:4px}
+.sv-rg-line{display:flex;align-items:center;gap:10px}
+.sv-rg-tag{font-family:var(--cond);font-weight:800;font-size:18px;letter-spacing:0.08em;
+           padding:4px 12px;border-radius:4px}
+.sv-rg-green{background:rgba(0,232,162,0.18);color:var(--green);border:1px solid rgba(0,232,162,0.5)}
+.sv-rg-yellow{background:rgba(240,192,64,0.15);color:var(--yellow);border:1px solid rgba(240,192,64,0.5)}
+.sv-rg-red{background:rgba(255,69,96,0.15);color:var(--red);border:1px solid rgba(255,69,96,0.5)}
+.sv-rg-label{font-family:var(--cond);color:var(--text-dim);font-size:11px;
+             letter-spacing:0.1em;text-transform:uppercase}
+.sv-rg-reasons{font-size:11px;color:var(--text-dim)}
+.sv-rg-reasons b{color:var(--text);font-weight:600}
+.sv-grid{display:grid;grid-template-columns:1fr;gap:12px}
+@media(min-width:900px){.sv-grid{grid-template-columns:1fr 1fr}}
+@media(min-width:1300px){.sv-grid{grid-template-columns:2fr 1fr 1fr}}
+.sv-card{background:var(--bg2);border:1px solid var(--border);border-radius:6px;padding:10px 12px;min-width:0}
+.sv-card-hd{font-family:var(--cond);font-weight:700;font-size:11px;letter-spacing:0.1em;
+            color:var(--accent);text-transform:uppercase;margin-bottom:8px}
+.sv-card-src{font-size:9.5px;color:var(--text-faint);margin-top:6px;font-family:var(--mono)}
+.sv-card-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px 14px}
+.sv-card-grid > div{display:flex;flex-direction:column;font-size:11px}
+.sv-card-grid b{color:var(--text-dim);font-size:10px;letter-spacing:0.06em;text-transform:uppercase}
+.sv-card-grid span{color:var(--text);font-variant-numeric:tabular-nums;font-size:13px;font-weight:700}
+.sv-table{width:100%;border-collapse:collapse;font-size:11px}
+.sv-table th{font-family:var(--cond);font-weight:700;font-size:10px;letter-spacing:0.08em;
+             color:var(--text-dim);text-transform:uppercase;padding:6px 8px;
+             border-bottom:1px solid var(--border);text-align:left;background:var(--bg3)}
+.sv-table td{padding:6px 8px;border-bottom:1px solid var(--border);vertical-align:middle}
+.sv-table .sv-num{text-align:right;font-variant-numeric:tabular-nums;font-family:var(--mono)}
+.sv-table .sv-pos{color:var(--green)}
+.sv-table .sv-neg{color:var(--red)}
+.sv-table .sv-flat{color:var(--text-dim)}
+.sv-table .sv-fixed{opacity:.7;font-style:italic}
+.sv-table small{color:var(--text-faint);font-size:9.5px}
+.sv-btn{font-size:10px;padding:3px 8px;border:1px solid var(--border);border-radius:3px;
+        background:var(--bg3);color:var(--text-dim);font-family:var(--cond);font-weight:700;
+        letter-spacing:0.05em;cursor:pointer;transition:all .15s}
+.sv-btn:hover{border-color:var(--accent);color:var(--accent)}
+.sv-btn-take{border-color:rgba(0,232,162,0.35);color:var(--green)}
+.sv-btn-skip{border-color:rgba(90,106,126,0.35)}
+.sv-mini{font-size:9px;padding:1px 5px;border:1px solid var(--border);border-radius:3px;
+         background:var(--bg3);cursor:pointer;font-family:var(--cond);font-weight:700}
+.sv-mini-win{color:var(--green);border-color:rgba(0,232,162,0.4)}
+.sv-mini-lose{color:var(--red);border-color:rgba(255,69,96,0.4)}
+.sv-empty{color:var(--text-faint);font-size:11px;padding:8px 0}
+.sv-row-taken{background:rgba(0,232,162,0.05)}
+.sv-row-skipped{opacity:.55}
+.sv-ror-lo{color:var(--green)}
+.sv-ror-md{color:var(--yellow)}
+.sv-ror-hi{color:var(--red)}
+.sv-notes{font-size:10px;color:var(--text-dim);margin-top:10px;border-top:1px solid var(--border);padding-top:8px}
+.sv-notes ul{margin:4px 0 0 16px}
+.sv-notes li{margin:2px 0}
+
 /* ── Multi-section table rows (rates_vol / pos_val) ── */
 tbody tr.section-row,tbody tr.section-row:hover{background:var(--bg3);cursor:default}
 .section-row td{font-family:var(--cond);font-weight:700;font-size:11px;letter-spacing:0.12em;
@@ -401,7 +461,8 @@ tbody tr.section-row,tbody tr.section-row:hover{background:var(--bg3);cursor:def
 <!-- Main -->
 <div id="main" style="display:none">
   <div id="tabs">
-    <button class="tab active" data-tab="nikkei225" onclick="sw('nikkei225',this)">日経 225</button>
+    <button class="tab active" data-tab="survival"  onclick="sw('survival',this)">SURVIVAL</button>
+    <button class="tab" data-tab="nikkei225" onclick="sw('nikkei225',this)">日経 225</button>
     <button class="tab" data-tab="dow30"     onclick="sw('dow30',this)">Dow 30</button>
     <button class="tab" data-tab="nasdaq100" onclick="sw('nasdaq100',this)">Nasdaq 100</button>
     <button class="tab" data-tab="sp500"     onclick="sw('sp500',this)">S&amp;P 500</button>
@@ -421,6 +482,25 @@ tbody tr.section-row,tbody tr.section-row:hover{background:var(--bg3);cursor:def
     <button class="fbtn" id="wlbtn" onclick="toggleWL()">☆ Watchlist</button>
     <div id="rowcount"></div>
   </div>
+  <!-- ─── SURVIVAL / 生存ループ (Phase 1, v4.2) ─── -->
+  <div id="survival-pane" style="display:none">
+    <div class="sv-disc">⚠ <b>Macro environment visualization / not investment advice</b>. Phase 1: 学習しない・固定天井で殺さない。</div>
+    <div id="sv-risk-gate"></div>
+    <div class="sv-grid">
+      <div class="sv-card" id="sv-candidates"></div>
+      <div class="sv-card" id="sv-auto-risk"></div>
+      <div class="sv-card" id="sv-mode-a"></div>
+      <div class="sv-card" id="sv-bankruptcy"></div>
+      <div class="sv-card" id="sv-pattern"></div>
+      <div class="sv-card" id="sv-aggregate"></div>
+      <div class="sv-card" id="sv-log" style="grid-column:1/-1"></div>
+    </div>
+    <div class="sv-notes" id="sv-notes"></div>
+    <div class="sv-empty-msg" style="display:none;color:var(--text-faint);padding:20px;text-align:center">
+      survival_loop データがロードされていません。data.json を確認してください。
+    </div>
+  </div>
+
   <!-- ─── お金の流れ / Money Flow (3-region, v4.1) ─── -->
   <div id="mf-pane" style="display:none">
     <div class="mf-disc">
@@ -474,7 +554,7 @@ tbody tr.section-row,tbody tr.section-row:hover{background:var(--bg3);cursor:def
 
 <script>
 // ══ State ══════════════════════════════════════════
-let DATA=null, tab="nikkei225", scol="composite_score", sdir=-1;
+let DATA=null, tab="survival", scol="composite_score", sdir=-1;
 let fsig=null, sv="", wlOnly=false;
 let WL=new Set(JSON.parse(localStorage.getItem("hf_wl")||"[]"));
 let light=localStorage.getItem("hf_theme")==="light";
@@ -686,7 +766,8 @@ function init(){
   document.getElementById("footer").style.display="block";
   // v4.1: pre-warm the money-flow pane so a single tab click renders instantly.
   if (window.__mfRefresh) window.__mfRefresh();
-  sw("nikkei225", document.querySelector(".tab.active"));
+  // v4.2 Phase 1: SURVIVAL is the default tab — first thing the user sees.
+  sw("survival", document.querySelector(".tab.active"));
 }
 
 // ══ Summary bar ════════════════════════════════════
@@ -720,6 +801,13 @@ function sw(key,btn){
   document.querySelectorAll(".tab").forEach(t=>t.classList.remove("active"));
   if (btn && btn.classList) btn.classList.add("active");
   const wlb=document.getElementById("wlbtn"); if (wlb) wlb.classList.remove("wl-active");
+  // SURVIVAL (Phase 1) is the default. Mode B/C use localStorage only.
+  if (key === "survival") {
+    if (window.__mfHide) window.__mfHide();
+    if (window.__survivalShow) window.__survivalShow();
+    return;
+  }
+  if (window.__survivalHide) window.__survivalHide();
   if (key === "moneyflow") {
     if (window.__mfShow) window.__mfShow();
     return;
@@ -1363,6 +1451,8 @@ function bbColor(b){
 
 <!-- Shared particle engine (Agent A + Agent C / SPEC §4.1) -->
 <script src="assets/lib/particles.js"></script>
+<!-- SURVIVAL loop module (Phase 1) -->
+<script src="assets/survival/survival.js"></script>
 <script>
 /* ════════════════════════════════════════════════════════════════
    v4.1 グルーコード (Agent A: bg-fx + i18n + 8-tab dispatch,

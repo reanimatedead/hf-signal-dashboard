@@ -12,3 +12,9 @@ data/macro.json
 verify_report.json
 seed/public/data.json
 node_modules/
+
+# Phase 1 — survival loop: 個別損益/残高は公開リポに置かない
+config.local
+config.local.*
+!config.local.json.example
+.pytest_cache/

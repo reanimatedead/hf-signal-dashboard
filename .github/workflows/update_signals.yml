@@ -40,10 +40,16 @@ jobs:
         run: python fetch_signals.py
 
       # ── 4a. Schema gate (fail-fast on contract regression) ─
-      - name: Verify data.json contract (pytest)
+      - name: Verify contracts (pytest)
         run: |
           pip install pytest
-          pytest tests/test_money_flow_schema.py tests/test_index_html_contract.py -q
+          pytest tests/test_money_flow_schema.py \
+                 tests/test_index_html_contract.py \
+                 tests/test_survival_loop_schema.py \
+                 tests/test_risk_ceiling.py \
+                 tests/test_pattern_table_invariants.py \
+                 tests/test_bankruptcy_simulator.py \
+                 -q
 
       # ── 4b. Generate (legacy) macro layer (still wired) ──
       - name: Generate macro layer

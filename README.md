@@ -33,12 +33,21 @@ without leaving the portfolio incomplete.
 
 ---
 
-## Features (v4.1)
+## Features (v4.2 / Phase 1)
 
-- **8 tabs (consolidated from 11)** — Nikkei 225, Dow 30, Nasdaq 100, S&P 500, FX / 商品,
+- **9 tabs (SURVIVAL default)** — **SURVIVAL** (生存ループ / 3-second judgment), Nikkei 225,
+  Dow 30, Nasdaq 100, S&P 500, FX / 商品,
   **金利・債券・VOL** (rates_vol; US/JP 2Y/10Y/30Y + VIX + MOVE in one view),
   **ポジション/割安度** (pos_val; CFTC IMM + Crypto + Buffett Indicator sectioned),
   **お金の流れ** (moneyflow; 3-region: US/EU/JP).
+- **SURVIVAL tab (v4.2 / Phase 1)** — 1-word risk gate (`risk-on / neutral / risk-off`,
+  computed from money_flow + VIX + yield_curve), auto-designed daily risk (inverse-vol scaling
+  × 1/4 Kelly, capped at 0.5%/trade by `survival.risk_engine.HARD_CAPS`), `edge_score` candidate
+  list with one-tap Mode B logging (localStorage only), pattern-based exit table (only the
+  take-profit cell auto-adjusts daily; stop-loss / DD / margin-call ceilings are **fixed**),
+  Monte-Carlo bankruptcy heatmap with closed-form Kaufman comparison, and client-side
+  hit-rate / ROI / Brier / pattern win-rate aggregation. **Zero human input. No learning.**
+  P&L / balances never leave the browser; `config.local*` is in `.gitignore`.
 - **お金の流れ panel (v4.1)** — keyless 3-region (US / Eurozone / Japan) flow visualization with
   central-bank → assets particle animation, debt counters, and freshness badges. US shows
   WALCL / TGA / RRP / net_liquidity / debt_to_penny (daily delta); EU shows ECBASSETSW with a

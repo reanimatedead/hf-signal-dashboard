@@ -90,6 +90,9 @@ try {
     const bg = document.getElementById("bg-fx");
     const bgStyle = bg ? getComputedStyle(bg) : null;
     const bgbtn = document.getElementById("bgbtn");
+    const active = document.querySelector("#tabs .tab.active[data-tab]");
+    const sp = document.getElementById("survival-pane");
+    const rg = document.getElementById("sv-risk-gate");
     return {
       tabCount: tabs.length,
       tabIds: tabs.map((t) => t.getAttribute("data-tab")),
@@ -98,6 +101,11 @@ try {
       bgPe: bgStyle ? bgStyle.pointerEvents : null,
       bgAria: bg ? bg.getAttribute("aria-hidden") : null,
       bgBtnPresent: !!bgbtn,
+      activeOnLoad: active ? active.getAttribute("data-tab") : null,
+      survivalPaneVisibleOnLoad: !!(sp && getComputedStyle(sp).display !== "none"),
+      riskGateTextLen: rg ? rg.textContent.trim().length : 0,
+      candidateRowsOnLoad: document.querySelectorAll("#sv-candidates tbody tr").length,
+      bankruptcyRowsOnLoad: document.querySelectorAll("#sv-bankruptcy tbody tr").length,
     };
   });
 
@@ -161,8 +169,8 @@ try {
   });
 
   const failed = [];
-  if (init.tabCount !== 8) failed.push(`expected 8 tabs, got ${init.tabCount}`);
-  const want = ["nikkei225","dow30","nasdaq100","sp500","fx","rates_vol","pos_val","moneyflow"];
+  if (init.tabCount !== 9) failed.push(`expected 9 tabs, got ${init.tabCount}`);
+  const want = ["survival","nikkei225","dow30","nasdaq100","sp500","fx","rates_vol","pos_val","moneyflow"];
   if (init.tabIds.join(",") !== want.join(","))
     failed.push(`tab order mismatch: ${init.tabIds.join(",")}`);
   if (!init.bgPresent) failed.push("#bg-fx canvas missing");
@@ -185,6 +193,12 @@ try {
   if (bgAfter1 === bgBefore) failed.push("background mode cycle did not change first time");
   if (bgAfter2 === bgAfter1) failed.push("background mode cycle did not change second time");
   if (!lng || (lng !== "ja" && lng !== "en")) failed.push("language toggle did not persist");
+
+  if (init.activeOnLoad !== "survival") failed.push(`default-active tab must be 'survival', got '${init.activeOnLoad}'`);
+  if (!init.survivalPaneVisibleOnLoad) failed.push("survival-pane not visible on first load");
+  if (init.riskGateTextLen === 0) failed.push("risk gate not rendered on load");
+  if (init.bankruptcyRowsOnLoad === 0) failed.push("bankruptcy heatmap empty on load");
+  if (init.candidateRowsOnLoad === 0) failed.push("no SURVIVAL candidates on load");
 
   if (!back.paneHidden) failed.push("mf-pane stayed visible after returning to nikkei225");
   if (!back.tableVisible) failed.push("table did not restore on return");
