@@ -1,0 +1,8 @@
+{
+  "_doc": "Optional. Copy to config.local.json to enable absolute-balance display.",
+  "_doc2": "DO NOT commit this file; it is in .gitignore. SPEC_SURVIVAL §0.",
+  "_doc3": "All risk math runs in % regardless; this is display-layer only.",
+  "initial_balance": 100,
+  "currency": "JPY",
+  "display_absolute": false
+}

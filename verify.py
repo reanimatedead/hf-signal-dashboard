@@ -35,8 +35,18 @@ REQUIRED_FILES = [
     "verify_render.mjs",
     "MACRO_INTEGRATION_NOTES.md",
     "SPEC_MONEYFLOW.md",                    # v4.1 contract
+    "SPEC_SURVIVAL.md",                     # v4.2 Phase 1 contract
+    "survival/risk_engine.py",
+    "survival/pattern_table.py",
+    "survival/bankruptcy.py",
+    "survival/survival_loop.py",
+    "docs/assets/survival/survival.js",
     "tests/test_money_flow_schema.py",
     "tests/test_index_html_contract.py",
+    "tests/test_risk_ceiling.py",
+    "tests/test_pattern_table_invariants.py",
+    "tests/test_bankruptcy_simulator.py",
+    "tests/test_survival_loop_schema.py",
 ]
 
 EXPECTED_LAG = {
@@ -139,6 +149,39 @@ try:
             ok("gate1c_money_flow")
 except Exception as e:
     fail("gate1c_money_flow", str(e))
+
+# Gate-1d: v4.2 Phase 1 — survival_loop の契約 + HARD_CAPS の遵守
+try:
+    sl = (existing or {}).get("survival_loop") if existing else None
+    if not isinstance(sl, dict):
+        fail("gate1d_survival_loop", "data.json.survival_loop missing or not dict")
+    elif sl.get("data_status") == "placeholder":
+        ok("gate1d_survival_loop")
+    else:
+        problems = []
+        for k in ("risk_gate", "auto_risk", "pattern_table",
+                  "candidates", "mode_a_positions", "bankruptcy_simulation"):
+            if k not in sl:
+                problems.append(f"survival_loop.{k} missing")
+        ar = sl.get("auto_risk") or {}
+        ptp = ar.get("per_trade_pct")
+        if ptp is None or ptp > 0.5 or ptp < 0:
+            problems.append(f"per_trade_pct {ptp} violates HARD_CAP 0.5")
+        if ar.get("dd_shrink_pct") != -10.0:
+            problems.append("dd_shrink_pct must be -10.0 (fixed)")
+        if ar.get("dd_stop_pct") != -15.0:
+            problems.append("dd_stop_pct must be -15.0 (fixed)")
+        if (ar.get("max_concurrent") or 0) > 3:
+            problems.append("max_concurrent > 3 violates HARD_CAP")
+        for p in sl.get("mode_a_positions", []):
+            if p.get("size_pct", 0) > 0.5:
+                problems.append(f"mode_a {p.get('symbol')} size_pct > 0.5")
+        if problems:
+            fail("gate1d_survival_loop", "; ".join(problems))
+        else:
+            ok("gate1d_survival_loop")
+except Exception as e:
+    fail("gate1d_survival_loop", str(e))
 
 
 def finish():

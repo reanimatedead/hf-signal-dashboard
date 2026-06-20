@@ -57,8 +57,11 @@ def test_survival_js_module_referenced():
 
 def test_localstorage_log_key_used():
     html = _read()
-    assert "hf_survival_log_v1" in html, (
-        "localStorage key hf_survival_log_v1 must be referenced (SPEC §5.1)"
+    survival_js_path = pathlib.Path(__file__).resolve().parents[1] / "docs" / "assets" / "survival" / "survival.js"
+    js = survival_js_path.read_text(encoding="utf-8") if survival_js_path.exists() else ""
+    # 公開リポに値は書かないが、キー文字列は前面 (html or js) に存在しないと結線できない。
+    assert "hf_survival_log_v1" in (html + js), (
+        "localStorage key hf_survival_log_v1 must be referenced in index.html or survival.js (SPEC §5.1)"
     )
 
 
