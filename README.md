@@ -33,6 +33,22 @@ without leaving the portfolio incomplete.
 
 ---
 
+## Features (v4.3 / Phase 1.5 — weekend autocollect)
+
+- **Weekend autocollect (v4.3 / Phase 1.5)** — a separate workflow
+  `.github/workflows/collect.yml` fires four extra cron runs without human
+  intervention: `0 15 * * 4,5,6` (Thu–Sat UTC = Fri–Sun 0:00 JST) and
+  `0 18 * * 0` (Sun UTC = Mon 03:00 JST). Each run invokes `collector.cli`
+  which calls `fetch_signals.main()`, writes an abridged daily snapshot to
+  `data/history/YYYY-MM-DD.json` (idempotent: same-day re-runs normalize),
+  updates `data/history/index.jsonl`, and appends a structured row to
+  `data/collect_log.jsonl` (per-source ok/failed/ratelimited + first 5 errors).
+  All sources stay keyless; `collector.runtime` ships a polite User-Agent,
+  per-host rate floor (≥ 0.4 s), and exponential-backoff retry. A single
+  source failure is recorded but never breaks the run. Learning (Phase 2) and
+  win/loss adjudication (Phase 3) are deliberately not implemented — only the
+  recording boxes are wired so that samples accumulate over the weekend.
+
 ## Features (v4.2 / Phase 1)
 
 - **9 tabs (SURVIVAL default)** — **SURVIVAL** (生存ループ / 3-second judgment), Nikkei 225,

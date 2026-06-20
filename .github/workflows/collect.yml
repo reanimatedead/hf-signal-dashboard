@@ -1,0 +1,73 @@
+name: Weekend Autocollect (Fri-Mon JST)
+
+# SPEC_AUTOCOLLECT.md §1.
+# - 木〜土 UTC 15:00 = 金〜日 0:00 JST (週末3日分)
+# - 日 UTC 18:00 = 月 3:00 JST (週明け追加 1 本)
+# update_signals.yml (毎日 0:00 JST) と曜日が部分的に重なるが、collect.yml は
+# data/history と data/collect_log を更新する別ジョブで衝突しない。
+
+on:
+  schedule:
+    - cron: "0 15 * * 4,5,6"
+    - cron: "0 18 * * 0"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  collect:
+    name: Fetch + Snapshot + Log
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest
+
+      # 取得 + 履歴 + ログ。collector.cli は 1 ソース失敗で死なない。
+      - name: Run collector (fetch → snapshot → log)
+        run: python -m collector.cli --workflow=collect
+
+      # 契約ゲート: Phase 1 + Phase 1.5 の回帰防止。
+      - name: pytest contract gate
+        run: |
+          pytest tests/test_money_flow_schema.py \
+                 tests/test_index_html_contract.py \
+                 tests/test_survival_loop_schema.py \
+                 tests/test_risk_ceiling.py \
+                 tests/test_pattern_table_invariants.py \
+                 tests/test_bankruptcy_simulator.py \
+                 tests/test_collector_idempotent.py \
+                 tests/test_collector_schema.py \
+                 tests/test_collector_resilience.py \
+                 tests/test_collect_workflow.py \
+                 -q
+
+      - name: Commit history + log
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name  "github-actions[bot]"
+          git add docs/data.json docs/data/macro.json \
+                  data/history/ data/collect_log.jsonl
+          git diff --cached --quiet && echo "No changes to commit" || \
+            git commit -m "chore(autocollect): $(date -u '+%Y-%m-%d %H:%M UTC')"
+
+      - name: Push
+        uses: ad-m/github-push-action@v0.8.0
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          branch: ${{ github.ref }}

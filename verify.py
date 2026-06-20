@@ -47,6 +47,16 @@ REQUIRED_FILES = [
     "tests/test_pattern_table_invariants.py",
     "tests/test_bankruptcy_simulator.py",
     "tests/test_survival_loop_schema.py",
+    "SPEC_AUTOCOLLECT.md",                  # v4.3 Phase 1.5 contract
+    "collector/runtime.py",
+    "collector/snapshot.py",
+    "collector/log.py",
+    "collector/cli.py",
+    ".github/workflows/collect.yml",
+    "tests/test_collector_idempotent.py",
+    "tests/test_collector_schema.py",
+    "tests/test_collector_resilience.py",
+    "tests/test_collect_workflow.py",
 ]
 
 EXPECTED_LAG = {
