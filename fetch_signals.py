@@ -2228,6 +2228,31 @@ def main():
         "money_flow": money_flow,
     }
 
+    # v4.2 — survival_loop (生存ループ / Phase 1).
+    # Pure analytic; reads payload (markets + money_flow + meta) only.
+    try:
+        from survival.survival_loop import build as _build_survival_loop
+        payload["survival_loop"] = _build_survival_loop(payload)
+        sl = payload["survival_loop"]
+        print(f"\n[survival_loop] risk_gate={sl['risk_gate']['label']} "
+              f"per_trade={sl['auto_risk']['per_trade_pct']}% "
+              f"mode_a={len(sl['mode_a_positions'])} "
+              f"cand={len(sl['candidates'])}")
+    except Exception as exc:
+        # 単一ティッカー失敗で全体破綻させない契約のため、生存ループ生成失敗も
+        # placeholder で degrade させる。
+        print(f"  [survival_loop] build failed ({type(exc).__name__}: {exc})")
+        payload["survival_loop"] = {
+            "as_of": now_jst.isoformat(),
+            "version": "1",
+            "data_status": "placeholder",
+            "error": str(exc)[:120],
+            "notes": [
+                "survival_loop build failed; placeholder retained.",
+                "Market environment visualization only. Not investment advice.",
+            ],
+        }
+
     # Strict-JSON guard: Python's json writes NaN/Infinity, but the browser's
     # JSON.parse rejects them — a single NaN (e.g. a ticker that returned no price)
     # would break the entire dashboard load. Sanitize non-finite floats to null.
