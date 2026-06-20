@@ -16,7 +16,7 @@ def _write_jsonl(path: pathlib.Path, rows):
             f.write(json.dumps(r, ensure_ascii=False) + "\n")
 
 
-def _bar(ts, close=100.0, sym="USDJPY=X", iv="1d"):
+def _bar(ts, close=100.0, sym="X", iv="1d"):
     return {"ts": ts, "open": close, "high": close * 1.01,
             "low": close * 0.99, "close": close, "volume": 0.0,
             "symbol": sym, "interval": iv}
@@ -31,7 +31,7 @@ def tmp_local(tmp_path, monkeypatch):
 
 # ── basic load ──────────────────────────────────────
 def test_load_all_reads_jsonl(tmp_local):
-    rows = [_bar(f"2020-01-{d:02d}T00:00:00", close=100 + d) for d in range(1, 20)]
+    rows = [_bar(f"2020-01-{d:02d}T00:00:00", close=100 + d, sym="USDJPY=X") for d in range(1, 20)]
     _write_jsonl(tmp_local / "history_USDJPY_X_1d.jsonl", rows)
     res = ll.load_all(interval="1d", min_bars=10, source="jsonl")
     assert res["source_used"] == "jsonl"
@@ -42,7 +42,7 @@ def test_load_all_reads_jsonl(tmp_local):
 
 
 def test_min_bars_below_threshold_goes_to_excluded(tmp_local):
-    rows = [_bar(f"2020-01-{d:02d}T00:00:00") for d in range(1, 5)]
+    rows = [_bar(f"2020-01-{d:02d}T00:00:00", sym="USDJPY=X") for d in range(1, 5)]
     _write_jsonl(tmp_local / "history_USDJPY_X_1d.jsonl", rows)
     res = ll.load_all(interval="1d", min_bars=10, source="jsonl")
     assert "USDJPY=X" not in res["symbols"]

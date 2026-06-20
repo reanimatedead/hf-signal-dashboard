@@ -1,18 +1,3562 @@
 {
-  "as_of_utc": null,
-  "mode": "smoke",
-  "n_oos_trades": 226,
-  "n_is_trades": 1209,
-  "summary": {
+  "as_of_utc": "2026-06-20T23:41:44+00:00",
+  "mode": "live",
+  "source_used": "jsonl",
+  "interval": "1d",
+  "fold_config": {
+    "mode": "anchored",
+    "train_min": 400,
+    "test_window": 80,
+    "purge": 5,
+    "embargo": 5
+  },
+  "exec_config": {
+    "slip_pct": 0.02,
+    "fee_pct": 0.01,
+    "size_pct": 0.5
+  },
+  "per_symbol": [
+    {
+      "symbol": "AUDUSD=X",
+      "n_bars": 5228,
+      "first_ts": "2006-05-16T00:00:00",
+      "last_ts": "2026-06-20T00:00:00",
+      "folds": 60,
+      "n_oos_trades": 1876,
+      "n_is_trades": 65461,
+      "in_sample": {
+        "n": 65461,
+        "judge": "undetermined",
+        "hit_rate": 0.381204,
+        "brier": 0.26438,
+        "brier_decomposition": {
+          "reliability": 0.028492,
+          "resolution": 0.0,
+          "uncertainty": 0.235888
+        },
+        "calibration": [
+          {
+            "bin": [
+              0.0,
+              0.1
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.1,
+              0.2
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.2,
+              0.3
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.3,
+              0.4
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.4,
+              0.5
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.5,
+              0.6
+            ],
+            "n": 65461,
+            "pred_mean": 0.55,
+            "obs_rate": 0.3812
+          },
+          {
+            "bin": [
+              0.6,
+              0.7
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.7,
+              0.8
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.8,
+              0.9
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.9,
+              1.0
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          }
+        ],
+        "avg_net_pct": -0.004407,
+        "avg_net_pct_ci": [
+          -0.0192,
+          0.006816
+        ],
+        "ev_ambiguous": true,
+        "max_dd_pct": -99.996178
+      },
+      "out_of_sample": {
+        "n": 1876,
+        "judge": "undetermined",
+        "hit_rate": 0.377399,
+        "brier": 0.26476,
+        "brier_decomposition": {
+          "reliability": 0.029791,
+          "resolution": 0.0,
+          "uncertainty": 0.234969
+        },
+        "calibration": [
+          {
+            "bin": [
+              0.0,
+              0.1
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.1,
+              0.2
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.2,
+              0.3
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.3,
+              0.4
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.4,
+              0.5
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.5,
+              0.6
+            ],
+            "n": 1876,
+            "pred_mean": 0.55,
+            "obs_rate": 0.3774
+          },
+          {
+            "bin": [
+              0.6,
+              0.7
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.7,
+              0.8
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.8,
+              0.9
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.9,
+              1.0
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          }
+        ],
+        "avg_net_pct": -0.0206,
+        "avg_net_pct_ci": [
+          -0.076792,
+          0.045783
+        ],
+        "ev_ambiguous": true,
+        "max_dd_pct": -63.326094
+      },
+      "overfit_gap": {
+        "hit_rate": 0.003805,
+        "brier": 0.00038,
+        "avg_net": 0.016193
+      },
+      "judge": "inconclusive"
+    },
+    {
+      "symbol": "BTC-USD",
+      "n_bars": 4294,
+      "first_ts": "2014-09-17T00:00:00",
+      "last_ts": "2026-06-20T00:00:00",
+      "folds": 48,
+      "n_oos_trades": 3584,
+      "n_is_trades": 99405,
+      "in_sample": {
+        "n": 99405,
+        "judge": "ok",
+        "hit_rate": 0.138645,
+        "brier": 0.288636,
+        "brier_decomposition": {
+          "reliability": 0.169213,
+          "resolution": 0.0,
+          "uncertainty": 0.119423
+        },
+        "calibration": [
+          {
+            "bin": [
+              0.0,
+              0.1
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.1,
+              0.2
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.2,
+              0.3
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.3,
+              0.4
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.4,
+              0.5
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.5,
+              0.6
+            ],
+            "n": 99405,
+            "pred_mean": 0.55,
+            "obs_rate": 0.1386
+          },
+          {
+            "bin": [
+              0.6,
+              0.7
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.7,
+              0.8
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.8,
+              0.9
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.9,
+              1.0
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          }
+        ],
+        "avg_net_pct": 0.026246,
+        "avg_net_pct_ci": [
+          0.013135,
+          0.03827
+        ],
+        "ev_ambiguous": false,
+        "max_dd_pct": -99.95937
+      },
+      "out_of_sample": {
+        "n": 3584,
+        "judge": "undetermined",
+        "hit_rate": 0.136998,
+        "brier": 0.2888,
+        "brier_decomposition": {
+          "reliability": 0.170571,
+          "resolution": 0.0,
+          "uncertainty": 0.118229
+        },
+        "calibration": [
+          {
+            "bin": [
+              0.0,
+              0.1
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.1,
+              0.2
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.2,
+              0.3
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.3,
+              0.4
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.4,
+              0.5
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.5,
+              0.6
+            ],
+            "n": 3584,
+            "pred_mean": 0.55,
+            "obs_rate": 0.137
+          },
+          {
+            "bin": [
+              0.6,
+              0.7
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.7,
+              0.8
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.8,
+              0.9
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.9,
+              1.0
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          }
+        ],
+        "avg_net_pct": -0.019579,
+        "avg_net_pct_ci": [
+          -0.085347,
+          0.042137
+        ],
+        "ev_ambiguous": true,
+        "max_dd_pct": -85.812744
+      },
+      "overfit_gap": {
+        "hit_rate": 0.001647,
+        "brier": 0.000164,
+        "avg_net": 0.045825
+      },
+      "judge": "inconclusive"
+    },
+    {
+      "symbol": "ETH-USD",
+      "n_bars": 3145,
+      "first_ts": "2017-11-09T00:00:00",
+      "last_ts": "2026-06-20T00:00:00",
+      "folds": 34,
+      "n_oos_trades": 2677,
+      "n_is_trades": 57110,
+      "in_sample": {
+        "n": 57110,
+        "judge": "ok",
+        "hit_rate": 0.057748,
+        "brier": 0.296725,
+        "brier_decomposition": {
+          "reliability": 0.242312,
+          "resolution": 0.0,
+          "uncertainty": 0.054413
+        },
+        "calibration": [
+          {
+            "bin": [
+              0.0,
+              0.1
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.1,
+              0.2
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.2,
+              0.3
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.3,
+              0.4
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.4,
+              0.5
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.5,
+              0.6
+            ],
+            "n": 57110,
+            "pred_mean": 0.55,
+            "obs_rate": 0.0577
+          },
+          {
+            "bin": [
+              0.6,
+              0.7
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.7,
+              0.8
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.8,
+              0.9
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.9,
+              1.0
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          }
+        ],
+        "avg_net_pct": -0.048812,
+        "avg_net_pct_ci": [
+          -0.06393,
+          -0.033472
+        ],
+        "ev_ambiguous": false,
+        "max_dd_pct": -100.0
+      },
+      "out_of_sample": {
+        "n": 2677,
+        "judge": "undetermined",
+        "hit_rate": 0.073963,
+        "brier": 0.295104,
+        "brier_decomposition": {
+          "reliability": 0.226611,
+          "resolution": 0.0,
+          "uncertainty": 0.068493
+        },
+        "calibration": [
+          {
+            "bin": [
+              0.0,
+              0.1
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.1,
+              0.2
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.2,
+              0.3
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.3,
+              0.4
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.4,
+              0.5
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.5,
+              0.6
+            ],
+            "n": 2677,
+            "pred_mean": 0.55,
+            "obs_rate": 0.074
+          },
+          {
+            "bin": [
+              0.6,
+              0.7
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.7,
+              0.8
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.8,
+              0.9
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.9,
+              1.0
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          }
+        ],
+        "avg_net_pct": -0.046526,
+        "avg_net_pct_ci": [
+          -0.102106,
+          0.007678
+        ],
+        "ev_ambiguous": true,
+        "max_dd_pct": -82.665399
+      },
+      "overfit_gap": {
+        "hit_rate": -0.016215,
+        "brier": -0.001621,
+        "avg_net": -0.002286
+      },
+      "judge": "inconclusive"
+    },
+    {
+      "symbol": "EURJPY=X",
+      "n_bars": 6076,
+      "first_ts": "2003-01-23T00:00:00",
+      "last_ts": "2026-06-19T00:00:00",
+      "folds": 70,
+      "n_oos_trades": 1935,
+      "n_is_trades": 77153,
+      "in_sample": {
+        "n": 77153,
+        "judge": "ok",
+        "hit_rate": 0.377056,
+        "brier": 0.264794,
+        "brier_decomposition": {
+          "reliability": 0.02991,
+          "resolution": 0.0,
+          "uncertainty": 0.234885
+        },
+        "calibration": [
+          {
+            "bin": [
+              0.0,
+              0.1
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.1,
+              0.2
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.2,
+              0.3
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.3,
+              0.4
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.4,
+              0.5
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.5,
+              0.6
+            ],
+            "n": 77153,
+            "pred_mean": 0.55,
+            "obs_rate": 0.3771
+          },
+          {
+            "bin": [
+              0.6,
+              0.7
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.7,
+              0.8
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.8,
+              0.9
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.9,
+              1.0
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          }
+        ],
+        "avg_net_pct": -0.063359,
+        "avg_net_pct_ci": [
+          -0.073079,
+          -0.052082
+        ],
+        "ev_ambiguous": false,
+        "max_dd_pct": -100.0
+      },
+      "out_of_sample": {
+        "n": 1935,
+        "judge": "undetermined",
+        "hit_rate": 0.389664,
+        "brier": 0.263534,
+        "brier_decomposition": {
+          "reliability": 0.025708,
+          "resolution": 0.0,
+          "uncertainty": 0.237826
+        },
+        "calibration": [
+          {
+            "bin": [
+              0.0,
+              0.1
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.1,
+              0.2
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.2,
+              0.3
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.3,
+              0.4
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.4,
+              0.5
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.5,
+              0.6
+            ],
+            "n": 1935,
+            "pred_mean": 0.55,
+            "obs_rate": 0.3897
+          },
+          {
+            "bin": [
+              0.6,
+              0.7
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.7,
+              0.8
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.8,
+              0.9
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.9,
+              1.0
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          }
+        ],
+        "avg_net_pct": -0.035459,
+        "avg_net_pct_ci": [
+          -0.094686,
+          0.036333
+        ],
+        "ev_ambiguous": true,
+        "max_dd_pct": -69.815079
+      },
+      "overfit_gap": {
+        "hit_rate": -0.012608,
+        "brier": -0.00126,
+        "avg_net": -0.0279
+      },
+      "judge": "inconclusive"
+    },
+    {
+      "symbol": "EURUSD=X",
+      "n_bars": 5851,
+      "first_ts": "2003-12-01T00:00:00",
+      "last_ts": "2026-06-19T00:00:00",
+      "folds": 68,
+      "n_oos_trades": 1464,
+      "n_is_trades": 58090,
+      "in_sample": {
+        "n": 58090,
+        "judge": "undetermined",
+        "hit_rate": 0.410639,
+        "brier": 0.261436,
+        "brier_decomposition": {
+          "reliability": 0.019422,
+          "resolution": 0.0,
+          "uncertainty": 0.242015
+        },
+        "calibration": [
+          {
+            "bin": [
+              0.0,
+              0.1
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.1,
+              0.2
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.2,
+              0.3
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.3,
+              0.4
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.4,
+              0.5
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.5,
+              0.6
+            ],
+            "n": 58090,
+            "pred_mean": 0.55,
+            "obs_rate": 0.4106
+          },
+          {
+            "bin": [
+              0.6,
+              0.7
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.7,
+              0.8
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.8,
+              0.9
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.9,
+              1.0
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          }
+        ],
+        "avg_net_pct": 0.011068,
+        "avg_net_pct_ci": [
+          -0.004488,
+          0.027372
+        ],
+        "ev_ambiguous": true,
+        "max_dd_pct": -99.404223
+      },
+      "out_of_sample": {
+        "n": 1464,
+        "judge": "undetermined",
+        "hit_rate": 0.409836,
+        "brier": 0.261516,
+        "brier_decomposition": {
+          "reliability": 0.019646,
+          "resolution": 0.0,
+          "uncertainty": 0.24187
+        },
+        "calibration": [
+          {
+            "bin": [
+              0.0,
+              0.1
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.1,
+              0.2
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.2,
+              0.3
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.3,
+              0.4
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.4,
+              0.5
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.5,
+              0.6
+            ],
+            "n": 1464,
+            "pred_mean": 0.55,
+            "obs_rate": 0.4098
+          },
+          {
+            "bin": [
+              0.6,
+              0.7
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.7,
+              0.8
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.8,
+              0.9
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.9,
+              1.0
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          }
+        ],
+        "avg_net_pct": -0.048975,
+        "avg_net_pct_ci": [
+          -0.126346,
+          0.043946
+        ],
+        "ev_ambiguous": true,
+        "max_dd_pct": -61.732185
+      },
+      "overfit_gap": {
+        "hit_rate": 0.000803,
+        "brier": 8e-05,
+        "avg_net": 0.060043
+      },
+      "judge": "inconclusive"
+    },
+    {
+      "symbol": "GBPUSD=X",
+      "n_bars": 5864,
+      "first_ts": "2003-12-01T00:00:00",
+      "last_ts": "2026-06-20T00:00:00",
+      "folds": 68,
+      "n_oos_trades": 1526,
+      "n_is_trades": 54661,
+      "in_sample": {
+        "n": 54661,
+        "judge": "ok",
+        "hit_rate": 0.409048,
+        "brier": 0.261595,
+        "brier_decomposition": {
+          "reliability": 0.019867,
+          "resolution": 0.0,
+          "uncertainty": 0.241728
+        },
+        "calibration": [
+          {
+            "bin": [
+              0.0,
+              0.1
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.1,
+              0.2
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.2,
+              0.3
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.3,
+              0.4
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.4,
+              0.5
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.5,
+              0.6
+            ],
+            "n": 54661,
+            "pred_mean": 0.55,
+            "obs_rate": 0.409
+          },
+          {
+            "bin": [
+              0.6,
+              0.7
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.7,
+              0.8
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.8,
+              0.9
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.9,
+              1.0
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          }
+        ],
+        "avg_net_pct": 0.016829,
+        "avg_net_pct_ci": [
+          0.003322,
+          0.030226
+        ],
+        "ev_ambiguous": false,
+        "max_dd_pct": -89.829839
+      },
+      "out_of_sample": {
+        "n": 1526,
+        "judge": "undetermined",
+        "hit_rate": 0.400393,
+        "brier": 0.262461,
+        "brier_decomposition": {
+          "reliability": 0.022382,
+          "resolution": 0.0,
+          "uncertainty": 0.240078
+        },
+        "calibration": [
+          {
+            "bin": [
+              0.0,
+              0.1
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.1,
+              0.2
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.2,
+              0.3
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.3,
+              0.4
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.4,
+              0.5
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.5,
+              0.6
+            ],
+            "n": 1526,
+            "pred_mean": 0.55,
+            "obs_rate": 0.4004
+          },
+          {
+            "bin": [
+              0.6,
+              0.7
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.7,
+              0.8
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.8,
+              0.9
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.9,
+              1.0
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          }
+        ],
+        "avg_net_pct": -0.025986,
+        "avg_net_pct_ci": [
+          -0.105055,
+          0.042569
+        ],
+        "ev_ambiguous": true,
+        "max_dd_pct": -55.918474
+      },
+      "overfit_gap": {
+        "hit_rate": 0.008655,
+        "brier": 0.000866,
+        "avg_net": 0.042815
+      },
+      "judge": "inconclusive"
+    },
+    {
+      "symbol": "USDJPY=X",
+      "n_bars": 7686,
+      "first_ts": "1996-10-30T00:00:00",
+      "last_ts": "2026-06-20T00:00:00",
+      "folds": 90,
+      "n_oos_trades": 2344,
+      "n_is_trades": 117607,
+      "in_sample": {
+        "n": 117607,
+        "judge": "ok",
+        "hit_rate": 0.396737,
+        "brier": 0.262826,
+        "brier_decomposition": {
+          "reliability": 0.02349,
+          "resolution": 0.0,
+          "uncertainty": 0.239337
+        },
+        "calibration": [
+          {
+            "bin": [
+              0.0,
+              0.1
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.1,
+              0.2
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.2,
+              0.3
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.3,
+              0.4
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.4,
+              0.5
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.5,
+              0.6
+            ],
+            "n": 117607,
+            "pred_mean": 0.55,
+            "obs_rate": 0.3967
+          },
+          {
+            "bin": [
+              0.6,
+              0.7
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.7,
+              0.8
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.8,
+              0.9
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.9,
+              1.0
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          }
+        ],
+        "avg_net_pct": -0.077969,
+        "avg_net_pct_ci": [
+          -0.088637,
+          -0.066984
+        ],
+        "ev_ambiguous": false,
+        "max_dd_pct": -100.0
+      },
+      "out_of_sample": {
+        "n": 2344,
+        "judge": "undetermined",
+        "hit_rate": 0.417235,
+        "brier": 0.260776,
+        "brier_decomposition": {
+          "reliability": 0.017626,
+          "resolution": 0.0,
+          "uncertainty": 0.24315
+        },
+        "calibration": [
+          {
+            "bin": [
+              0.0,
+              0.1
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.1,
+              0.2
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.2,
+              0.3
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.3,
+              0.4
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.4,
+              0.5
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.5,
+              0.6
+            ],
+            "n": 2344,
+            "pred_mean": 0.55,
+            "obs_rate": 0.4172
+          },
+          {
+            "bin": [
+              0.6,
+              0.7
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.7,
+              0.8
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.8,
+              0.9
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.9,
+              1.0
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          }
+        ],
+        "avg_net_pct": -0.013189,
+        "avg_net_pct_ci": [
+          -0.078663,
+          0.053347
+        ],
+        "ev_ambiguous": true,
+        "max_dd_pct": -80.773587
+      },
+      "overfit_gap": {
+        "hit_rate": -0.020498,
+        "brier": -0.00205,
+        "avg_net": -0.06478
+      },
+      "judge": "inconclusive"
+    },
+    {
+      "symbol": "^DJI",
+      "n_bars": 8677,
+      "first_ts": "1992-01-02T00:00:00",
+      "last_ts": "2026-06-18T00:00:00",
+      "folds": 103,
+      "n_oos_trades": 4222,
+      "n_is_trades": 228394,
+      "in_sample": {
+        "n": 228394,
+        "judge": "ok",
+        "hit_rate": 0.356546,
+        "brier": 0.266845,
+        "brier_decomposition": {
+          "reliability": 0.037424,
+          "resolution": 0.0,
+          "uncertainty": 0.229421
+        },
+        "calibration": [
+          {
+            "bin": [
+              0.0,
+              0.1
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.1,
+              0.2
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.2,
+              0.3
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.3,
+              0.4
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.4,
+              0.5
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.5,
+              0.6
+            ],
+            "n": 228394,
+            "pred_mean": 0.55,
+            "obs_rate": 0.3565
+          },
+          {
+            "bin": [
+              0.6,
+              0.7
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.7,
+              0.8
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.8,
+              0.9
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.9,
+              1.0
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          }
+        ],
+        "avg_net_pct": -0.048077,
+        "avg_net_pct_ci": [
+          -0.054183,
+          -0.04002
+        ],
+        "ev_ambiguous": false,
+        "max_dd_pct": -100.0
+      },
+      "out_of_sample": {
+        "n": 4222,
+        "judge": "undetermined",
+        "hit_rate": 0.364045,
+        "brier": 0.266095,
+        "brier_decomposition": {
+          "reliability": 0.034579,
+          "resolution": 0.0,
+          "uncertainty": 0.231516
+        },
+        "calibration": [
+          {
+            "bin": [
+              0.0,
+              0.1
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.1,
+              0.2
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.2,
+              0.3
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.3,
+              0.4
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.4,
+              0.5
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.5,
+              0.6
+            ],
+            "n": 4222,
+            "pred_mean": 0.55,
+            "obs_rate": 0.364
+          },
+          {
+            "bin": [
+              0.6,
+              0.7
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.7,
+              0.8
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.8,
+              0.9
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.9,
+              1.0
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          }
+        ],
+        "avg_net_pct": -0.034155,
+        "avg_net_pct_ci": [
+          -0.076922,
+          0.023819
+        ],
+        "ev_ambiguous": true,
+        "max_dd_pct": -93.995854
+      },
+      "overfit_gap": {
+        "hit_rate": -0.007499,
+        "brier": -0.00075,
+        "avg_net": -0.013922
+      },
+      "judge": "inconclusive"
+    },
+    {
+      "symbol": "^GSPC",
+      "n_bars": 24733,
+      "first_ts": "1927-12-30T00:00:00",
+      "last_ts": "2026-06-18T00:00:00",
+      "folds": 304,
+      "n_oos_trades": 12293,
+      "n_is_trades": 1824472,
+      "in_sample": {
+        "n": 1824472,
+        "judge": "ok",
+        "hit_rate": 0.41492,
+        "brier": 0.261008,
+        "brier_decomposition": {
+          "reliability": 0.018247,
+          "resolution": 0.0,
+          "uncertainty": 0.242761
+        },
+        "calibration": [
+          {
+            "bin": [
+              0.0,
+              0.1
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.1,
+              0.2
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.2,
+              0.3
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.3,
+              0.4
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.4,
+              0.5
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.5,
+              0.6
+            ],
+            "n": 1824472,
+            "pred_mean": 0.55,
+            "obs_rate": 0.4149
+          },
+          {
+            "bin": [
+              0.6,
+              0.7
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.7,
+              0.8
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.8,
+              0.9
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.9,
+              1.0
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          }
+        ],
+        "avg_net_pct": -0.010567,
+        "avg_net_pct_ci": [
+          -0.014361,
+          -0.006161
+        ],
+        "ev_ambiguous": false,
+        "max_dd_pct": -100.0
+      },
+      "out_of_sample": {
+        "n": 12293,
+        "judge": "undetermined",
+        "hit_rate": 0.38526,
+        "brier": 0.263974,
+        "brier_decomposition": {
+          "reliability": 0.027139,
+          "resolution": 0.0,
+          "uncertainty": 0.236835
+        },
+        "calibration": [
+          {
+            "bin": [
+              0.0,
+              0.1
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.1,
+              0.2
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.2,
+              0.3
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.3,
+              0.4
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.4,
+              0.5
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.5,
+              0.6
+            ],
+            "n": 12293,
+            "pred_mean": 0.55,
+            "obs_rate": 0.3853
+          },
+          {
+            "bin": [
+              0.6,
+              0.7
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.7,
+              0.8
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.8,
+              0.9
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.9,
+              1.0
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          }
+        ],
+        "avg_net_pct": -0.047398,
+        "avg_net_pct_ci": [
+          -0.086172,
+          0.000805
+        ],
+        "ev_ambiguous": true,
+        "max_dd_pct": -99.996796
+      },
+      "overfit_gap": {
+        "hit_rate": 0.02966,
+        "brier": 0.002966,
+        "avg_net": 0.036831
+      },
+      "judge": "inconclusive"
+    },
+    {
+      "symbol": "^MOVE",
+      "n_bars": 5831,
+      "first_ts": "2002-11-12T00:00:00",
+      "last_ts": "2026-06-12T00:00:00",
+      "folds": 67,
+      "n_oos_trades": 4756,
+      "n_is_trades": 173273,
+      "in_sample": {
+        "n": 173273,
+        "judge": "ok",
+        "hit_rate": 0.409741,
+        "brier": 0.261526,
+        "brier_decomposition": {
+          "reliability": 0.019673,
+          "resolution": 0.0,
+          "uncertainty": 0.241853
+        },
+        "calibration": [
+          {
+            "bin": [
+              0.0,
+              0.1
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.1,
+              0.2
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.2,
+              0.3
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.3,
+              0.4
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.4,
+              0.5
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.5,
+              0.6
+            ],
+            "n": 173273,
+            "pred_mean": 0.55,
+            "obs_rate": 0.4097
+          },
+          {
+            "bin": [
+              0.6,
+              0.7
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.7,
+              0.8
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.8,
+              0.9
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.9,
+              1.0
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          }
+        ],
+        "avg_net_pct": -0.509058,
+        "avg_net_pct_ci": [
+          -0.532863,
+          -0.48094
+        ],
+        "ev_ambiguous": false,
+        "max_dd_pct": -100.0
+      },
+      "out_of_sample": {
+        "n": 4756,
+        "judge": "ok",
+        "hit_rate": 0.348192,
+        "brier": 0.267681,
+        "brier_decomposition": {
+          "reliability": 0.040727,
+          "resolution": 0.0,
+          "uncertainty": 0.226954
+        },
+        "calibration": [
+          {
+            "bin": [
+              0.0,
+              0.1
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.1,
+              0.2
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.2,
+              0.3
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.3,
+              0.4
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.4,
+              0.5
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.5,
+              0.6
+            ],
+            "n": 4756,
+            "pred_mean": 0.55,
+            "obs_rate": 0.3482
+          },
+          {
+            "bin": [
+              0.6,
+              0.7
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.7,
+              0.8
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.8,
+              0.9
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.9,
+              1.0
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          }
+        ],
+        "avg_net_pct": -0.353962,
+        "avg_net_pct_ci": [
+          -0.492548,
+          -0.209103
+        ],
+        "ev_ambiguous": false,
+        "max_dd_pct": -100.0
+      },
+      "overfit_gap": {
+        "hit_rate": 0.061549,
+        "brier": 0.006155,
+        "avg_net": -0.155096
+      },
+      "judge": "no-edge"
+    },
+    {
+      "symbol": "^N225",
+      "n_bars": 15108,
+      "first_ts": "1965-01-05T00:00:00",
+      "last_ts": "2026-06-19T00:00:00",
+      "folds": 183,
+      "n_oos_trades": 8052,
+      "n_is_trades": 646238,
+      "in_sample": {
+        "n": 646238,
+        "judge": "ok",
+        "hit_rate": 0.405174,
+        "brier": 0.261983,
+        "brier_decomposition": {
+          "reliability": 0.020974,
+          "resolution": 0.0,
+          "uncertainty": 0.241008
+        },
+        "calibration": [
+          {
+            "bin": [
+              0.0,
+              0.1
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.1,
+              0.2
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.2,
+              0.3
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.3,
+              0.4
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.4,
+              0.5
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.5,
+              0.6
+            ],
+            "n": 646238,
+            "pred_mean": 0.55,
+            "obs_rate": 0.4052
+          },
+          {
+            "bin": [
+              0.6,
+              0.7
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.7,
+              0.8
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.8,
+              0.9
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.9,
+              1.0
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          }
+        ],
+        "avg_net_pct": 0.008232,
+        "avg_net_pct_ci": [
+          0.00295,
+          0.014089
+        ],
+        "ev_ambiguous": false,
+        "max_dd_pct": -100.0
+      },
+      "out_of_sample": {
+        "n": 8052,
+        "judge": "undetermined",
+        "hit_rate": 0.378043,
+        "brier": 0.264696,
+        "brier_decomposition": {
+          "reliability": 0.029569,
+          "resolution": 0.0,
+          "uncertainty": 0.235126
+        },
+        "calibration": [
+          {
+            "bin": [
+              0.0,
+              0.1
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.1,
+              0.2
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.2,
+              0.3
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.3,
+              0.4
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.4,
+              0.5
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.5,
+              0.6
+            ],
+            "n": 8052,
+            "pred_mean": 0.55,
+            "obs_rate": 0.378
+          },
+          {
+            "bin": [
+              0.6,
+              0.7
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.7,
+              0.8
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.8,
+              0.9
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.9,
+              1.0
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          }
+        ],
+        "avg_net_pct": -0.043183,
+        "avg_net_pct_ci": [
+          -0.085608,
+          0.001202
+        ],
+        "ev_ambiguous": true,
+        "max_dd_pct": -99.931756
+      },
+      "overfit_gap": {
+        "hit_rate": 0.027131,
+        "brier": 0.002713,
+        "avg_net": 0.051415
+      },
+      "judge": "inconclusive"
+    },
+    {
+      "symbol": "^NDX",
+      "n_bars": 10258,
+      "first_ts": "1985-10-01T00:00:00",
+      "last_ts": "2026-06-18T00:00:00",
+      "folds": 123,
+      "n_oos_trades": 7046,
+      "n_is_trades": 466365,
+      "in_sample": {
+        "n": 466365,
+        "judge": "ok",
+        "hit_rate": 0.286098,
+        "brier": 0.27389,
+        "brier_decomposition": {
+          "reliability": 0.069644,
+          "resolution": 0.0,
+          "uncertainty": 0.204246
+        },
+        "calibration": [
+          {
+            "bin": [
+              0.0,
+              0.1
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.1,
+              0.2
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.2,
+              0.3
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.3,
+              0.4
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.4,
+              0.5
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.5,
+              0.6
+            ],
+            "n": 466365,
+            "pred_mean": 0.55,
+            "obs_rate": 0.2861
+          },
+          {
+            "bin": [
+              0.6,
+              0.7
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.7,
+              0.8
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.8,
+              0.9
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.9,
+              1.0
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          }
+        ],
+        "avg_net_pct": -0.043364,
+        "avg_net_pct_ci": [
+          -0.048369,
+          -0.038186
+        ],
+        "ev_ambiguous": false,
+        "max_dd_pct": -100.0
+      },
+      "out_of_sample": {
+        "n": 7046,
+        "judge": "ok",
+        "hit_rate": 0.287681,
+        "brier": 0.273732,
+        "brier_decomposition": {
+          "reliability": 0.068811,
+          "resolution": 0.0,
+          "uncertainty": 0.204921
+        },
+        "calibration": [
+          {
+            "bin": [
+              0.0,
+              0.1
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.1,
+              0.2
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.2,
+              0.3
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.3,
+              0.4
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.4,
+              0.5
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.5,
+              0.6
+            ],
+            "n": 7046,
+            "pred_mean": 0.55,
+            "obs_rate": 0.2877
+          },
+          {
+            "bin": [
+              0.6,
+              0.7
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.7,
+              0.8
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.8,
+              0.9
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.9,
+              1.0
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          }
+        ],
+        "avg_net_pct": -0.051422,
+        "avg_net_pct_ci": [
+          -0.09033,
+          -0.011294
+        ],
+        "ev_ambiguous": false,
+        "max_dd_pct": -99.640598
+      },
+      "overfit_gap": {
+        "hit_rate": -0.001583,
+        "brier": -0.000158,
+        "avg_net": 0.008058
+      },
+      "judge": "no-edge"
+    },
+    {
+      "symbol": "^TNX",
+      "n_bars": 16127,
+      "first_ts": "1962-01-02T00:00:00",
+      "last_ts": "2026-06-12T00:00:00",
+      "folds": 196,
+      "n_oos_trades": 8691,
+      "n_is_trades": 610041,
+      "in_sample": {
+        "n": 610041,
+        "judge": "ok",
+        "hit_rate": 0.412749,
+        "brier": 0.261225,
+        "brier_decomposition": {
+          "reliability": 0.018838,
+          "resolution": 0.0,
+          "uncertainty": 0.242387
+        },
+        "calibration": [
+          {
+            "bin": [
+              0.0,
+              0.1
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.1,
+              0.2
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.2,
+              0.3
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.3,
+              0.4
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.4,
+              0.5
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.5,
+              0.6
+            ],
+            "n": 610041,
+            "pred_mean": 0.55,
+            "obs_rate": 0.4127
+          },
+          {
+            "bin": [
+              0.6,
+              0.7
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.7,
+              0.8
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.8,
+              0.9
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.9,
+              1.0
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          }
+        ],
+        "avg_net_pct": 0.121416,
+        "avg_net_pct_ci": [
+          0.115278,
+          0.125852
+        ],
+        "ev_ambiguous": false,
+        "max_dd_pct": -99.392379
+      },
+      "out_of_sample": {
+        "n": 8691,
+        "judge": "undetermined",
+        "hit_rate": 0.332988,
+        "brier": 0.269201,
+        "brier_decomposition": {
+          "reliability": 0.047094,
+          "resolution": 0.0,
+          "uncertainty": 0.222107
+        },
+        "calibration": [
+          {
+            "bin": [
+              0.0,
+              0.1
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.1,
+              0.2
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.2,
+              0.3
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.3,
+              0.4
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.4,
+              0.5
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.5,
+              0.6
+            ],
+            "n": 8691,
+            "pred_mean": 0.55,
+            "obs_rate": 0.333
+          },
+          {
+            "bin": [
+              0.6,
+              0.7
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.7,
+              0.8
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.8,
+              0.9
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.9,
+              1.0
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          }
+        ],
+        "avg_net_pct": 0.017512,
+        "avg_net_pct_ci": [
+          -0.019861,
+          0.054264
+        ],
+        "ev_ambiguous": true,
+        "max_dd_pct": -99.161962
+      },
+      "overfit_gap": {
+        "hit_rate": 0.079761,
+        "brier": 0.007976,
+        "avg_net": 0.103904
+      },
+      "judge": "inconclusive"
+    },
+    {
+      "symbol": "^TYX",
+      "n_bars": 12357,
+      "first_ts": "1977-02-15T00:00:00",
+      "last_ts": "2026-06-12T00:00:00",
+      "folds": 149,
+      "n_oos_trades": 6740,
+      "n_is_trades": 398376,
+      "in_sample": {
+        "n": 398376,
+        "judge": "ok",
+        "hit_rate": 0.404259,
+        "brier": 0.262074,
+        "brier_decomposition": {
+          "reliability": 0.021241,
+          "resolution": 0.0,
+          "uncertainty": 0.240834
+        },
+        "calibration": [
+          {
+            "bin": [
+              0.0,
+              0.1
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.1,
+              0.2
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.2,
+              0.3
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.3,
+              0.4
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.4,
+              0.5
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.5,
+              0.6
+            ],
+            "n": 398376,
+            "pred_mean": 0.55,
+            "obs_rate": 0.4043
+          },
+          {
+            "bin": [
+              0.6,
+              0.7
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.7,
+              0.8
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.8,
+              0.9
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.9,
+              1.0
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          }
+        ],
+        "avg_net_pct": 0.013513,
+        "avg_net_pct_ci": [
+          0.006997,
+          0.021034
+        ],
+        "ev_ambiguous": false,
+        "max_dd_pct": -100.0
+      },
+      "out_of_sample": {
+        "n": 6740,
+        "judge": "undetermined",
+        "hit_rate": 0.356677,
+        "brier": 0.266832,
+        "brier_decomposition": {
+          "reliability": 0.037374,
+          "resolution": 0.0,
+          "uncertainty": 0.229458
+        },
+        "calibration": [
+          {
+            "bin": [
+              0.0,
+              0.1
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.1,
+              0.2
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.2,
+              0.3
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.3,
+              0.4
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.4,
+              0.5
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.5,
+              0.6
+            ],
+            "n": 6740,
+            "pred_mean": 0.55,
+            "obs_rate": 0.3567
+          },
+          {
+            "bin": [
+              0.6,
+              0.7
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.7,
+              0.8
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.8,
+              0.9
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.9,
+              1.0
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          }
+        ],
+        "avg_net_pct": -0.027527,
+        "avg_net_pct_ci": [
+          -0.074837,
+          0.012807
+        ],
+        "ev_ambiguous": true,
+        "max_dd_pct": -98.880765
+      },
+      "overfit_gap": {
+        "hit_rate": 0.047582,
+        "brier": 0.004758,
+        "avg_net": 0.04104
+      },
+      "judge": "inconclusive"
+    },
+    {
+      "symbol": "^VIX",
+      "n_bars": 9184,
+      "first_ts": "1990-01-02T00:00:00",
+      "last_ts": "2026-06-18T00:00:00",
+      "folds": 109,
+      "n_oos_trades": 8710,
+      "n_is_trades": 508937,
+      "in_sample": {
+        "n": 508937,
+        "judge": "ok",
+        "hit_rate": 0.055828,
+        "brier": 0.296917,
+        "brier_decomposition": {
+          "reliability": 0.244206,
+          "resolution": 0.0,
+          "uncertainty": 0.052711
+        },
+        "calibration": [
+          {
+            "bin": [
+              0.0,
+              0.1
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.1,
+              0.2
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.2,
+              0.3
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.3,
+              0.4
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.4,
+              0.5
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.5,
+              0.6
+            ],
+            "n": 508937,
+            "pred_mean": 0.55,
+            "obs_rate": 0.0558
+          },
+          {
+            "bin": [
+              0.6,
+              0.7
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.7,
+              0.8
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.8,
+              0.9
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.9,
+              1.0
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          }
+        ],
+        "avg_net_pct": -0.175821,
+        "avg_net_pct_ci": [
+          -0.18309,
+          -0.169065
+        ],
+        "ev_ambiguous": false,
+        "max_dd_pct": -100.0
+      },
+      "out_of_sample": {
+        "n": 8710,
+        "judge": "ok",
+        "hit_rate": 0.014696,
+        "brier": 0.30103,
+        "brier_decomposition": {
+          "reliability": 0.286551,
+          "resolution": 0.0,
+          "uncertainty": 0.01448
+        },
+        "calibration": [
+          {
+            "bin": [
+              0.0,
+              0.1
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.1,
+              0.2
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.2,
+              0.3
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.3,
+              0.4
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.4,
+              0.5
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.5,
+              0.6
+            ],
+            "n": 8710,
+            "pred_mean": 0.55,
+            "obs_rate": 0.0147
+          },
+          {
+            "bin": [
+              0.6,
+              0.7
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.7,
+              0.8
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.8,
+              0.9
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          },
+          {
+            "bin": [
+              0.9,
+              1.0
+            ],
+            "n": 0,
+            "pred_mean": null,
+            "obs_rate": null
+          }
+        ],
+        "avg_net_pct": -0.115163,
+        "avg_net_pct_ci": [
+          -0.144498,
+          -0.087597
+        ],
+        "ev_ambiguous": false,
+        "max_dd_pct": -99.998536
+      },
+      "overfit_gap": {
+        "hit_rate": 0.041132,
+        "brier": 0.004113,
+        "avg_net": -0.060658
+      },
+      "judge": "no-edge"
+    }
+  ],
+  "excluded": [],
+  "overall": {
+    "n_symbols": 15,
+    "n_excluded": 0,
+    "n_oos_trades": 75916,
+    "n_is_trades": 5385583,
     "in_sample": {
-      "n": 1209,
+      "n": 5385583,
       "judge": "ok",
-      "hit_rate": 0.376344,
-      "brier": 0.264866,
+      "hit_rate": 0.354642,
+      "brier": 0.267036,
       "brier_decomposition": {
-        "reliability": 0.030156,
+        "reliability": 0.038165,
         "resolution": 0.0,
-        "uncertainty": 0.234709
+        "uncertainty": 0.228871
       },
       "calibration": [
         {
@@ -65,9 +3609,9 @@
             0.5,
             0.6
           ],
-          "n": 1209,
+          "n": 5385583,
           "pred_mean": 0.55,
-          "obs_rate": 0.3763
+          "obs_rate": 0.3546
         },
         {
           "bin": [
@@ -106,23 +3650,23 @@
           "obs_rate": null
         }
       ],
-      "avg_net_pct": -0.205603,
+      "avg_net_pct": -0.029033,
       "avg_net_pct_ci": [
-        -0.320427,
-        -0.096822
+        -0.031024,
+        -0.026508
       ],
       "ev_ambiguous": false,
-      "max_dd_pct": -93.638815
+      "max_dd_pct": -100.0
     },
     "out_of_sample": {
-      "n": 226,
+      "n": 75916,
       "judge": "ok",
-      "hit_rate": 0.367257,
-      "brier": 0.265774,
+      "hit_rate": 0.299884,
+      "brier": 0.272512,
       "brier_decomposition": {
-        "reliability": 0.033395,
+        "reliability": 0.062558,
         "resolution": 0.0,
-        "uncertainty": 0.232379
+        "uncertainty": 0.209954
       },
       "calibration": [
         {
@@ -175,9 +3719,9 @@
             0.5,
             0.6
           ],
-          "n": 226,
+          "n": 75916,
           "pred_mean": 0.55,
-          "obs_rate": 0.3673
+          "obs_rate": 0.2999
         },
         {
           "bin": [
@@ -216,19 +3760,112 @@
           "obs_rate": null
         }
       ],
-      "avg_net_pct": -0.256493,
+      "avg_net_pct": -0.060606,
       "avg_net_pct_ci": [
-        -0.522449,
-        -0.050939
+        -0.07399,
+        -0.039639
       ],
       "ev_ambiguous": false,
-      "max_dd_pct": -49.930963
+      "max_dd_pct": -100.0
     },
     "overfit_gap": {
-      "hit_rate": 0.009087,
-      "brier": 0.000908,
-      "avg_net": 0.05089
-    }
+      "hit_rate": 0.054758,
+      "brier": 0.005476,
+      "avg_net": 0.031573
+    },
+    "judge": "no-edge",
+    "calibration": [
+      {
+        "bin": [
+          0.0,
+          0.1
+        ],
+        "n": 0,
+        "pred_mean": null,
+        "obs_rate": null
+      },
+      {
+        "bin": [
+          0.1,
+          0.2
+        ],
+        "n": 0,
+        "pred_mean": null,
+        "obs_rate": null
+      },
+      {
+        "bin": [
+          0.2,
+          0.3
+        ],
+        "n": 0,
+        "pred_mean": null,
+        "obs_rate": null
+      },
+      {
+        "bin": [
+          0.3,
+          0.4
+        ],
+        "n": 0,
+        "pred_mean": null,
+        "obs_rate": null
+      },
+      {
+        "bin": [
+          0.4,
+          0.5
+        ],
+        "n": 0,
+        "pred_mean": null,
+        "obs_rate": null
+      },
+      {
+        "bin": [
+          0.5,
+          0.6
+        ],
+        "n": 75916,
+        "pred_mean": 0.55,
+        "obs_rate": 0.2999
+      },
+      {
+        "bin": [
+          0.6,
+          0.7
+        ],
+        "n": 0,
+        "pred_mean": null,
+        "obs_rate": null
+      },
+      {
+        "bin": [
+          0.7,
+          0.8
+        ],
+        "n": 0,
+        "pred_mean": null,
+        "obs_rate": null
+      },
+      {
+        "bin": [
+          0.8,
+          0.9
+        ],
+        "n": 0,
+        "pred_mean": null,
+        "obs_rate": null
+      },
+      {
+        "bin": [
+          0.9,
+          1.0
+        ],
+        "n": 0,
+        "pred_mean": null,
+        "obs_rate": null
+      }
+    ]
   },
-  "note": "Macro environment visualization / not investment advice. Phase 1.7 smoke."
+  "note": "想定精度のみ / This is the system's estimated accuracy, not real trading P&L. Macro environment visualization, not investment advice. Phase 2 (model training) is not implemented."
 }

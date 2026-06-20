@@ -86,6 +86,11 @@ REQUIRED_FILES = [
     "tests/test_backtest_metrics.py",
     "tests/test_backfill_cli.py",
     "tests/test_backtest_e2e_smoke.py",
+    "SPEC_BACKTEST_LIVE.md",                # v4.6 Phase 1.8 contract
+    "backtest/local_loader.py",
+    "tests/test_local_loader.py",
+    "tests/test_backtest_live.py",
+    "tests/test_no_learning_code.py",
 ]
 
 EXPECTED_LAG = {
