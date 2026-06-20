@@ -181,17 +181,19 @@ def simulate_fold(test_bars: Sequence[Dict[str, Any]],
         "max_dd_pct": round(max_dd_pct, 6),
     }
 
-    # Persist (data/local/ — NOT committed)
-    root = pathlib.Path(backtest_root or DEFAULT_BACKTEST_DIR)
-    try:
-        root.mkdir(parents=True, exist_ok=True)
-        rid = run_id or uuid.uuid4().hex
-        out_path = root / f"{rid}.jsonl"
-        with out_path.open("a", encoding="utf-8") as f:
-            for tr in trades:
-                f.write(json.dumps(tr, ensure_ascii=False) + "\n")
-        result["persisted"] = str(out_path)
-    except OSError:
-        pass
+    # Persist (data/local/ — NOT committed).
+    # backtest_root=False に明示すると一切書かない (live ラン時の inode 爆発を回避).
+    if backtest_root is not False:
+        root = pathlib.Path(backtest_root or DEFAULT_BACKTEST_DIR)
+        try:
+            root.mkdir(parents=True, exist_ok=True)
+            rid = run_id or uuid.uuid4().hex
+            out_path = root / f"{rid}.jsonl"
+            with out_path.open("a", encoding="utf-8") as f:
+                for tr in trades:
+                    f.write(json.dumps(tr, ensure_ascii=False) + "\n")
+            result["persisted"] = str(out_path)
+        except OSError:
+            pass
 
     return result

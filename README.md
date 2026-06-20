@@ -33,6 +33,29 @@ without leaving the portfolio incomplete.
 
 ---
 
+## Features (v4.6 / Phase 1.8 — live-rate walk-forward, system-only estimated accuracy)
+
+- **Real-rate backtest結線 (v4.6 / Phase 1.8).** `backtest/cli.py --source=local` で
+  `data/local/history_*.jsonl` (DuckDB があれば優先) から OHLC を読み、銘柄ごとに
+  walk-forward → 仮想売買 → IS/OOS 並列メトリクスを算出する。`backtest/local_loader.py`
+  は重複 ts を最新値で正規化、非数値 close を弾き、`min_bars` 未満の銘柄は
+  `excluded[]` に `insufficient_data` で逃がす (捏造しない)。
+- **judge 4 分類 (per_symbol + overall).** `metrics.summarize_pair` の OOS CI を
+  4 値に正規化する `_classify_judge`:
+  - `edge` = N≥30 かつ 95% CI 下限 > 0
+  - `no-edge` = N≥30 かつ 95% CI 上限 < 0
+  - `inconclusive` = N≥30 かつ CI が 0 を跨ぐ
+  - `insufficient` = N<30
+  SURVIVAL `#sv-backtest` で per_symbol 表が緑/灰/赤/薄字で色分け、overall 較正曲線
+  を SVG で描画 (pred_mean vs obs_rate のバブルプロット, バブルは bin の n に比例)。
+- **学習コード未追加の構造保証.** `tests/test_no_learning_code.py` が `backtest/` と
+  `collector/` 配下を grep し、`sklearn / torch / tensorflow / xgboost / .fit( /
+  .train( / optimizer. / learning_rate` 等の混入を検知して fail。Phase 2 (学習) の
+  着工可否は本フェーズの overall EV 95% CI を見てから判断する設計。
+- **GRC.** SURVIVAL の表に「これは想定精度であり実トレード結果ではない /
+  not investment advice」を最上部に明示。実トレード結果はリポに入らない (`data/local/`
+  は `.gitignore` 済)。
+
 ## Features (v4.5 / Phase 1.7 — walk-forward backtest + data backfill)
 
 - **Walk-forward backtest harness (v4.5).** `backtest/` ships a structurally-anti-overfit

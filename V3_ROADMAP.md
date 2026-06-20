@@ -217,7 +217,41 @@ alignable). Japan stays placeholder rather than show stale or single-side data. 
 
 ---
 
-## v4.5 — Walk-forward backtest + data backfill / Phase 1.7 (this release)
+## v4.6 — Live-rate walk-forward / Phase 1.8 (this release)
+
+**Goal:** Phase 1.7 の配線を実レート (data/local/history_*.jsonl, 14万行 / 15銘柄) に
+流し、システム単体の想定精度を測る。**自分の実トレード結果は使わない**。
+Phase 2 (学習) 着工可否は本フェーズの overall EV CI を見て別途判断。
+
+- **`backtest/local_loader.py` (shipped).** `data/local/` をスキャンし、銘柄ごとに
+  時系列整列 / 重複除去 (同 ts は最新で上書き) / 非数値 close 排除 / `min_bars` 未満は
+  `excluded[]` に "insufficient_data" マークで分離 (捏造しない)。DuckDB 優先 → 失敗時
+  jsonl fallback。
+- **`backtest/cli.py --source=local` (shipped).** 銘柄横断で walk-forward + 仮想売買 +
+  IS/OOS 並列メトリクスを 1 パスで算出 (per_symbol の trade テープを overall に流して
+  計算量半減)。look-ahead は既存 WatchedBars で物理保証。
+- **`_classify_judge` (shipped).** OOS CI を `edge / no-edge / inconclusive /
+  insufficient` の 4 値に正規化。SURVIVAL `#sv-backtest` は per_symbol 表を緑/灰/赤
+  で色分け、overall 較正曲線を SVG (bin n に比例したバブル) で描画。詳細結果は
+  `data/local/backtest/<run>_live.json`、公開抜粋は `docs/data/backtest_summary_public.json`。
+- **`tests/test_no_learning_code.py` (shipped).** Phase 2 が密かに混ざらない構造保証。
+  `backtest/` と `collector/` を grep し、`sklearn / torch / tensorflow / xgboost /
+  .fit( / .train( / optimizer. / learning_rate` 等を検知して即 fail。
+- **既存予測器の暫定使用 (shipped).** 過去 10 本リターンの符号 → 方向、
+  `predicted_prob=0.55` 固定 — 「システム素の精度」のベースラインを測るために
+  最も単純な予測器をそのまま使う。これより劣る予測器は Phase 2 でも採用しない方針。
+- **GRC.** SURVIVAL の表に「想定精度 / not investment advice / Phase 2 未実装」を
+  最上部に明示。`data/local/` (履歴 + backtest 結果) はリポに出ない。
+
+**判断基準 (Phase 2 着工可否).** 実走後 overall OOS EV 95% CI の位置で判断:
+- `edge` (CI 全正) → 既存予測器でも edge あり。Phase 2 は予測器強化で伸ばす方向。
+- `inconclusive` (CI 0 跨ぎ) → 予測器の入替えが必要。Phase 2 は差替実装が筋。
+- `no-edge` (CI 全負) → slip/fee/サイズ設計 or ロジック自体の見直しが先。
+- `insufficient` → backfill を延長して bar 数を稼ぐ。
+
+---
+
+## v4.5 — Walk-forward backtest + data backfill / Phase 1.7
 
 **Goal:** ship a structurally-anti-overfit "予測 vs 実レート" harness and the
 depth-builder that feeds it, so tomorrow morning we have meaningful out-of-sample
