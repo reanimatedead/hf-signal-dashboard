@@ -1,9 +1,9 @@
-name: Daily Signal Update (08:00 JST)
+name: Daily Signal Update (00:00 JST)
 
 on:
   schedule:
-    # 08:00 JST = 23:00 UTC (previous day)
-    - cron: "0 23 * * *"
+    # 00:00 JST = 15:00 UTC (same day). SPEC_MONEYFLOW.md §6.1.
+    - cron: "0 15 * * *"
   workflow_dispatch:   # Allow manual trigger from GitHub UI
 
 permissions:
@@ -35,11 +35,17 @@ jobs:
           pip install --upgrade pip
           pip install -r requirements.txt
 
-      # ── 4. Run signal generation ───────────────────────
+      # ── 4. Run signal generation (incl. v4.1 money_flow) ─
       - name: Generate signals
         run: python fetch_signals.py
 
-      # ── 4b. Generate macro layer (additive; reads docs/data.json) ──
+      # ── 4a. Schema gate (fail-fast on contract regression) ─
+      - name: Verify data.json contract (pytest)
+        run: |
+          pip install pytest
+          pytest tests/test_money_flow_schema.py tests/test_index_html_contract.py -q
+
+      # ── 4b. Generate (legacy) macro layer (still wired) ──
       - name: Generate macro layer
         env:
           FRED_API_KEY: ${{ secrets.FRED_API_KEY }}

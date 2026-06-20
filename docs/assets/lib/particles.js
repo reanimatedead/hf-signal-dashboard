@@ -220,10 +220,21 @@
       start();
     }
 
+    // ResizeObserver picks up display:none -> block transitions that don't
+    // fire a window resize. Falls back to a few delayed refits.
+    let ro = null;
+    if (typeof ResizeObserver !== "undefined") {
+      ro = new ResizeObserver(onResize);
+      try { ro.observe(canvas); } catch (e) { /* ignore */ }
+    } else {
+      [100, 400, 1200].forEach(function (ms) { setTimeout(onResize, ms); });
+    }
+
     function destroy() {
       stop();
       global.removeEventListener("resize", onResize);
       document.removeEventListener("visibilitychange", onVis);
+      if (ro) try { ro.disconnect(); } catch (e) {}
     }
 
     global.addEventListener("resize", onResize);
@@ -454,6 +465,16 @@
     global.addEventListener("resize", onResize);
     document.addEventListener("visibilitychange", onVis);
 
+    // ResizeObserver picks up display:none -> block transitions that don't
+    // fire window resize (e.g. tab switch in this dashboard).
+    let ro = null;
+    if (typeof ResizeObserver !== "undefined") {
+      ro = new ResizeObserver(onResize);
+      try { ro.observe(canvas); } catch (e) { /* ignore */ }
+    } else {
+      [100, 400, 1200].forEach(function (ms) { setTimeout(onResize, ms); });
+    }
+
     recompute();
     start();
 
@@ -472,6 +493,7 @@
       stop();
       global.removeEventListener("resize", onResize);
       document.removeEventListener("visibilitychange", onVis);
+      if (ro) try { ro.disconnect(); } catch (e) {}
     }
 
     return { setDynamics: setDynamics, getArrivalPct: getArrivalPct, destroy: destroy };

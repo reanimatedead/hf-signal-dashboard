@@ -176,6 +176,47 @@ alignable). Japan stays placeholder rather than show stale or single-side data. 
 
 ---
 
+## v4.1 — Money Flow + UI re-invention  ✅ (this release)
+
+**Goal:** unify scattered macro context into a single "お金の流れ" panel; collapse the
+11-tab IA into 8; add a non-interfering background animation layer; remain keyless.
+
+- **Tabs 11 → 8 (shipped).**
+  - `rates_vol` = Rates (US 2Y/10Y/30Y + JP 2Y/10Y/30Y) + Volatility (VIX + MOVE).
+  - `pos_val` = CFTC IMM + Crypto + Buffett Indicator, sectioned.
+  - `moneyflow` = お金の流れ 3-region panel (replaces the legacy Macro / お金の流れ tab).
+  - 旧 `volatility / imm / crypto / valuation` の独立タブは廃止 (データは `markets.*` に保持)。
+- **New top-level `money_flow.{us,eu,jp}` (shipped).** Keyless 3-region data:
+  - US: FRED `WALCL` (weekly), TGA closing balance via fiscaldata (`open_today_bal` fallback,
+    daily), FRED `RRPONTSYD` (daily), and `net_liquidity = WALCL - TGA - RRP`. Debt via
+    `debt_to_penny` with daily delta. Freshness badge = `daily | weekly | stale`.
+  - EU: FRED `ECBASSETSW` (weekly). Govt debt remains `placeholder` (Eurostat quarterly not yet
+    keyless-wired). Freshness badge = `weekly | stale`.
+  - JP: FRED `JPNASSETS` (monthly). Central-govt debt remains `placeholder`. Badge = `monthly | stale`.
+  - 1 ticker failure ⇒ that series only goes to `data_status:"placeholder"` (no fabrication);
+    the run continues.
+- **`markets.rates` adds `US30Y` (^TYX) + `JP30Y`** from the MoF JGB CSV (30年 column,
+  optional; 2Y/10Y unaffected when missing). **`markets.volatility` adds `MOVE` (^MOVE).**
+- **Background animation `<canvas id="bg-fx">` (shipped).** Always behind data UI
+  (`z-index:0; pointer-events:none; aria-hidden`); three modes (`clean`, `starfield`,
+  `constellation`) cycled via header button; 30fps cap, `prefers-reduced-motion` static,
+  Page Visibility pause, `devicePixelRatio<=2`, mobile particle halving, resize debounced 150ms.
+  Persisted in `localStorage.hf_bg_mode`; default = `clean`. Zero dependencies.
+- **Shared particle engine `docs/assets/lib/particles.js` (shipped).** Single module powering
+  both the background and the お金の流れ flow fields (Agent A + Agent C share a single rAF /
+  ResizeObserver / vis-handler — no double draw, no interference).
+- **Minimal i18n (JA / EN) (shipped).** Header toggle, persisted in `localStorage.hf_lang`.
+- **Cron 00:00 JST (15:00 UTC) (shipped).** Workflow runs `pytest tests/test_money_flow_schema.py
+  tests/test_index_html_contract.py` before push, failing fast on schema regression.
+
+**Deferred:**
+- BoJ "営業毎旬報告" 10日次差替 (current monthly FRED series is a stand-in).
+- EU/JP central-govt debt live wiring (Eurostat / MoF quarterly).
+- `money_flow.*.tilt` (basin allocation per region) — to be ingested from the legacy
+  `macro.json` flow block in v4.2.
+
+---
+
 ## Guardrails (all phases)
 
 - yfinance / free sources only; no API keys, no paid APIs.

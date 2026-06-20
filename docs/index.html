@@ -659,6 +659,7 @@ async function loadData(){
     const r=await fetch("data.json?t="+Date.now());
     if(!r.ok) throw new Error("HTTP "+r.status);
     DATA=await r.json();
+    window.DATA = DATA;   // v4.1: expose to the money-flow IIFE
     st.textContent="Rendering…";
     await new Promise(r=>setTimeout(r,300));
     init();
