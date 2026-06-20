@@ -33,6 +33,42 @@ without leaving the portfolio incomplete.
 
 ---
 
+## Features (v4.4 / Phase 1.6 — instant notify + tamper-evident log)
+
+- **Two-route instant notify (v4.4 / Phase 1.6).** ENTRY/EXIT判定の瞬間に Mac mini
+  ローカル通知 (osascript) と ntfy.sh 経由スマホ通知の **二経路** で発火。両ルートとも
+  完全 keyless (Gmail OAuth / API key 不要)。ntfy のトピック文字列だけは推測困難な
+  乱数値を `config.local` に置く方針で公開リポには出さない。両ルート同時失敗時は
+  `data/local/notify_queue.jsonl` に積み、次サイクルで自動再送 (queue + retry)。
+  `event_id` 単位の 24 時間 dedup で同一判定の二重送信を抑止。
+- **Append-only ハッシュチェーン台帳 (改竄不能ログ).** `notify/chain.py` は
+  `data/local/notifications.jsonl` に 1 行 1 イベントで書き込み、`prev_hash + payload
+  → sha256 → curr_hash` の連鎖で後出し改竄を物理封鎖。pytest は (a) 中間行の改竄、
+  (b) 中間行の削除、(c) 偽行の挿入、を全て chain.verify() が検知することを保証。
+  EXIT_TP/SL/TIMEOUT は `entry_ref` に対応する過去 ENTRY を必ず参照しなければ
+  `ValueError` で拒否され、「片方隠し」のインチキを構造で封じる。
+- **look-ahead 厳禁の ENTRY/EXIT 判定.** `notify/triggers.evaluate(bars, t_index, ...)`
+  は `bars[:t_index+1]` のみ参照。テストは `bars` を監視 list に置き換え、関数が
+  `t_index` を超えるインデックスにアクセスした瞬間に失敗する。仕様の本質を
+  「読まない」ことそのもので守る。
+- **launchd 常駐 receiver.** `scripts/notify_receiver.py` を `KeepAlive` で 60 秒
+  ループ。死んだら macOS が即再起動。Mac mini 落下時も ntfy 経路でスマホには届く。
+  ロード手順:
+
+  ```sh
+  mkdir -p ~/Library/LaunchAgents
+  sed "s/USER/$USER/g" scripts/com.hf.notify.plist > ~/Library/LaunchAgents/com.hf.notify.plist
+  launchctl unload ~/Library/LaunchAgents/com.hf.notify.plist 2>/dev/null || true
+  launchctl load -w ~/Library/LaunchAgents/com.hf.notify.plist
+  launchctl list | grep com.hf.notify     # 動作確認
+  ```
+- **SURVIVAL 内通知ログパネル.** `docs/assets/survival/notify_panel.js` がブラウザ側で
+  もう一度ハッシュチェーンを再計算し、断裂時は赤バナー「⚠ chain integrity failed at
+  index N」を最上部に出す。価格は公開抜粋から除外 (`export_public`)、判定の事実だけを公開。
+- **GRC.** すべての通知本文に「事実記録 / not investment advice」を必ず含む
+  (テストで保証)。執行助言ではなく「自分が立てた判定を自分に通知する」位置づけ。
+  `config.local` / `data/local/` は `.gitignore` 済 — 個別損益はリポに出ない。
+
 ## Features (v4.3 / Phase 1.5 — weekend autocollect)
 
 - **Weekend autocollect (v4.3 / Phase 1.5)** — a separate workflow

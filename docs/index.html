@@ -415,6 +415,14 @@ body.light .mf-cv-wrap{background:radial-gradient(ellipse at 50% 18%,#e8edf3,#f7
 .sv-notes{font-size:10px;color:var(--text-dim);margin-top:10px;border-top:1px solid var(--border);padding-top:8px}
 .sv-notes ul{margin:4px 0 0 16px}
 .sv-notes li{margin:2px 0}
+.sv-notify-warn{background:rgba(255,69,96,0.15);color:var(--red);
+                border:1px solid rgba(255,69,96,0.5);
+                font-family:var(--cond);font-weight:700;letter-spacing:0.04em;
+                padding:6px 10px;border-radius:4px;margin-bottom:8px;font-size:11px}
+.sv-notify-info{margin-top:6px;font-size:10px;color:var(--yellow);
+                font-family:var(--cond);font-weight:700}
+.sv-entry{border-left:2px solid rgba(0,232,162,0.4)}
+.sv-exit{border-left:2px solid rgba(255,140,48,0.4)}
 
 /* ── Multi-section table rows (rates_vol / pos_val) ── */
 tbody tr.section-row,tbody tr.section-row:hover{background:var(--bg3);cursor:default}
@@ -494,6 +502,7 @@ tbody tr.section-row,tbody tr.section-row:hover{background:var(--bg3);cursor:def
       <div class="sv-card" id="sv-pattern"></div>
       <div class="sv-card" id="sv-aggregate"></div>
       <div class="sv-card" id="sv-log" style="grid-column:1/-1"></div>
+      <div class="sv-card" id="sv-notify" style="grid-column:1/-1"></div>
     </div>
     <div class="sv-notes" id="sv-notes"></div>
     <div class="sv-empty-msg" style="display:none;color:var(--text-faint);padding:20px;text-align:center">
@@ -1453,6 +1462,8 @@ function bbColor(b){
 <script src="assets/lib/particles.js"></script>
 <!-- SURVIVAL loop module (Phase 1) -->
 <script src="assets/survival/survival.js"></script>
+<!-- Notify panel (改竄不能チェーンを表示。data/notifications_public.jsonl 不在時は静かにスキップ) -->
+<script src="assets/survival/notify_panel.js"></script>
 <script>
 /* ════════════════════════════════════════════════════════════════
    v4.1 グルーコード (Agent A: bg-fx + i18n + 8-tab dispatch,
