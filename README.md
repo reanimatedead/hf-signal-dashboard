@@ -33,6 +33,45 @@ without leaving the portfolio incomplete.
 
 ---
 
+## Features (v4.5 / Phase 1.7 — walk-forward backtest + data backfill)
+
+- **Walk-forward backtest harness (v4.5).** `backtest/` ships a structurally-anti-overfit
+  evaluator:
+  - `walk_forward.make_splits(mode="anchored"|"rolling", purge, embargo)` produces
+    time-ordered train/test splits with mandatory purge+embargo (zero on both raises).
+  - `walk_forward.run_fold()` wraps `bars` in a **watcher list** so the predictor
+    physically cannot read indices > `t_index` — peeking the future raises
+    `AssertionError` (verified by tests).
+  - `simulator.simulate_fold()` clamps `size_pct` to `survival.risk_engine.HARD_CAPS`
+    (≤ 0.5 %), respects `MAX_CONCURRENT=3`, and **always** deducts slippage + fee
+    (no ideal-fill mode).
+  - `metrics.summarize_pair(IS, OOS)` returns IS / OOS side-by-side with
+    `overfit_gap` plus Brier (with Murphy decomposition `reliability − resolution +
+    uncertainty`), 10-bin calibration, bootstrap-1000 CI on average net %, and a
+    `judge` field that goes "undetermined" when `N<30` *or* the CI straddles 0.
+  - Tonight's deliverable is wiring only: `python3 -m backtest.cli --smoke` runs
+    an end-to-end synthetic random-walk pass (6 folds, ~226 OOS trades, no edge).
+
+- **Data backfill CLI (v4.5).** `collector/backfill.py` is the depth-builder.
+  `python3 -m collector.backfill --period=max --interval=1d` downloads the longest
+  available history per symbol into `data/local/history.duckdb` (or a per-symbol
+  jsonl fallback when DuckDB isn't installed). Idempotent (same-day re-runs
+  produce zero duplicates), partial-failure tolerant (broken symbol is logged,
+  run continues), polite UA, low-disk WARN at < 20 GB free, and progress lands
+  in `data/local/backfill_progress.json` (+ a public abridged copy at
+  `docs/data/backfill_progress_public.json` for the SURVIVAL panel).
+
+- **SURVIVAL panels (v4.5).** Two new cards: `#sv-backtest` (IS vs OOS table with
+  judge badges, EV CI, overfit_gap, and a yellow "overfit risk" warning when IS-OOS
+  diverges) and `#sv-backfill` (symbols / total bars / coverage span / free disk /
+  store backend). Both fetch their public-abridged JSON; the panels show
+  「履歴蓄積中」 until backfill runs, so the rest of the SURVIVAL tab never breaks.
+
+- **GRC.** All market data still keyless. Trade results, individual P&L, and the
+  DuckDB store stay in `data/local/` (gitignored). Disclaimers preserved.
+  Phase 2 (model training) and Phase 3 (auto win/loss adjudication) remain
+  intentionally not implemented.
+
 ## Features (v4.4 / Phase 1.6 — instant notify + tamper-evident log)
 
 - **Two-route instant notify (v4.4 / Phase 1.6).** ENTRY/EXIT判定の瞬間に Mac mini

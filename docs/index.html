@@ -503,6 +503,8 @@ tbody tr.section-row,tbody tr.section-row:hover{background:var(--bg3);cursor:def
       <div class="sv-card" id="sv-aggregate"></div>
       <div class="sv-card" id="sv-log" style="grid-column:1/-1"></div>
       <div class="sv-card" id="sv-notify" style="grid-column:1/-1"></div>
+      <div class="sv-card" id="sv-backtest" style="grid-column:1/-1"></div>
+      <div class="sv-card" id="sv-backfill" style="grid-column:1/-1"></div>
     </div>
     <div class="sv-notes" id="sv-notes"></div>
     <div class="sv-empty-msg" style="display:none;color:var(--text-faint);padding:20px;text-align:center">
@@ -1464,6 +1466,9 @@ function bbColor(b){
 <script src="assets/survival/survival.js"></script>
 <!-- Notify panel (改竄不能チェーンを表示。data/notifications_public.jsonl 不在時は静かにスキップ) -->
 <script src="assets/survival/notify_panel.js"></script>
+<!-- Backtest + backfill panels (Phase 1.7). 公開抜粋 JSON 不在時は「履歴蓄積中」を表示 -->
+<script src="assets/survival/backtest_panel.js"></script>
+<script src="assets/survival/backfill_panel.js"></script>
 <script>
 /* ════════════════════════════════════════════════════════════════
    v4.1 グルーコード (Agent A: bg-fx + i18n + 8-tab dispatch,

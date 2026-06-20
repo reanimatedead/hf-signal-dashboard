@@ -1,0 +1,9 @@
+{
+  "as_of_utc": null,
+  "symbol_count": 0,
+  "total_bars": 0,
+  "coverage": { "first_ts": null, "last_ts": null },
+  "free_gb": null,
+  "store_backend": null,
+  "note": "Macro environment visualization / not investment advice. Run `python3 -m collector.backfill` to populate."
+}

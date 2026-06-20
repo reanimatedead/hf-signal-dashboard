@@ -217,7 +217,52 @@ alignable). Japan stays placeholder rather than show stale or single-side data. 
 
 ---
 
-## v4.4 — Instant notify + tamper-evident log / Phase 1.6 (this release)
+## v4.5 — Walk-forward backtest + data backfill / Phase 1.7 (this release)
+
+**Goal:** ship a structurally-anti-overfit "予測 vs 実レート" harness and the
+depth-builder that feeds it, so tomorrow morning we have meaningful out-of-sample
+samples. Tonight delivers the wiring; the actual data backfill runs tomorrow.
+
+- **`backtest/walk_forward.py` (shipped).** anchored and rolling modes; mandatory
+  purge + embargo (both zero → `ValueError`). `run_fold()` wraps `bars` in a
+  `WatchedBars` view that asserts every index ≤ `train_end` — a predictor cannot
+  peek at the future without exploding.
+- **`backtest/simulator.py` (shipped).** 1-fold virtual execution. Entry/exit
+  prices include slippage on both legs; fees are deducted from realized %. Size
+  is clamped to `survival.risk_engine.HARD_CAPS["PER_TRADE_PCT_MAX"]=0.5%`; the
+  simultaneous-position count is capped at `MAX_CONCURRENT=3`. TP / SL /
+  TIMEOUT (40 bars) all fire. Trade log lands in `data/local/backtest/<run>.jsonl`
+  (never committed).
+- **`backtest/metrics.py` (shipped).** `summarize()` returns hit_rate, Brier with
+  Murphy decomposition (`reliability − resolution + uncertainty`), a 10-bin
+  calibration table, bootstrap-1000 CI on average net %, and a `judge` field
+  that flips to `undetermined` when `N<30` or the CI straddles 0.
+  `summarize_pair()` surfaces `in_sample`, `out_of_sample`, and `overfit_gap`
+  so the IS-OOS divergence is impossible to hide.
+- **`backtest/cli.py --smoke` (shipped).** Generates a deterministic random-walk,
+  runs the full pipeline, writes `docs/data/backtest_summary_public.json` for the
+  UI. Expected on noise: negative-edge CI, no profit claim from luck.
+- **`collector/backfill.py` (shipped).** `python3 -m collector.backfill` downloads
+  max-history bars from yfinance for a default watchlist into
+  `data/local/history.duckdb` (or per-symbol jsonl fallback when DuckDB isn't
+  installed). Idempotent on (symbol, interval, ts). Failures land in
+  `errors`; run never aborts. Polite UA via `collector.runtime`. Surfaces
+  progress + low-disk WARN at < 20 GB.
+- **SURVIVAL `#sv-backtest` and `#sv-backfill` (shipped).** Two client-side
+  cards that fetch the public abridged JSONs. Missing files render 「履歴蓄積中」
+  so the SURVIVAL tab never breaks before backfill runs.
+- **Explicitly out of Phase 1.7 (deferred).** Real-data backtest connection
+  (`backtest/cli.py --source=duckdb`), model retraining, win/loss adjudication.
+
+**Tomorrow's runbook:**
+1. `python3 -m collector.backfill --period=max --interval=1d` (時間がかかる).
+2. Re-run `python3 -m backtest.cli` against real bars (Phase 2 で `--source=duckdb`
+   を実装する).
+3. Verify `judge=ok` on a watchlist before considering any live position.
+
+---
+
+## v4.4 — Instant notify + tamper-evident log / Phase 1.6
 
 **Goal:** when the engine emits an ENTRY or EXIT verdict, the human gets
 notified **the moment it happens** on two independent channels, and every
