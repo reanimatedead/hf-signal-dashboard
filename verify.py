@@ -28,13 +28,15 @@ HOME_STORE = pathlib.Path(os.path.expanduser("~/hf-data-store"))
 REQUIRED_FILES = [
     "docs/index.html",
     "docs/data.json",
-    "docs/data/macro.json",
-    "docs/assets/macro/flow.js",
-    "docs/assets/macro/macro.js",
+    "docs/data/macro.json",                 # legacy macro layer (still wired)
+    "docs/assets/lib/particles.js",         # v4.1 shared particle engine
     "pipeline/build_macro.py",
     "verify.py",
     "verify_render.mjs",
     "MACRO_INTEGRATION_NOTES.md",
+    "SPEC_MONEYFLOW.md",                    # v4.1 contract
+    "tests/test_money_flow_schema.py",
+    "tests/test_index_html_contract.py",
 ]
 
 EXPECTED_LAG = {
@@ -93,17 +95,50 @@ try:
 except Exception as e:
     fail("gate1_regression_data", f"existing data.json parse fail: {e}")
 
-# Gate-1b: 既存 index.html の per-symbol タブが消えていない
+# Gate-1b: v4.1 タブ統合後の構造が壊れていない (per-symbol タブのうち
+# 残るべきもの = nikkei225 / fx 等; rates/imm/valuation は rates_vol/pos_val に統合済み)
 try:
     html = INDEX.read_text(encoding="utf-8")
-    needles = ["sw('nikkei225'", "sw('fx'", "sw('rates'", "sw('imm'", "sw('valuation'"]
+    needles = [
+        'data-tab="nikkei225"', 'data-tab="fx"',
+        'data-tab="rates_vol"', 'data-tab="pos_val"', 'data-tab="moneyflow"',
+        'id="bg-fx"', 'assets/lib/particles.js',
+    ]
     miss = [n for n in needles if n not in html]
     if miss:
-        fail("gate1_regression_index", f"per-symbol tabs missing in index.html: {miss}")
+        fail("gate1_regression_index", f"v4.1 index.html anchors missing: {miss}")
     else:
         ok("gate1_regression_index")
 except Exception as e:
     fail("gate1_regression_index", str(e))
+
+# Gate-1c: v4.1 top-level money_flow ブロックが data.json に存在し契約を満たす
+try:
+    mf = (existing or {}).get("money_flow") if existing else None
+    if not isinstance(mf, dict):
+        fail("gate1c_money_flow", "data.json.money_flow missing or not dict")
+    else:
+        problems = []
+        for region in ("us", "eu", "jp"):
+            blk = mf.get(region)
+            if not isinstance(blk, dict):
+                problems.append(f"money_flow.{region} missing"); continue
+            for k in ("cb_assets", "debt", "freshness_badge"):
+                if k not in blk:
+                    problems.append(f"money_flow.{region}.{k} missing")
+            if blk.get("region") != region:
+                problems.append(f"money_flow.{region}.region != {region}")
+        for region in ("eu", "jp"):
+            blk = mf.get(region, {})
+            for k in ("tga", "rrp", "net_liquidity"):
+                if blk.get(k) is not None:
+                    problems.append(f"money_flow.{region}.{k} must be null (US-only)")
+        if problems:
+            fail("gate1c_money_flow", "; ".join(problems))
+        else:
+            ok("gate1c_money_flow")
+except Exception as e:
+    fail("gate1c_money_flow", str(e))
 
 
 def finish():

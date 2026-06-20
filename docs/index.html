@@ -301,10 +301,73 @@ body.light .cname{color:var(--text-dim)}
   .tab{padding:10px 12px;font-size:12px}
   .cname{max-width:80px}
   #clock{display:none}
+  .mf-grid{grid-template-columns:1fr !important}
 }
+
+/* ══════════════════════════════════════════════════
+   BACKGROUND ANIMATION LAYER (Agent A, SPEC §4)
+   - Always behind all data UI. pointer-events: none. aria-hidden.
+   - Selection of mode persisted in localStorage.hf_bg_mode.
+══════════════════════════════════════════════════ */
+#bg-fx{position:fixed;inset:0;width:100vw;height:100vh;
+       pointer-events:none;z-index:0;display:block;background:transparent}
+/* Force all data UI in front of the background canvas */
+#header,#sum-bar,#tabs,#toolbar,#main,#footer,.tbl-wrap,#mf-pane,#loading,#errmsg{
+  position:relative;z-index:1
+}
+#header{z-index:100}
+
+/* ══════════════════════════════════════════════════
+   MONEY FLOW PANE (Agent C, SPEC §5)
+══════════════════════════════════════════════════ */
+#mf-pane{padding:14px 16px;font-family:-apple-system,"Hiragino Kaku Gothic ProN",system-ui,sans-serif;font-size:13px;color:var(--text)}
+.mf-disc{font-size:11px;color:var(--yellow);border:1px solid var(--border);border-radius:4px;
+         padding:6px 10px;margin-bottom:10px;background:var(--bg2)}
+.mf-grid{display:grid;grid-template-columns:1fr;gap:14px}
+@media(min-width:760px){.mf-grid{grid-template-columns:1fr 1fr}}
+@media(min-width:1200px){.mf-grid{grid-template-columns:1fr 1fr 1fr}}
+.mf-region{background:var(--bg2);border:1px solid var(--border);border-radius:6px;
+           padding:12px;display:flex;flex-direction:column;gap:10px;min-width:0}
+.mf-head{font-family:var(--cond);font-weight:700;font-size:13px;letter-spacing:0.08em;
+         color:var(--sym-color);text-transform:uppercase;display:flex;align-items:center;
+         justify-content:space-between;gap:8px}
+.mf-badge{font-size:10px;padding:2px 7px;border-radius:3px;font-family:var(--cond);
+          font-weight:700;letter-spacing:0.06em;text-transform:uppercase}
+.mf-badge.daily{background:rgba(0,232,162,.15);color:var(--green);border:1px solid rgba(0,232,162,.4)}
+.mf-badge.weekly{background:rgba(59,130,246,.15);color:var(--blue);border:1px solid rgba(59,130,246,.4)}
+.mf-badge.monthly{background:rgba(240,192,64,.12);color:var(--yellow);border:1px solid rgba(240,192,64,.35)}
+.mf-badge.quarterly{background:rgba(255,140,48,.12);color:var(--orange);border:1px solid rgba(255,140,48,.35)}
+.mf-badge.stale{background:rgba(90,106,126,.12);color:var(--text-dim);border:1px solid var(--border)}
+.mf-counter{display:flex;flex-direction:column;gap:2px;padding:8px 10px;
+            background:var(--bg3);border:1px solid var(--border);border-radius:4px}
+.mf-counter-lbl{font-size:10px;letter-spacing:0.08em;color:var(--text-dim);text-transform:uppercase}
+.mf-counter-val{font-family:var(--mono);font-size:18px;font-weight:700;
+                color:var(--sym-color);font-variant-numeric:tabular-nums}
+.mf-counter-delta{font-family:var(--mono);font-size:11px;color:var(--text-dim);
+                  font-variant-numeric:tabular-nums}
+.mf-counter-delta.up{color:var(--red)}     /* debt grows -> red (warning) */
+.mf-counter-delta.dn{color:var(--green)}
+.mf-cv-wrap{position:relative;background:radial-gradient(ellipse at 50% 18%,#101a26,#0a0e14);
+            border:1px solid var(--border);border-radius:5px;aspect-ratio:5/3;overflow:hidden}
+body.light .mf-cv-wrap{background:radial-gradient(ellipse at 50% 18%,#e8edf3,#f7fafe)}
+.mf-cv-wrap canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
+.mf-meta{font-size:10px;color:var(--text-dim);display:flex;flex-wrap:wrap;gap:4px 12px;line-height:1.6}
+.mf-meta b{color:var(--text);font-weight:600}
+.mf-meta .mf-status{padding:1px 5px;border:1px solid var(--border);border-radius:3px;
+                    color:var(--text-dim);font-family:var(--cond);font-weight:700}
+
+/* ── Multi-section table rows (rates_vol / pos_val) ── */
+tbody tr.section-row,tbody tr.section-row:hover{background:var(--bg3);cursor:default}
+.section-row td{font-family:var(--cond);font-weight:700;font-size:11px;letter-spacing:0.12em;
+                color:var(--accent);text-transform:uppercase;padding:8px 12px;border-right:none}
+.cell-section{color:var(--text-dim);font-size:10px;font-family:var(--cond);font-weight:700;
+              letter-spacing:0.05em;text-transform:uppercase}
 </style>
 </head>
 <body>
+
+<!-- Background animation layer (SPEC_MONEYFLOW §4) -->
+<canvas id="bg-fx" aria-hidden="true" style="pointer-events:none"></canvas>
 
 <!-- Loading -->
 <div id="loading">
@@ -325,6 +388,8 @@ body.light .cname{color:var(--text-dim)}
     <span style="color:var(--text-faint)">|</span>
     <span id="nxt-upd" style="color:var(--text-faint)">—</span>
   </div>
+  <button class="hbtn" id="lngbtn" onclick="toggleLang()" title="Language">JA</button>
+  <button class="hbtn" id="bgbtn"  onclick="cycleBg()"    title="Background [B]">背景 ○</button>
   <button class="hbtn" onclick="exportCSV()" title="Export CSV [E]">⬇ CSV</button>
   <button class="hbtn" id="thbtn" onclick="toggleTheme()" title="Toggle theme [D]">☀ Light</button>
   <button class="hbtn" onclick="location.reload()" title="Refresh">↺</button>
@@ -336,17 +401,14 @@ body.light .cname{color:var(--text-dim)}
 <!-- Main -->
 <div id="main" style="display:none">
   <div id="tabs">
-    <button class="tab active" onclick="sw('nikkei225',this)">日経 225</button>
-    <button class="tab" onclick="sw('dow30',this)">Dow 30</button>
-    <button class="tab" onclick="sw('nasdaq100',this)">Nasdaq 100</button>
-    <button class="tab" onclick="sw('sp500',this)">S&amp;P 500</button>
-    <button class="tab" onclick="sw('fx',this)">FX / Commodities</button>
-    <button class="tab" onclick="sw('rates',this)">Rates / Bonds</button>
-    <button class="tab" onclick="sw('volatility',this)">VIX</button>
-    <button class="tab" onclick="sw('imm',this)">IMM</button>
-    <button class="tab" onclick="sw('crypto',this)">Crypto</button>
-    <button class="tab" onclick="sw('valuation',this)">Valuation</button>
-    <button class="tab hf-macro-tab" id="hf-macro-tab-btn" onclick="hfMacroActivate(this)">Macro / お金の流れ</button>
+    <button class="tab active" data-tab="nikkei225" onclick="sw('nikkei225',this)">日経 225</button>
+    <button class="tab" data-tab="dow30"     onclick="sw('dow30',this)">Dow 30</button>
+    <button class="tab" data-tab="nasdaq100" onclick="sw('nasdaq100',this)">Nasdaq 100</button>
+    <button class="tab" data-tab="sp500"     onclick="sw('sp500',this)">S&amp;P 500</button>
+    <button class="tab" data-tab="fx"        onclick="sw('fx',this)">FX / 商品</button>
+    <button class="tab" data-tab="rates_vol" onclick="sw('rates_vol',this)">金利・債券・VOL</button>
+    <button class="tab" data-tab="pos_val"   onclick="sw('pos_val',this)">ポジション/割安度</button>
+    <button class="tab" data-tab="moneyflow" onclick="sw('moneyflow',this)">お金の流れ</button>
   </div>
   <div id="toolbar">
     <div id="srch-wrap">
@@ -359,22 +421,30 @@ body.light .cname{color:var(--text-dim)}
     <button class="fbtn" id="wlbtn" onclick="toggleWL()">☆ Watchlist</button>
     <div id="rowcount"></div>
   </div>
-  <!-- ─── Macro / お金の流れ ペイン（増築・非破壊） ─── -->
-  <div id="hf-macro-pane" style="display:none">
-    <div class="hf-macro-disc">
-      ⚠ 概念可視化 / これは相場「環境」の可視化であり、<b>売買助言ではありません (not investment advice)</b>。
+  <!-- ─── お金の流れ / Money Flow (3-region, v4.1) ─── -->
+  <div id="mf-pane" style="display:none">
+    <div class="mf-disc">
+      ⚠ <b id="mf-disc-text">相場「環境」の可視化 / not investment advice</b>
     </div>
-    <div class="hf-macro-grid">
-      <div class="hf-macro-canvas-wrap">
-        <canvas id="hf-macro-cv" width="660" height="470"></canvas>
-        <div class="hf-macro-legend">
-          <span><span class="hf-macro-dot" style="background:#5a8fe0"></span>水=お金</span>
-          <span><span class="hf-macro-dot" style="background:#39d0d8"></span>中央銀行</span>
-          <span id="hf-macro-flowmeta"></span>
-        </div>
-        <div id="hf-macro-updated"></div>
-      </div>
-      <div class="hf-macro-tiles" id="hf-macro-tiles"></div>
+    <div class="mf-grid">
+      <article class="mf-region" data-region="us">
+        <div class="mf-head"><span id="mf-head-us">米国</span><span class="mf-badge stale" id="mf-fresh-us">—</span></div>
+        <div class="mf-counter" id="mf-counter-us"></div>
+        <div class="mf-cv-wrap"><canvas id="mf-cv-us"></canvas></div>
+        <div class="mf-meta" id="mf-meta-us"></div>
+      </article>
+      <article class="mf-region" data-region="eu">
+        <div class="mf-head"><span id="mf-head-eu">欧州</span><span class="mf-badge stale" id="mf-fresh-eu">—</span></div>
+        <div class="mf-counter" id="mf-counter-eu"></div>
+        <div class="mf-cv-wrap"><canvas id="mf-cv-eu"></canvas></div>
+        <div class="mf-meta" id="mf-meta-eu"></div>
+      </article>
+      <article class="mf-region" data-region="jp">
+        <div class="mf-head"><span id="mf-head-jp">日本</span><span class="mf-badge stale" id="mf-fresh-jp">—</span></div>
+        <div class="mf-counter" id="mf-counter-jp"></div>
+        <div class="mf-cv-wrap"><canvas id="mf-cv-jp"></canvas></div>
+        <div class="mf-meta" id="mf-meta-jp"></div>
+      </article>
     </div>
   </div>
   <div class="tbl-wrap">
@@ -391,7 +461,7 @@ body.light .cname{color:var(--text-dim)}
         For data visualization purposes only. Not investment advice.
       </p>
       <p style="margin-top:12px;font-size:11px;color:var(--text-faint)">
-        Keys: [1-5] tabs · [/] search · [D] theme · [E] export · [W] watchlist · [Esc] clear
+        Keys: [1-8] tabs · [/] search · [D] theme · [B] bg · [L] lang · [E] export · [W] watchlist · [Esc] clear
       </p>
     </div>
   </div>
@@ -483,7 +553,31 @@ const C_VALUATION=[
   {k:"data_status",       l:"Data",     a:"center",w:104},
   {k:"source",            l:"Source",   a:"left",  w:160},
 ];
-const cols=()=>({fx:C_FX,rates:C_RATES,volatility:C_VOL,imm:C_IMM,crypto:C_CRYPTO,valuation:C_VALUATION})[tab]||C_STOCK;
+// v4.1 combined-tab unified column sets (rates_vol / pos_val).
+// Rows from sub-sections are mapped to these columns; missing fields render as "—".
+const C_RATES_VOL=[
+  {k:"symbol",      l:"Symbol",   a:"left",  w:120},
+  {k:"name",        l:"Name",     a:"left",  w:240},
+  {k:"type_label",  l:"Type",     a:"center",w:84},
+  {k:"value",       l:"Value",    a:"right", w:100},
+  {k:"delta",       l:"Δ",        a:"right", w:80},
+  {k:"risk",        l:"Risk",     a:"center",w:90},
+  {k:"data_status", l:"Data",     a:"center",w:100},
+];
+const C_POS_VAL=[
+  {k:"symbol",      l:"Symbol",   a:"left",  w:160},
+  {k:"name",        l:"Name",     a:"left",  w:210},
+  {k:"type_label",  l:"Type",     a:"left",  w:130},
+  {k:"value",       l:"Value",    a:"right", w:110},
+  {k:"delta",       l:"Δ",        a:"right", w:84},
+  {k:"context",     l:"Context",  a:"left",  w:200},
+  {k:"data_status", l:"Data",     a:"center",w:100},
+];
+const cols=()=>{
+  if (tab === "rates_vol") return C_RATES_VOL;
+  if (tab === "pos_val")   return C_POS_VAL;
+  return ({fx:C_FX,rates:C_RATES,volatility:C_VOL,imm:C_IMM,crypto:C_CRYPTO,valuation:C_VALUATION})[tab]||C_STOCK;
+};
 
 // ══ Boot ═══════════════════════════════════════════
 window.addEventListener("DOMContentLoaded",()=>{
@@ -545,6 +639,9 @@ function keys(){
       case"3": tabs[2]?.click(); break;
       case"4": tabs[3]?.click(); break;
       case"5": tabs[4]?.click(); break;
+      case"6": tabs[5]?.click(); break;
+      case"7": tabs[6]?.click(); break;
+      case"8": tabs[7]?.click(); break;
       case"/": e.preventDefault(); document.getElementById("search")?.focus(); break;
       case"d": case"D": toggleTheme(); break;
       case"e": case"E": exportCSV(); break;
@@ -562,6 +659,7 @@ async function loadData(){
     const r=await fetch("data.json?t="+Date.now());
     if(!r.ok) throw new Error("HTTP "+r.status);
     DATA=await r.json();
+    window.DATA = DATA;   // v4.1: expose to the money-flow IIFE
     st.textContent="Rendering…";
     await new Promise(r=>setTimeout(r,300));
     init();
@@ -586,6 +684,8 @@ function init(){
   document.getElementById("sum-bar").style.display="flex";
   document.getElementById("main").style.display="block";
   document.getElementById("footer").style.display="block";
+  // v4.1: pre-warm the money-flow pane so a single tab click renders instantly.
+  if (window.__mfRefresh) window.__mfRefresh();
   sw("nikkei225", document.querySelector(".tab.active"));
 }
 
@@ -616,10 +716,15 @@ function renderSum(){
 // ══ Tab switch ═════════════════════════════════════
 function sw(key,btn){
   tab=key; fsig=null; sv=""; wlOnly=false;
-  document.getElementById("search").value="";
+  const srch=document.getElementById("search"); if (srch) srch.value="";
   document.querySelectorAll(".tab").forEach(t=>t.classList.remove("active"));
-  btn.classList.add("active");
-  document.getElementById("wlbtn").classList.remove("wl-active");
+  if (btn && btn.classList) btn.classList.add("active");
+  const wlb=document.getElementById("wlbtn"); if (wlb) wlb.classList.remove("wl-active");
+  if (key === "moneyflow") {
+    if (window.__mfShow) window.__mfShow();
+    return;
+  }
+  if (window.__mfHide) window.__mfHide();
   renderFBtns(); renderTbl();
 }
 
@@ -655,9 +760,16 @@ function updWLBtn(){
 }
 
 // ══ Table ══════════════════════════════════════════
-function renderTbl(){const rows=getRows(); renderHead(); renderBody(rows); document.getElementById("rowcount").textContent=rows.length+" symbols"; updWLBtn();}
+function renderTbl(){
+  const rows=getRows();
+  renderHead();
+  renderBody(rows);
+  // renderBody now writes #rowcount itself (data rows only, excluding sections).
+  updWLBtn();
+}
 
 function getRows(){
+  if (tab === "rates_vol" || tab === "pos_val") return getCombinedRows();
   const market=DATA.markets?.[tab]||[];
   return market.filter(r=>{
     if(fsig&&r.signal!==fsig) return false;
@@ -671,6 +783,78 @@ function getRows(){
     if(typeof va==="string") return sdir*va.localeCompare(vb);
     return sdir*(vb-va);
   });
+}
+
+// v4.1 combined-tab row adapter: emits [{__section}, row, row, ...] sequences.
+// Sub-section sources retain their schema; rows are mapped to the unified columns.
+function getCombinedRows(){
+  const sections = [];
+  if (tab === "rates_vol") {
+    const rates = (DATA.markets?.rates||[]).map(r => ({
+      __orig: "rates",
+      symbol: r.symbol, name: r.name,
+      type_label: r.tenor || "—",
+      value: r.yield, delta: r.change,
+      risk: r.risk, data_status: r.data_status,
+    }));
+    const vol = (DATA.markets?.volatility||[]).map(r => ({
+      __orig: "volatility",
+      symbol: r.symbol, name: r.name,
+      type_label: "Vol",
+      value: r.price, delta: r.change_pct,
+      risk: r.risk,
+      data_status: r.data_status || (r.error ? "placeholder" : "live"),
+    }));
+    sections.push({title: "Rates / Bonds", rows: rates});
+    sections.push({title: "Volatility (VIX / MOVE)", rows: vol});
+  } else if (tab === "pos_val") {
+    const imm = (DATA.markets?.imm||[]).map(r => ({
+      __orig: "imm",
+      symbol: r.symbol, name: r.name,
+      type_label: "IMM " + (r.currency||""),
+      value: r.net_position, delta: r.weekly_change,
+      context: r.positioning_state,
+      risk: r.crowding_risk,
+      data_status: r.data_status,
+    }));
+    const crypto = (DATA.markets?.crypto||[]).map(r => ({
+      __orig: "crypto",
+      symbol: r.symbol, name: r.name,
+      type_label: "Crypto",
+      value: r.price, delta: r.change_pct,
+      context: r.risk || "—",
+      risk: r.risk,
+      data_status: r.data_status || (r.error ? "placeholder" : "live"),
+    }));
+    const val = (DATA.markets?.valuation||[]).map(r => ({
+      __orig: "valuation",
+      symbol: r.symbol, name: r.name,
+      type_label: r.metric || "—",
+      value: r.value, delta: null,
+      context: r.valuation_context,
+      risk: "—",
+      data_status: r.data_status,
+    }));
+    sections.push({title: "IMM Positioning (CFTC)", rows: imm});
+    sections.push({title: "Crypto",                 rows: crypto});
+    sections.push({title: "Valuation",              rows: val});
+  }
+  const out = [];
+  sections.forEach(sec => {
+    const filtered = sec.rows.filter(r => {
+      if (wlOnly && !WL.has(r.symbol)) return false;
+      if (sv) {
+        const s = (r.symbol||"").toLowerCase(), n = (r.name||"").toLowerCase();
+        if (!s.includes(sv) && !n.includes(sv)) return false;
+      }
+      return true;
+    });
+    if (filtered.length) {
+      out.push({__section: sec.title});
+      filtered.forEach(r => out.push(r));
+    }
+  });
+  return out;
 }
 
 function renderHead(){
@@ -690,8 +874,24 @@ function renderBody(rows){
     return;
   }
   ROWMAP={};
-  rows.forEach(r=>{ROWMAP[r.symbol]=r;});
-  tb.innerHTML=rows.map(r=>`<tr class="${WL.has(r.symbol)?"wl-row":""}" data-sym="${r.symbol}" onclick="toggleDetail(event,'${r.symbol}')" style="cursor:pointer">${cols().map(c=>cell(c,r)).join("")}</tr>`).join("");
+  const colset = cols();
+  const dataRowCount = rows.filter(r => !r.__section).length;
+  // For combined tabs (rates_vol/pos_val), suppress per-row click-detail since
+  // the underlying schemas differ — section header rows already give context.
+  const detailable = !(tab === "rates_vol" || tab === "pos_val");
+  tb.innerHTML = rows.map(r => {
+    if (r.__section) {
+      return `<tr class="section-row"><td colspan="${colset.length}">${r.__section}</td></tr>`;
+    }
+    if (r.symbol) ROWMAP[r.symbol] = r;
+    const cls = WL.has(r.symbol) ? "wl-row" : "";
+    const click = detailable
+      ? `onclick="toggleDetail(event,'${r.symbol}')" style="cursor:pointer"`
+      : "";
+    return `<tr class="${cls}" data-sym="${r.symbol||''}" ${click}>${colset.map(c=>cell(c,r)).join("")}</tr>`;
+  }).join("");
+  const rc = document.getElementById("rowcount");
+  if (rc) rc.textContent = dataRowCount + " symbols";
 }
 
 // ══ Symbol detail panel ════════════════════════════
@@ -1042,16 +1242,53 @@ function cell(c,r){
       h=`<span class="cci-v ${cl}">${v>=0?"+":""}${v.toFixed(0)}</span>`;
       break;
     }
-    case"value":
-      h=(r.value==null)?`<span style="color:var(--text-faint)">—</span>`
-        :`<span class="price">${Number(r.value).toFixed(1)}${esc(r.unit||"")}</span>`;
+    case"value":{
+      const v=r.value;
+      if (v==null) { h=`<span style="color:var(--text-faint)">—</span>`; break; }
+      if (typeof v === "number") {
+        const isYield = r.__orig === "rates";
+        const isLarge = Math.abs(v) >= 1000;
+        const formatted = isYield ? v.toFixed(3) + "%"
+                       : isLarge ? Math.round(v).toLocaleString()
+                       : v.toFixed(2);
+        h=`<span class="price">${formatted}${esc(r.unit||"")}</span>`;
+      } else {
+        h=`<span class="price">${esc(v)}${esc(r.unit||"")}</span>`;
+      }
       break;
+    }
+    case"delta":{
+      const v=r.delta;
+      if (v==null) { h=`<span class="cz">—</span>`; break; }
+      const cl = v>0?"cp":v<0?"cn":"cz";
+      const sign = v>0?"+":"";
+      const formatted = Math.abs(v) >= 1000 ? Math.round(v).toLocaleString() : v.toFixed(2);
+      h=`<span class="${cl}">${sign}${formatted}</span>`;
+      break;
+    }
+    case"type_label": h=`<span class="cell-section">${esc(r.type_label||"—")}</span>`; break;
+    case"context":    h=`<span style="color:var(--text-dim)">${esc(r.context||r.valuation_context||"—")}</span>`; break;
+    case"data_status":{
+      const s = r.data_status || "—";
+      const col = s==="live" ? "var(--green)"
+              : s==="weekly" || s==="monthly" ? "var(--blue)"
+              : s==="placeholder" || s==="stale" ? "var(--text-faint)"
+              : "var(--text-dim)";
+      h=`<span style="color:${col};font-family:var(--cond);font-weight:700;font-size:10px;letter-spacing:0.05em;text-transform:uppercase">${esc(s)}</span>`;
+      break;
+    }
+    case"risk":{
+      const v = r.risk || "—";
+      const col = v==="low"?"var(--green)":v==="medium"?"var(--yellow)":v==="high"?"var(--red)":"var(--text-dim)";
+      h=`<span style="color:${col};font-size:11px;font-family:var(--cond);font-weight:700;text-transform:uppercase">${esc(v)}</span>`;
+      break;
+    }
     case"valuation_context":{
       const ph=r.valuation_context==="placeholder"||r.valuation_context==null;
       h=`<span style="color:${ph?"var(--text-faint)":"var(--text-dim)"}">${esc(valCtxLabel(r.valuation_context))}</span>`;
       break;
     }
-    default: h=r[c.k]??"—";
+    default: h=esc(r[c.k]==null?"—":r[c.k]);
   }
   return`<td style="${al}">${h}</td>`;
 }
@@ -1124,71 +1361,214 @@ function bbColor(b){
 }
 </script>
 
-<!-- ════════════════════════════════════════════════════════════════
-     Macro / お金の流れ レイヤー（feat/macro-environment 増築）
-     既存セレクタ/スタイルは触らない。すべて .hf-macro-* で分離。
-══════════════════════════════════════════════════════════════════ -->
-<style>
-  .hf-macro-tab{color:var(--text-dim);}
-  .hf-macro-tab.active{color:var(--accent);}
-  #hf-macro-pane{padding:14px 16px;font-family:-apple-system,"Hiragino Kaku Gothic ProN",system-ui,sans-serif;font-size:13px;line-height:1.55;color:var(--text);}
-  .hf-macro-disc{font-size:11px;color:var(--yellow);border:1px solid var(--border);border-radius:4px;padding:6px 10px;margin-bottom:10px;background:var(--bg2);}
-  .hf-macro-grid{display:grid;grid-template-columns:1fr;gap:14px;}
-  @media(min-width:980px){.hf-macro-grid{grid-template-columns:680px 1fr;}}
-  .hf-macro-canvas-wrap{min-width:0;}
-  #hf-macro-cv{width:100%;height:auto;display:block;background:radial-gradient(ellipse at 50% 18%,#101a26,#0a0e14);border:1px solid var(--border);border-radius:6px;}
-  .hf-macro-legend{display:flex;gap:14px;flex-wrap:wrap;font-size:10px;color:var(--text-dim);margin-top:8px;}
-  .hf-macro-dot{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:4px;vertical-align:middle;}
-  #hf-macro-updated{font-size:10px;color:var(--text-dim);margin-top:6px;}
-  .hf-macro-tiles{display:grid;grid-template-columns:1fr;gap:8px;}
-  @media(min-width:560px){.hf-macro-tiles{grid-template-columns:1fr 1fr;}}
-  @media(min-width:980px){.hf-macro-tiles{grid-template-columns:1fr;}}
-  .hf-macro-tile{background:var(--bg2);border:1px solid var(--border);border-left:3px solid var(--text-dim);border-radius:6px;padding:9px 11px;}
-  .hf-macro-tile.green{border-left-color:var(--green);}
-  .hf-macro-tile.amber{border-left-color:var(--yellow);}
-  .hf-macro-tile.red{border-left-color:var(--red);}
-  .hf-macro-tile.neutral{border-left-color:var(--text-dim);}
-  .hf-macro-top{display:flex;justify-content:space-between;align-items:baseline;gap:8px;}
-  .hf-macro-label{font-size:12px;color:var(--text);}
-  .hf-macro-val{font-variant-numeric:tabular-nums;color:var(--text);font-size:12px;text-align:right;}
-  .hf-macro-meta{font-size:10px;color:var(--text-dim);margin-top:3px;}
-  .hf-macro-explain{font-size:10.5px;color:var(--text);opacity:.88;margin-top:5px;}
-  .hf-macro-caveat{font-size:9.5px;color:var(--text-dim);margin-top:3px;line-height:1.45;}
-  .hf-macro-st{font-size:9px;padding:0 5px;border-radius:3px;border:1px solid var(--border);margin-left:6px;}
-  .hf-macro-st.ok{color:var(--green);}
-  .hf-macro-st.stale{color:var(--yellow);}
-  .hf-macro-st.missing{color:var(--red);}
-  .hf-macro-src{font-size:9px;color:var(--text-dim);margin-left:4px;}
-</style>
-<script src="assets/macro/flow.js"></script>
-<script src="assets/macro/macro.js"></script>
+<!-- Shared particle engine (Agent A + Agent C / SPEC §4.1) -->
+<script src="assets/lib/particles.js"></script>
 <script>
-/* Macro タブの開閉ロジック（既存 sw() を非破壊にラップ） */
+/* ════════════════════════════════════════════════════════════════
+   v4.1 グルーコード (Agent A: bg-fx + i18n + 8-tab dispatch,
+                       Agent C: お金の流れ 3地域パネル描画)
+   既存 sw / renderTbl と協調動作する。
+═════════════════════════════════════════════════════════════════ */
 (function(){
-  const PANE_ID="hf-macro-pane", TAB_ID="hf-macro-tab-btn";
-  function getPane(){return document.getElementById(PANE_ID);}
-  function getTabBtn(){return document.getElementById(TAB_ID);}
-  function hideMacro(){
-    const p=getPane(); if(p) p.style.display="none";
-    const tb=getTabBtn(); if(tb) tb.classList.remove("active");
-    const tw=document.querySelector(".tbl-wrap"); if(tw) tw.style.display="";
-    const tb2=document.getElementById("toolbar"); if(tb2) tb2.style.display="";
+  // ── i18n -------------------------------------------------------
+  const I18N = {
+    ja: {
+      tabs: {nikkei225:"日経 225", dow30:"Dow 30", nasdaq100:"Nasdaq 100",
+             sp500:"S&P 500", fx:"FX / 商品",
+             rates_vol:"金利・債券・VOL", pos_val:"ポジション/割安度",
+             moneyflow:"お金の流れ"},
+      region: {us:"米国", eu:"欧州", jp:"日本"},
+      sink:   {stocks:"株", gold:"金", crypto:"暗号資産", cash:"現金"},
+      disc: "相場「環境」の可視化 / not investment advice",
+      debt: "政府債務", cb_assets: "中央銀行総資産",
+      as_of: "as_of", source: "出典", elapsed: "経過",
+      cb_short: "中央銀行", supply: "供給↑", absorb: "吸収↓",
+      bg_btn: "背景", lng_btn: "JA", days: "日",
+    },
+    en: {
+      tabs: {nikkei225:"Nikkei 225", dow30:"Dow 30", nasdaq100:"Nasdaq 100",
+             sp500:"S&P 500", fx:"FX / Commodities",
+             rates_vol:"Rates / Bonds / Vol", pos_val:"Positioning / Value",
+             moneyflow:"Money Flow"},
+      region: {us:"United States", eu:"Eurozone", jp:"Japan"},
+      sink:   {stocks:"Stocks", gold:"Gold", crypto:"Crypto", cash:"Cash"},
+      disc: "Macro environment visualization / not investment advice",
+      debt: "Gov debt", cb_assets: "CB total assets",
+      as_of: "as_of", source: "source", elapsed: "elapsed",
+      cb_short: "CB", supply: "supply↑", absorb: "absorb↓",
+      bg_btn: "BG", lng_btn: "EN", days: "d",
+    },
+  };
+  let lang = (localStorage.getItem("hf_lang") || "ja");
+  if (!(lang in I18N)) lang = "ja";
+  function tr(k){ return (I18N[lang] && I18N[lang][k]) || k; }
+  function trSink(k){ return I18N[lang].sink[k] || k; }
+  function trRegion(k){ return I18N[lang].region[k] || k; }
+
+  function applyLang(){
+    document.documentElement.lang = lang;
+    document.querySelectorAll('#tabs .tab[data-tab]').forEach(btn=>{
+      const k = btn.getAttribute('data-tab');
+      const t = I18N[lang].tabs[k]; if (t) btn.textContent = t;
+    });
+    const lb = document.getElementById('lngbtn'); if (lb) lb.textContent = tr('lng_btn');
+    const bg = document.getElementById('bgbtn');  if (bg) bg.textContent = tr('bg_btn') + ' ' + bgIcon();
+    ["us","eu","jp"].forEach(r=>{
+      const h = document.getElementById('mf-head-'+r); if (h) h.textContent = trRegion(r);
+    });
+    const dt = document.getElementById('mf-disc-text'); if (dt) dt.textContent = tr('disc');
+    if (window.__mfRefresh) window.__mfRefresh();   // re-render labels
   }
-  function showMacro(){
-    const p=getPane(); if(p) p.style.display="block";
-    const tw=document.querySelector(".tbl-wrap"); if(tw) tw.style.display="none";
-    const tb2=document.getElementById("toolbar"); if(tb2) tb2.style.display="none";
-    document.querySelectorAll(".tab").forEach(t=>t.classList.remove("active"));
-    const tb=getTabBtn(); if(tb) tb.classList.add("active");
-    if (window.HFMacro && window.HFMacro.start) window.HFMacro.start();
+  window.toggleLang = function(){
+    lang = (lang === "ja") ? "en" : "ja";
+    localStorage.setItem("hf_lang", lang);
+    applyLang();
+  };
+
+  // ── Background animation -------------------------------------
+  let bgMode = localStorage.getItem("hf_bg_mode") || "clean";
+  if (!["clean","starfield","constellation"].includes(bgMode)) bgMode = "clean";
+  let bgEngine = null;
+  function bgIcon(){
+    return bgMode==="clean" ? "○" : bgMode==="starfield" ? "✦" : "◆";
   }
-  window.hfMacroActivate=function(btn){ showMacro(); };
-  // 既存 sw() を一度だけ非破壊でラップ：他タブを押したら macro ペイン非表示に
-  if (typeof window.sw==="function" && !window.sw.__hfMacroWrapped){
-    const orig=window.sw;
-    window.sw=function(key, btn){ hideMacro(); return orig.apply(this, arguments); };
-    window.sw.__hfMacroWrapped=true;
+  function bootBg(){
+    const cv = document.getElementById("bg-fx");
+    if (cv && window.HFParticles){
+      bgEngine = window.HFParticles.createBackground(cv, { mode: bgMode });
+    }
+    const bg = document.getElementById('bgbtn');
+    if (bg) bg.textContent = tr('bg_btn') + ' ' + bgIcon();
   }
+  window.cycleBg = function(){
+    const seq = ["clean","starfield","constellation"];
+    bgMode = seq[(seq.indexOf(bgMode)+1) % seq.length];
+    localStorage.setItem("hf_bg_mode", bgMode);
+    if (bgEngine) bgEngine.setMode(bgMode);
+    const bg = document.getElementById('bgbtn');
+    if (bg) bg.textContent = tr('bg_btn') + ' ' + bgIcon();
+  };
+
+  // ── Money flow rendering -------------------------------------
+  const SINKS = [
+    {key:"stocks", color:"#5ad07a", rx:0.78, ry:0.42, weight:0.45},
+    {key:"gold",   color:"#e6c84a", rx:0.22, ry:0.42, weight:0.20},
+    {key:"crypto", color:"#8a55ff", rx:0.78, ry:0.76, weight:0.15},
+    {key:"cash",   color:"#8fa0b3", rx:0.22, ry:0.76, weight:0.20},
+  ];
+  const mfEngines = { us:null, eu:null, jp:null };
+
+  function fmtNum(v, d){
+    if (v === null || v === undefined || Number.isNaN(v)) return "—";
+    try {
+      return new Intl.NumberFormat(lang==='ja'?'ja-JP':'en-US',
+        {maximumFractionDigits: d!=null?d:2}).format(v);
+    } catch(e) { return String(v); }
+  }
+  function unitTn(unit){
+    if (!unit) return "T";
+    if (unit === "USD_TN") return "T USD";
+    if (unit === "EUR_TN") return "T EUR";
+    if (unit === "JPY_TN") return "T JPY";
+    return unit;
+  }
+
+  function renderRegion(r, block){
+    if (!block) return;
+    // freshness badge
+    const fb = document.getElementById('mf-fresh-'+r);
+    if (fb){
+      fb.className = 'mf-badge ' + (block.freshness_badge||'stale');
+      fb.textContent = (block.freshness_badge||'stale');
+    }
+    // counter
+    const c = document.getElementById('mf-counter-'+r);
+    const debt = block.debt || {};
+    if (c){
+      const val = debt.value_local_tn;
+      const lblUnit = unitTn(debt.unit);
+      let html = '<div class="mf-counter-lbl">'+tr('debt')+' ('+lblUnit+')</div>';
+      html += '<div class="mf-counter-val">'+(val!=null?fmtNum(val,3):'—')+'</div>';
+      if (r==='us' && debt.change_prev_day !== null && debt.change_prev_day !== undefined){
+        const d = debt.change_prev_day;
+        const cls = d >= 0 ? 'up' : 'dn';
+        const sign = d >= 0 ? '+' : '';
+        html += '<div class="mf-counter-delta '+cls+'">Δ '+sign+fmtNum(d,4)+' '+lblUnit+'</div>';
+      } else {
+        const lag = debt.lag_days;
+        html += '<div class="mf-counter-delta">'+(debt.as_of||'—')+
+                ' ('+(lag!=null?lag+tr('days'):'—')+')</div>';
+      }
+      c.innerHTML = html;
+    }
+    // meta line (CB assets + source)
+    const m = document.getElementById('mf-meta-'+r);
+    if (m){
+      const cb = block.cb_assets || {};
+      const nl = block.net_liquidity;
+      const parts = [];
+      parts.push('<span><b>'+tr('cb_assets')+':</b> '+(cb.value_usd_tn!=null?fmtNum(cb.value_usd_tn,3):'—')+' '+unitTn(cb.unit)+'</span>');
+      parts.push('<span><b>'+tr('as_of')+':</b> '+(cb.as_of||'—')+' ('+(cb.lag_days!=null?cb.lag_days+tr('days'):'—')+')</span>');
+      parts.push('<span><b>'+tr('source')+':</b> '+(cb.source||'—')+'</span>');
+      parts.push('<span class="mf-status">'+(cb.data_status||'—')+'</span>');
+      if (r==='us' && nl){
+        parts.push('<span><b>Net Liq:</b> '+(nl.value_usd_tn!=null?fmtNum(nl.value_usd_tn,3):'—')+' T USD</span>');
+      }
+      m.innerHTML = parts.join(' ');
+    }
+    // canvas
+    const cv = document.getElementById('mf-cv-'+r);
+    if (cv && window.HFParticles){
+      const cb = block.cb_assets || {};
+      const wow = +cb.wow_change || 0;
+      // Normalize: a US WALCL move of 0.05T week-over-week is sizeable; scale mag accordingly.
+      const mag = Math.min(1, Math.max(0.25, Math.abs(wow) * 4 + 0.3));
+      const expand = wow >= 0;
+      const sinks = SINKS.map(s => Object.assign({}, s, { label: trSink(s.key) }));
+      if (mfEngines[r]){
+        mfEngines[r].setDynamics({mag, expand});
+      } else {
+        mfEngines[r] = window.HFParticles.createFlowField(cv, {
+          source: { rx: 0.5, ry: 0.18 },
+          sinks: sinks,
+          cbLabel: tr('cb_short'),
+          expandLabel: tr('supply'),
+          contractLabel: tr('absorb'),
+          dynamics: { mag, expand, riskOff: 0 },
+        });
+      }
+    }
+  }
+
+  function refreshMoneyFlow(){
+    const D = window.DATA;
+    const mf = D && D.money_flow;
+    if (!mf) return;
+    ["us","eu","jp"].forEach(r => renderRegion(r, mf[r]));
+  }
+  window.__mfRefresh = refreshMoneyFlow;
+  window.__mfShow = function(){
+    refreshMoneyFlow();
+    document.getElementById('mf-pane').style.display = 'block';
+    const tw = document.querySelector('.tbl-wrap'); if (tw) tw.style.display = 'none';
+    const tb = document.getElementById('toolbar'); if (tb) tb.style.display = 'none';
+  };
+  window.__mfHide = function(){
+    document.getElementById('mf-pane').style.display = 'none';
+    const tw = document.querySelector('.tbl-wrap'); if (tw) tw.style.display = '';
+    const tb = document.getElementById('toolbar'); if (tb) tb.style.display = '';
+  };
+
+  // ── Boot hook: integrate with existing DOMContentLoaded path --
+  document.addEventListener('DOMContentLoaded', function(){
+    bootBg();
+    applyLang();
+    document.addEventListener('keydown', function(e){
+      if (e.target && e.target.tagName === 'INPUT') return;
+      if (e.key === 'b' || e.key === 'B') window.cycleBg();
+      if (e.key === 'l' || e.key === 'L') window.toggleLang();
+    });
+  });
 })();
 </script>
 </body>

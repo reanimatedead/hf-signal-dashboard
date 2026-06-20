@@ -6,6 +6,7 @@ HF Signal Scanner Pro v2 - Daily Signal Generator
 """
 
 import json, sys, time, warnings, csv, math
+import urllib.parse
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 
@@ -765,12 +766,37 @@ def build_chart_row(yf_sym, display_sym, name, market, risk_fn=None, extra=None)
         return row
 
 
+def _move_risk(v):
+    """ICE BofA MOVE: rates-vol gauge. >130 = high stress, 90–130 = elevated."""
+    try:
+        x = float(v)
+    except (TypeError, ValueError):
+        return "unknown"
+    return "high" if x >= 130 else "medium" if x >= 90 else "low"
+
+
 def process_volatility():
-    print("\n[Volatility] VIX…")
-    return [build_chart_row(
+    """VIX (equity vol) + MOVE (rates vol). Both yfinance, no API key.
+
+    MOVE failure is degraded to placeholder row (data_status='placeholder',
+    price=None) so the whole pipeline never breaks on a single ticker error.
+    """
+    print("\n[Volatility] VIX + MOVE…")
+    vix = build_chart_row(
         "^VIX", "VIX", "CBOE Volatility Index", "Volatility", risk_fn=_vix_risk,
-        extra={"relation": "Equity risk gauge; rises in risk-off. Cross-check USDJPY / Gold. Context only."},
-    )]
+        extra={"relation": "Equity risk gauge; rises in risk-off. Cross-check USDJPY / Gold. Context only.",
+               "data_status": "live"},
+    )
+    move = build_chart_row(
+        "^MOVE", "MOVE", "ICE BofA MOVE Index (US Treasury vol)", "Volatility",
+        risk_fn=_move_risk,
+        extra={"relation": "Rates implied vol; pairs with VIX for liquidity-stress reading. Context only.",
+               "data_status": "live"},
+    )
+    # `build_chart_row` sets price=None + error on failure; degrade explicitly.
+    if move.get("error") or move.get("price") is None:
+        move["data_status"] = "placeholder"
+    return [vix, move]
 
 
 CRYPTO = [("BTC-USD", "Bitcoin"), ("ETH-USD", "Ethereum"),
@@ -791,8 +817,10 @@ def process_crypto():
 RATE_TICKERS = [
     ("US2Y", "US 2Y Treasury Yield", "US", "2Y", "short_end", ["2YY=F"]),
     ("US10Y", "US 10Y Treasury Yield", "US", "10Y", "long_end", ["^TNX", "10YY=F"]),
+    ("US30Y", "US 30Y Treasury Yield", "US", "30Y", "long_end", ["^TYX", "30YY=F"]),
     ("JP2Y", "Japan 2Y JGB Yield", "JP", "2Y", "short_end", []),
     ("JP10Y", "Japan 10Y JGB Yield", "JP", "10Y", "long_end", []),
+    ("JP30Y", "Japan 30Y JGB Yield", "JP", "30Y", "long_end", []),
 ]
 
 
@@ -858,7 +886,7 @@ def load_jp_rates_from_csv(path="data/jp_rates.csv"):
             return {}
         rows.sort(key=lambda r: r.get("date", ""))
         out = {}
-        for k in ("JP2Y", "JP10Y"):
+        for k in ("JP2Y", "JP10Y", "JP30Y"):
             series = []
             for r in rows:
                 try:
@@ -906,11 +934,17 @@ def _parse_mof_jgb_csv(text, max_points):
     if hdr_idx is None:
         return {}
     hdr = rows[hdr_idx]
+    # 30年 is intentionally optional: MoF added the 30Y column later, so a missing
+    # column degrades to placeholder rather than breaking the 2Y/10Y path.
     try:
         want = {"JP2Y": hdr.index("2年"), "JP10Y": hdr.index("10年")}
     except ValueError:
         return {}
-    series = {"JP2Y": [], "JP10Y": []}
+    try:
+        want["JP30Y"] = hdr.index("30年")
+    except ValueError:
+        pass
+    series = {sym: [] for sym in want}
     for r in rows[hdr_idx + 1:]:
         if not r or not r[0].strip():
             continue
@@ -926,7 +960,7 @@ def _parse_mof_jgb_csv(text, max_points):
                 if -2 <= v < 25:   # admit real negative JGB yields (2016–2024 era)
                     series[sym].append({"date": iso, "value": round(v, 3)})
     out = {}
-    for sym in ("JP2Y", "JP10Y"):
+    for sym in series:
         s = series[sym]
         if s:
             out[sym] = {"value": s[-1]["value"], "series": s[-max_points:]}
@@ -1776,6 +1810,344 @@ def build_summary(rows):
 
 # ─── MAIN ────────────────────────────────────────────────
 
+# ──────────────────────────────────────────────────────────
+# v4.1 money_flow (お金の流れ / 3地域版)
+#
+# 契約: SPEC_MONEYFLOW.md §1, DATA_CONTRACT.md v4.1。
+# 取得は全て **keyless**。失敗系列は placeholder + value=null
+# (捏造禁止)。例外を外に出さない (graceful degradation)。
+# ──────────────────────────────────────────────────────────
+
+import urllib.error
+import urllib.request
+
+_MF_UA = {"User-Agent": "hf-signal-dashboard money_flow (keyless)"}
+
+
+def _mf_today():
+    return datetime.now(timezone.utc).date()
+
+
+def _mf_days_since(iso_date):
+    if not iso_date:
+        return None
+    try:
+        d = datetime.fromisoformat(str(iso_date)[:10]).date()
+        return max(0, (_mf_today() - d).days)
+    except Exception:
+        return None
+
+
+def _mf_http_get_text(url, timeout=20, headers=None):
+    req = urllib.request.Request(url, headers={**_MF_UA, **(headers or {})})
+    with urllib.request.urlopen(req, timeout=timeout) as r:
+        return r.read().decode("utf-8", errors="replace")
+
+
+def _mf_fred_csv_latest(series_id, timeout=30):
+    """FRED keyless CSV. Return (latest_value, latest_iso, prev_value, prev_iso)
+    or (None,)*4. Series id e.g. WALCL/RRPONTSYD/ECBASSETSW/JPNASSETS.
+    """
+    try:
+        url = f"https://fred.stlouisfed.org/graph/fredgraph.csv?id={series_id}"
+        body = _mf_http_get_text(url, timeout=timeout,
+                                 headers={"User-Agent": "curl/8 hf-money-flow"})
+        rows = []
+        for line in body.splitlines()[1:]:
+            parts = line.split(",")
+            if len(parts) < 2:
+                continue
+            d, v = parts[0].strip(), parts[1].strip()
+            if v in (".", "", None):
+                continue
+            try:
+                rows.append((d, float(v)))
+            except ValueError:
+                continue
+        if not rows:
+            return None, None, None, None
+        latest = rows[-1]
+        prev = rows[-2] if len(rows) >= 2 else (None, None)
+        return latest[1], latest[0], prev[1], prev[0]
+    except Exception as exc:
+        print(f"  [money_flow] FRED {series_id} fetch failed ({type(exc).__name__})")
+        return None, None, None, None
+
+
+def _mf_placeholder_cb(label, unit, source):
+    return {
+        "label": label, "value_usd_tn": None, "unit": unit,
+        "as_of": None, "lag_days": None, "data_status": "placeholder",
+        "source": source, "wow_change": None,
+    }
+
+
+def _mf_placeholder_series(label, source):
+    return {
+        "label": label, "value_usd_tn": None, "as_of": None,
+        "lag_days": None, "data_status": "placeholder", "source": source,
+    }
+
+
+def _mf_placeholder_debt(label, unit, source):
+    return {
+        "label": label, "value_local_tn": None, "unit": unit,
+        "as_of": None, "lag_days": None, "data_status": "placeholder",
+        "source": source, "change_prev_day": None,
+    }
+
+
+def _mf_status_from_lag(lag, fresh_max, stale_max, fresh_status):
+    if lag is None:
+        return "stale"
+    if lag <= fresh_max:
+        return fresh_status
+    if lag > stale_max:
+        return "stale"
+    return "stale"
+
+
+def _mf_fetch_us_tga():
+    """US TGA daily balance (fiscaldata.treasury.gov, keyless, JSON).
+
+    Endpoint: /v1/accounting/dts/operating_cash_balance
+    account_type ∈ {Closing Balance, Opening Balance}. Recent rows often have
+    close_today_bal=null while open_today_bal is populated; fall back to the
+    next record's opening balance (which equals the previous day's closing).
+    Values are in **millions USD**.
+    """
+    base = ("https://api.fiscaldata.treasury.gov/services/api/fiscal_service/v1/"
+            "accounting/dts/operating_cash_balance")
+    flt = ("account_type:in:(Treasury General Account (TGA) Closing Balance,"
+           "Treasury General Account (TGA) Opening Balance)")
+    qs = (f"?filter={urllib.parse.quote(flt, safe=':,()')}&sort=-record_date"
+          f"&page[size]=20")
+    try:
+        body = _mf_http_get_text(base + qs, timeout=25)
+        js = json.loads(body)
+        recs = js.get("data") or []
+        for rec in recs:
+            raw = rec.get("close_today_bal")
+            if raw in (None, "null", ""):
+                raw = rec.get("open_today_bal")
+            try:
+                v_mil = float(raw)
+            except (TypeError, ValueError):
+                continue
+            as_of = (rec.get("record_date") or "")[:10]
+            tn = round(v_mil / 1_000_000.0, 4)   # millions -> trillions
+            lag = _mf_days_since(as_of)
+            status = "live" if (lag is not None and lag <= 4) else "stale"
+            return {
+                "label": "Treasury General Account",
+                "value_usd_tn": tn, "as_of": as_of, "lag_days": lag,
+                "data_status": status,
+                "source": "fiscaldata:operating_cash_balance",
+            }
+        return _mf_placeholder_series("Treasury General Account",
+                                      "fiscaldata:operating_cash_balance")
+    except Exception as exc:
+        print(f"  [money_flow] TGA fetch failed ({type(exc).__name__})")
+        return _mf_placeholder_series("Treasury General Account",
+                                      "fiscaldata:operating_cash_balance")
+
+
+def _mf_fetch_us_debt():
+    """US gross national debt — fiscaldata debt_to_penny (keyless, daily).
+
+    Returns tn (1e-12 of USD) plus change vs previous record day.
+    """
+    base = ("https://api.fiscaldata.treasury.gov/services/api/fiscal_service/v2/"
+            "accounting/od/debt_to_penny")
+    qs = "?sort=-record_date&page[size]=2"
+    try:
+        body = _mf_http_get_text(base + qs, timeout=25)
+        js = json.loads(body)
+        rows = js.get("data") or []
+        if not rows:
+            return _mf_placeholder_debt("US gross national debt", "USD_TN",
+                                        "fiscaldata:debt_to_penny")
+        cur = rows[0]
+        prev = rows[1] if len(rows) > 1 else None
+        cur_v = float(cur.get("tot_pub_debt_out_amt"))
+        cur_d = (cur.get("record_date") or "")[:10]
+        delta = None
+        if prev is not None:
+            try:
+                prev_v = float(prev.get("tot_pub_debt_out_amt"))
+                delta = round((cur_v - prev_v) / 1e12, 4)
+            except (TypeError, ValueError):
+                delta = None
+        lag = _mf_days_since(cur_d)
+        status = "live" if (lag is not None and lag <= 3) else "stale"
+        return {
+            "label": "US gross national debt",
+            "value_local_tn": round(cur_v / 1e12, 4),
+            "unit": "USD_TN",
+            "as_of": cur_d, "lag_days": lag, "data_status": status,
+            "source": "fiscaldata:debt_to_penny",
+            "change_prev_day": delta,
+        }
+    except Exception as exc:
+        print(f"  [money_flow] debt_to_penny fetch failed ({type(exc).__name__})")
+        return _mf_placeholder_debt("US gross national debt", "USD_TN",
+                                    "fiscaldata:debt_to_penny")
+
+
+def _mf_build_us():
+    walcl_v, walcl_d, walcl_prev, _ = _mf_fred_csv_latest("WALCL")
+    if walcl_v is not None:
+        lag = _mf_days_since(walcl_d)
+        cb = {
+            "label": "Fed total assets",
+            "value_usd_tn": round(walcl_v / 1_000_000.0, 4),  # millions -> trillions
+            "unit": "USD_TN",
+            "as_of": walcl_d, "lag_days": lag,
+            "data_status": _mf_status_from_lag(lag, 10, 30, "weekly"),
+            "source": "FRED:WALCL",
+            "wow_change": round((walcl_v - walcl_prev) / 1_000_000.0, 5)
+                          if walcl_prev is not None else None,
+        }
+    else:
+        cb = _mf_placeholder_cb("Fed total assets", "USD_TN", "FRED:WALCL")
+
+    rrp_v, rrp_d, _, _ = _mf_fred_csv_latest("RRPONTSYD")
+    if rrp_v is not None:
+        lag = _mf_days_since(rrp_d)
+        rrp = {
+            "label": "Reverse Repo",
+            "value_usd_tn": round(rrp_v / 1_000.0, 4),   # billions -> trillions
+            "as_of": rrp_d, "lag_days": lag,
+            "data_status": _mf_status_from_lag(lag, 5, 14, "live"),
+            "source": "FRED:RRPONTSYD",
+        }
+    else:
+        rrp = _mf_placeholder_series("Reverse Repo", "FRED:RRPONTSYD")
+
+    tga = _mf_fetch_us_tga()
+
+    # net_liquidity (USD trillions). All three components must be present; else null.
+    walcl_tn = cb.get("value_usd_tn")
+    tga_tn = tga.get("value_usd_tn")
+    rrp_tn = rrp.get("value_usd_tn")
+    if all(isinstance(v, (int, float)) for v in (walcl_tn, tga_tn, rrp_tn)):
+        nl_val = round(walcl_tn - tga_tn - rrp_tn, 4)
+        # Use the oldest as_of as the net_liquidity as_of (truth of the bottleneck).
+        as_ofs = [d for d in (cb["as_of"], tga["as_of"], rrp["as_of"]) if d]
+        nl_as_of = min(as_ofs) if as_ofs else None
+        nl_lag = _mf_days_since(nl_as_of)
+        nl_status = "live" if (nl_lag is not None and nl_lag <= 10) else "stale"
+    else:
+        nl_val, nl_as_of, nl_lag, nl_status = None, None, None, "placeholder"
+    nl = {
+        "value_usd_tn": nl_val,
+        "as_of": nl_as_of, "lag_days": nl_lag, "data_status": nl_status,
+        "components": {"walcl": walcl_tn, "tga": tga_tn, "rrp": rrp_tn},
+    }
+
+    debt = _mf_fetch_us_debt()
+
+    # Freshness badge: daily if debt is live, weekly if cb is fresh, else stale.
+    if cb["data_status"] == "placeholder":
+        badge = "stale"
+    elif debt.get("data_status") == "live" and (debt.get("lag_days") or 99) <= 2:
+        badge = "daily"
+    elif cb.get("lag_days") is not None and cb["lag_days"] <= 10:
+        badge = "weekly"
+    else:
+        badge = "stale"
+
+    return {
+        "region": "us",
+        "cb_assets": cb,
+        "tga": tga,
+        "rrp": rrp,
+        "net_liquidity": nl,
+        "debt": debt,
+        "freshness_badge": badge,
+    }
+
+
+def _mf_build_eu():
+    v, d, prev, _ = _mf_fred_csv_latest("ECBASSETSW")
+    if v is not None:
+        lag = _mf_days_since(d)
+        cb = {
+            "label": "ECB total assets",
+            "value_usd_tn": round(v / 1_000_000.0, 4),    # millions EUR -> trillions EUR
+            "unit": "EUR_TN",
+            "as_of": d, "lag_days": lag,
+            "data_status": _mf_status_from_lag(lag, 14, 60, "weekly"),
+            "source": "FRED:ECBASSETSW",
+            "wow_change": round((v - prev) / 1_000_000.0, 5) if prev is not None else None,
+        }
+    else:
+        cb = _mf_placeholder_cb("ECB total assets", "EUR_TN", "FRED:ECBASSETSW")
+    debt = _mf_placeholder_debt("EU general govt debt", "EUR_TN",
+                                "placeholder (Eurostat quarterly not yet wired)")
+    debt["data_status"] = "quarterly"  # surface intent; value stays null
+    badge = "stale" if cb["data_status"] == "placeholder" else (
+        "weekly" if (cb.get("lag_days") or 99) <= 14 else "stale")
+    return {
+        "region": "eu",
+        "cb_assets": cb,
+        "tga": None,
+        "rrp": None,
+        "net_liquidity": None,
+        "debt": debt,
+        "freshness_badge": badge,
+    }
+
+
+def _mf_build_jp():
+    # JPNASSETS: Monthly, in 100 millions JPY (10^8). 10000 = 1 trillion JPY.
+    v, d, prev, _ = _mf_fred_csv_latest("JPNASSETS")
+    if v is not None:
+        lag = _mf_days_since(d)
+        # 100M -> 1T means /10000 — verify FRED unit when wiring (most series for
+        # JP central bank assets are in 100M JPY).
+        cb = {
+            "label": "BoJ total assets",
+            "value_usd_tn": round(v / 10_000.0, 3),   # 100M JPY -> trillions JPY
+            "unit": "JPY_TN",
+            "as_of": d, "lag_days": lag,
+            "data_status": _mf_status_from_lag(lag, 40, 120, "monthly"),
+            "source": "FRED:JPNASSETS",
+            "wow_change": round((v - prev) / 10_000.0, 4) if prev is not None else None,
+        }
+    else:
+        cb = _mf_placeholder_cb("BoJ total assets", "JPY_TN", "FRED:JPNASSETS")
+    debt = _mf_placeholder_debt("JP central govt debt", "JPY_TN",
+                                "placeholder (MoF quarterly not yet wired)")
+    debt["data_status"] = "quarterly"
+    badge = "stale" if cb["data_status"] == "placeholder" else (
+        "monthly" if (cb.get("lag_days") or 999) <= 40 else "stale")
+    return {
+        "region": "jp",
+        "cb_assets": cb,
+        "tga": None,
+        "rrp": None,
+        "net_liquidity": None,
+        "debt": debt,
+        "freshness_badge": badge,
+    }
+
+
+def _build_money_flow():
+    """Top-level money_flow block (US/EU/JP).
+
+    All sources are **keyless**; failures fall back to placeholder so the run
+    never breaks. Schema: SPEC_MONEYFLOW.md §1, DATA_CONTRACT.md v4.1.
+    """
+    print("\n[money_flow] US (WALCL/TGA/RRP/debt_to_penny) + EU (ECBASSETSW) + JP (JPNASSETS)…")
+    return {
+        "as_of": datetime.now(timezone.utc).replace(microsecond=0).isoformat(),
+        "us": _mf_build_us(),
+        "eu": _mf_build_eu(),
+        "jp": _mf_build_jp(),
+    }
+
+
 def main():
     t0      = time.time()
     now_jst = datetime.now(JST)
@@ -1800,6 +2172,9 @@ def main():
     crypto_results = process_crypto()
     valuation_results = build_valuation_market()  # v4.0 Buffett Indicator (manual CSV / placeholder)
     yield_curve   = build_yield_curve_state(rates_results)
+
+    # v4.1 — top-level money_flow (お金の流れ / 3地域版). Keyless; failures degrade.
+    money_flow = _build_money_flow()
 
     # v3.1: populate USDJPY=X edge_context from integrated context (USDJPY only)
     _usdjpy = next((r for r in fx_results if r.get("symbol") == "USDJPY=X"), None)
@@ -1850,6 +2225,7 @@ def main():
             "imm":        imm_results,   "crypto":     crypto_results,
             "valuation":  valuation_results,
         },
+        "money_flow": money_flow,
     }
 
     # Strict-JSON guard: Python's json writes NaN/Infinity, but the browser's

@@ -789,3 +789,119 @@ financial advice, price targets, trade execution, or buy/sell recommendations.
 - 既存 `fetch_signals.py`/`docs/data.json`/`docs/index.html` の per-symbol 系/SVG/CSS セレクタは無改変。
 - フロントは `docs/assets/macro/{flow.js,macro.js}` の 2 ファイルを追加し、`#hf-macro-*` プレフィックスで完全分離。
 - 「概念可視化／売買助言ではない (not investment advice)」を Macro タブ上に常時表示。
+
+
+---
+
+# v4.1 — top-level `money_flow` (お金の流れ / 3地域版)
+
+> SPEC_MONEYFLOW.md と一対。フロント (Agent A/C) が直接参照する。
+> ここに無い系列は実装してはいけない (捏造禁止)。
+> ここから外す系列は data_status="placeholder" で残し、値は null。
+
+## 配置
+
+```jsonc
+{
+  "meta": { ... },
+  "summary": { ... },
+  "markets": { ... },
+  "money_flow": {
+    "as_of": "<ISO UTC>",
+    "us": <RegionBlock>,
+    "eu": <RegionBlock>,
+    "jp": <RegionBlock>
+  }
+}
+```
+
+## RegionBlock 共通
+
+| key | 型 | 必須 | 内容 |
+| --- | --- | --- | --- |
+| `region` | "us"\|"eu"\|"jp" | ✓ | 自地域識別子 |
+| `cb_assets` | object | ✓ | 中央銀行総資産。US=WALCL(週次)、EU=ECBASSETSW(週次)、JP=JPNASSETS(月次) |
+| `tga` | object \| null | ✓ | US だけ object。EU/JP は null。 |
+| `rrp` | object \| null | ✓ | US だけ object (FRED:RRPONTSYD)。EU/JP は null。 |
+| `net_liquidity` | object \| null | ✓ | US だけ object。WALCL − TGA − RRP。EU/JP は null。 |
+| `debt` | object | ✓ | US=fiscaldata debt_to_penny(日次)、EU=政府債務 (placeholder 可)、JP=国債残高 (placeholder 可) |
+| `freshness_badge` | "daily"\|"weekly"\|"monthly"\|"quarterly"\|"stale" | ✓ | 地域代表系列の鮮度 |
+
+## `cb_assets`
+
+| key | 型 | 内容 |
+| --- | --- | --- |
+| `label` | string | 表示名 (例 "Fed total assets") |
+| `value_usd_tn` | number\|null | 兆単位の数値 (null は placeholder) |
+| `unit` | "USD_TN"\|"EUR_TN"\|"JPY_TN" | 単位コード |
+| `as_of` | "YYYY-MM-DD" | 系列の公表日 |
+| `lag_days` | int | today − as_of (placeholder 時は null) |
+| `data_status` | "live"\|"weekly"\|"monthly"\|"stale"\|"placeholder" | 鮮度 |
+| `source` | string | "FRED:WALCL" など |
+| `wow_change` | number\|null | 前回公表値からの差。アニメ流量に使う |
+
+## `tga` / `rrp` (US のみ。EU/JP は null)
+
+| key | 内容 |
+| --- | --- |
+| `label` | "Treasury General Account" / "Reverse Repo" |
+| `value_usd_tn` | number\|null |
+| `as_of` | YYYY-MM-DD |
+| `lag_days` | int\|null |
+| `data_status` | live\|stale\|placeholder |
+| `source` | "fiscaldata:operating_cash_balance" / "FRED:RRPONTSYD" |
+
+## `net_liquidity` (US のみ。EU/JP は null)
+
+| key | 内容 |
+| --- | --- |
+| `value_usd_tn` | (WALCL − TGA − RRP)、null 可 |
+| `as_of` | 3系列のうち最も古い as_of |
+| `lag_days` | int |
+| `data_status` | live\|stale\|placeholder |
+| `components` | `{ "walcl": <num\|null>, "tga": <num\|null>, "rrp": <num\|null> }` |
+
+## `debt`
+
+| key | 内容 |
+| --- | --- |
+| `label` | 例 "US gross national debt" |
+| `value_local_tn` | number\|null。現地通貨の兆単位 |
+| `unit` | USD_TN\|EUR_TN\|JPY_TN |
+| `as_of` | YYYY-MM-DD |
+| `lag_days` | int\|null |
+| `data_status` | live\|quarterly\|stale\|placeholder |
+| `source` | 例 "fiscaldata:debt_to_penny" |
+| `change_prev_day` | number\|null。**US のみ** non-null 可。EU/JP は null。 |
+
+## 鮮度バッジ判定
+
+| region | daily | weekly | monthly | quarterly | stale |
+| --- | --- | --- | --- | --- | --- |
+| us | debt.lag_days ≤ 2 | cb_assets.lag_days ≤ 8 | — | — | cb_assets.lag_days > 30 |
+| eu | — | cb_assets.lag_days ≤ 12 | — | debt.data_status="quarterly" | cb_assets.lag_days > 60 |
+| jp | — | — | cb_assets.lag_days ≤ 35 | — | cb_assets.lag_days > 90 |
+
+代表系列 (`cb_assets`) が placeholder の場合は **強制 stale**。
+
+## Graceful degradation
+
+- 1 系列の HTTP/parse 失敗で全体を落とさない。失敗系列は `data_status="placeholder"` + `value_*=null`。
+- pipeline は STDERR に1行だけ警告。例外は外に出さない (pytest test_smoke_pipeline.py で担保)。
+- フロントは null / placeholder を「—」と「鮮度バッジ stale」で描画。アニメは 0 粒で停止せず、最小流量で循環。
+
+## 既存 v4.0 スキーマとの関係
+
+- 旧 `docs/data/macro.json` は **過渡的に維持**。今回の `money_flow` がフロント主参照に昇格。
+- 旧 `flow.basin_tilt` / `clock_phase` は macro.json 側のみで生き残る (v4.2 で money_flow.us.tilt として吸収予定)。
+
+## 追加された他系列
+
+- `markets.rates[]` に `US30Y` (^TYX) と `JP30Y` (MoF JGB CSV) を追加。スキーマは既存 RateRow と同形。
+- `markets.volatility[]` に `MOVE` (^MOVE) を追加。同系列。
+- これらが failure 時 `data_status="placeholder"` で残ること (テストで担保)。
+
+## 「環境可視化 / not investment advice」維持
+
+- お金の流れタブ、金利・債券・VOL タブ、ポジション/割安度タブの上部に同一の disclaimer を出す。
+- 文言は既存 `For data visualization purposes only. Not investment advice.` を踏襲。

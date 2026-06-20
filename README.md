@@ -33,10 +33,24 @@ without leaving the portfolio incomplete.
 
 ---
 
-## Features
+## Features (v4.1)
 
-- **10 market tabs** — Nikkei 225, Dow 30, Nasdaq 100, S&P 500, FX / Commodities, Rates / Bonds,
-  VIX, IMM, Crypto, Valuation.
+- **8 tabs (consolidated from 11)** — Nikkei 225, Dow 30, Nasdaq 100, S&P 500, FX / 商品,
+  **金利・債券・VOL** (rates_vol; US/JP 2Y/10Y/30Y + VIX + MOVE in one view),
+  **ポジション/割安度** (pos_val; CFTC IMM + Crypto + Buffett Indicator sectioned),
+  **お金の流れ** (moneyflow; 3-region: US/EU/JP).
+- **お金の流れ panel (v4.1)** — keyless 3-region (US / Eurozone / Japan) flow visualization with
+  central-bank → assets particle animation, debt counters, and freshness badges. US shows
+  WALCL / TGA / RRP / net_liquidity / debt_to_penny (daily delta); EU shows ECBASSETSW with a
+  weekly badge; JP shows JPNASSETS monthly. Failed series degrade to `placeholder` (no fabrication).
+- **Background animation layer** — full-viewport `<canvas id="bg-fx">` with three modes
+  (`clean`, `starfield`, `constellation`). Always behind data UI, `pointer-events:none`,
+  `aria-hidden`, 30fps cap, respects `prefers-reduced-motion`, pauses on tab hide, and halves
+  particle count on mobile. Mode persisted in `localStorage.hf_bg_mode`. Default = `clean`.
+- **Minimal i18n (JA / EN)** — toggle in the header re-labels tabs / region headers / disclaimers.
+  Persisted in `localStorage.hf_lang`.
+- **Legacy 10-tab layout** — superseded; the underlying `markets.{rates,volatility,imm,crypto,valuation}`
+  arrays remain in `data.json` for downstream consumers.
 - **Click-to-expand detail panel** per symbol with lightweight **inline-SVG charts** (no external
   chart library, mobile-friendly), with **switchable 4h / 1d / 1w timeframe tabs** (4h/1w on an
   allowlist of liquid symbols — USDJPY, EURUSD, XAUUSD, XAGUSD, VIX, BTC, ETH, US2Y, US10Y):
