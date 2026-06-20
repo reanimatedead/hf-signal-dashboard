@@ -1,13 +1,13 @@
 {
   "meta": {
-    "generated_at": "2026-06-20T00:00:42Z",
+    "generated_at": "2026-06-20T16:21:25Z",
     "pipeline_version": "macro-0.1",
     "reference_seed": false,
     "branch": "feat/macro-environment",
     "note": "JP rates / IMM(CFTC) / VIX / yield_curve は docs/data.json を再利用。FRED 系は FRED_API_KEY 設定時のみ live、未設定なら missing。捏造はしない。",
     "sources_as_of": {
       "treasury_tga": "2026-06-17",
-      "coingecko": "2026-06-20T00:00:42Z",
+      "coingecko": "2026-06-20T16:21:25Z",
       "fred": "2026-06-17",
       "fred_gdpnow": "2026-04-01",
       "fred_cpi": "2026-05-01"
@@ -52,8 +52,8 @@
       "unit": "%",
       "z": 0.0,
       "color": "neutral",
-      "as_of": "2026-06-20T08:59:18.703768+09:00",
-      "lag_days": 0,
+      "as_of": "2026-06-21T01:19:45.285202+09:00",
+      "lag_days": -1,
       "status": "ok",
       "source": "docs/data.json (再利用)",
       "explain": "差が縮むと円高→キャリー巻き戻し→世界的リスクオフ。",
@@ -78,12 +78,12 @@
     },
     "vix": {
       "label": "VIX",
-      "value": 16.78,
+      "value": 16.4,
       "unit": "pt",
       "z": 0.0,
       "color": "green",
-      "as_of": "2026-06-20T08:59:18.703768+09:00",
-      "lag_days": 0,
+      "as_of": "2026-06-21T01:19:45.285202+09:00",
+      "lag_days": -1,
       "status": "ok",
       "source": "docs/data.json (yfinance, 再利用)",
       "explain": "株の予想変動率=恐怖指数。",
@@ -117,11 +117,11 @@
     },
     "btc_price": {
       "label": "BTC価格",
-      "value": 63514.0,
+      "value": 63956.0,
       "unit": "USD",
       "z": 0.0,
       "color": "neutral",
-      "as_of": "2026-06-20T00:00:42Z",
+      "as_of": "2026-06-20T16:21:25Z",
       "lag_days": 0,
       "status": "ok",
       "source": "CoinGecko (キーレス)",
@@ -131,13 +131,13 @@
     "stablecoin_peg": {
       "label": "ステーブルコイン ペグ",
       "value": {
-        "USDT": 0.999059,
-        "USDC": 0.999808
+        "USDT": 0.999044,
+        "USDC": 0.999742
       },
       "unit": "USD",
       "z": 0.19,
       "color": "green",
-      "as_of": "2026-06-20T00:00:42Z",
+      "as_of": "2026-06-20T16:21:25Z",
       "lag_days": 0,
       "status": "ok",
       "source": "CoinGecko (キーレス)",
