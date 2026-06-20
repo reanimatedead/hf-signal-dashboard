@@ -65,6 +65,23 @@ def test_localstorage_log_key_used():
     )
 
 
+def test_notify_panel_present():
+    html = _read()
+    assert 'id="sv-notify"' in html, "SURVIVAL notify panel (#sv-notify) missing"
+    assert 'assets/survival/notify_panel.js' in html, "notify_panel.js script not loaded"
+    p = pathlib.Path(__file__).resolve().parents[1] / "docs" / "assets" / "survival" / "notify_panel.js"
+    assert p.exists(), "docs/assets/survival/notify_panel.js must exist"
+
+
+def test_notify_panel_uses_public_jsonl_path():
+    p = pathlib.Path(__file__).resolve().parents[1] / "docs" / "assets" / "survival" / "notify_panel.js"
+    js = p.read_text(encoding="utf-8")
+    # SPEC §7: 公開安全な抜粋を data/notifications_public.jsonl から
+    assert "notifications_public.jsonl" in js, (
+        "panel must read from data/notifications_public.jsonl (SPEC §7)"
+    )
+
+
 def test_no_legacy_independent_tabs():
     html = _read()
     legacy = ["sw('rates'", "sw('volatility'", "sw('imm'", "sw('crypto'", "sw('valuation'"]

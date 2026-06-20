@@ -427,6 +427,10 @@
       nt.innerHTML = '<div class="sv-card-hd">' + esc(t("notes")) + '</div>' +
         '<ul>' + sl.notes.map(n => '<li>' + esc(n) + '</li>').join('') + '</ul>';
     }
+    // Notify panel (Phase 1.6): refresh when survival is rendered.
+    if (typeof window.__survivalNotifyRefresh === "function") {
+      try { window.__survivalNotifyRefresh(); } catch (e) {}
+    }
   }
 
   window.__survivalShow = function(){

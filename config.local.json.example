@@ -1,8 +1,11 @@
 {
-  "_doc": "Optional. Copy to config.local.json to enable absolute-balance display.",
-  "_doc2": "DO NOT commit this file; it is in .gitignore. SPEC_SURVIVAL §0.",
-  "_doc3": "All risk math runs in % regardless; this is display-layer only.",
+  "_doc": "Optional. Copy to config.local (no extension) to enable optional features.",
+  "_doc2": "DO NOT commit this file with real values; it is in .gitignore.",
+  "_doc3": "All risk math runs in % regardless; absolute display + notify topic only.",
   "initial_balance": 100,
   "currency": "JPY",
-  "display_absolute": false
+  "display_absolute": false,
+  "notify_enabled": false,
+  "ntfy_topic": "hf-<random-string-32-chars>",
+  "mac_notify_sound": "Glass"
 }

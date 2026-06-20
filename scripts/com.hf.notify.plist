@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.hf.notify</string>
+
+  <key>ProgramArguments</key>
+  <array>
+    <string>/usr/bin/python3</string>
+    <string>/Users/USER/hf-signal-dashboard/scripts/notify_receiver.py</string>
+    <string>--interval=60</string>
+  </array>
+
+  <key>RunAtLoad</key>
+  <true/>
+
+  <key>KeepAlive</key>
+  <true/>
+
+  <key>WorkingDirectory</key>
+  <string>/Users/USER/hf-signal-dashboard</string>
+
+  <key>StandardOutPath</key>
+  <string>/Users/USER/hf-signal-dashboard/data/local/notify.out.log</string>
+
+  <key>StandardErrorPath</key>
+  <string>/Users/USER/hf-signal-dashboard/data/local/notify.err.log</string>
+
+  <key>ThrottleInterval</key>
+  <integer>30</integer>
+
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PYTHONUNBUFFERED</key>
+    <string>1</string>
+  </dict>
+</dict>
+</plist>
