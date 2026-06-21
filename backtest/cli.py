@@ -27,10 +27,13 @@ import uuid
 from typing import Any, Dict, List, Optional
 
 from . import local_loader, metrics, simulator, walk_forward as wf
+from . import h1 as h1_mod   # Phase 1.9 — single-hypothesis evaluation
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 PUBLIC_RESULT_PATH = ROOT / "docs" / "data" / "backtest_summary_public.json"
 LIVE_RESULT_DIR = ROOT / "data" / "local" / "backtest"
+H1_PUBLIC_PATH = ROOT / "docs" / "data" / "h1_summary_public.json"
+H1_RESULT_DIR = ROOT / "data" / "local" / "h1"
 
 
 # ── 仮装データ (random walk) ─────────────────────────
@@ -332,6 +335,47 @@ def run_local(*, interval: str = "1d",
     return out
 
 
+# ──────────────────────────────────────────────
+# Phase 1.9 — H1 単一仮説 (US→日本オーバーナイト波及)
+# ──────────────────────────────────────────────
+def run_h1_local(*, jp_symbol: str = "^N225",
+                 us_symbol: str = "^GSPC",
+                 bootstrap_runs: int = 300,
+                 n_min: int = 30,
+                 source: str = "auto") -> Dict[str, Any]:
+    loaded = local_loader.load_all(interval="1d", min_bars=200, source=source)
+    if jp_symbol not in loaded["symbols"]:
+        return {"ok": False, "error": f"jp_symbol {jp_symbol!r} not in store"}
+    if us_symbol not in loaded["symbols"]:
+        return {"ok": False, "error": f"us_symbol {us_symbol!r} not in store"}
+    jp = loaded["symbols"][jp_symbol]["bars"]
+    us = loaded["symbols"][us_symbol]["bars"]
+    res = h1_mod.run_h1(jp_bars=jp, us_bars=us,
+                        bootstrap_runs=bootstrap_runs, n_min=n_min,
+                        jp_symbol=jp_symbol, us_symbol=us_symbol)
+    res["source_used"] = loaded["source_used"]
+
+    # 詳細結果は data/local/h1/ (リポ外)
+    try:
+        H1_RESULT_DIR.mkdir(parents=True, exist_ok=True)
+        rid = uuid.uuid4().hex[:10]
+        out_path = H1_RESULT_DIR / f"{res['as_of_utc'].replace(':','')}_{rid}.json"
+        out_path.write_text(json.dumps(res, ensure_ascii=False, indent=2),
+                             encoding="utf-8")
+        res["persisted"] = str(out_path)
+    except OSError:
+        pass
+
+    # 公開抜粋: 詳細を含むが reproducible
+    try:
+        H1_PUBLIC_PATH.parent.mkdir(parents=True, exist_ok=True)
+        H1_PUBLIC_PATH.write_text(json.dumps(res, ensure_ascii=False, indent=2),
+                                   encoding="utf-8")
+    except OSError:
+        pass
+    return res
+
+
 def main(argv: Optional[List[str]] = None) -> int:
     p = argparse.ArgumentParser(prog="backtest.cli",
                                 description="Walk-forward backtest harness (smoke + real).")
@@ -354,7 +398,42 @@ def main(argv: Optional[List[str]] = None) -> int:
     p.add_argument("--fee-pct", type=float, default=0.01)
     p.add_argument("--size-pct", type=float, default=0.5)
     p.add_argument("--bootstrap-runs", type=int, default=500)
+    p.add_argument("--hypothesis", choices=("h1",), default=None,
+                   help="Phase 1.9: 単一仮説評価. 'h1' のみ実装.")
+    p.add_argument("--jp-symbol", default="^N225")
+    p.add_argument("--us-symbol", default="^GSPC")
+    p.add_argument("--n-min", type=int, default=30)
     ns = p.parse_args(argv)
+
+    # ── Phase 1.9 hypothesis branch ──────────────────
+    if ns.hypothesis == "h1":
+        res = run_h1_local(jp_symbol=ns.jp_symbol, us_symbol=ns.us_symbol,
+                            bootstrap_runs=ns.bootstrap_runs, n_min=ns.n_min,
+                            source=(ns.source or "auto"))
+        # 表示は要約のみ
+        out = {
+            "ok": res["ok"],
+            "hypothesis": res.get("hypothesis"),
+            "jp_symbol": res.get("jp_symbol"),
+            "us_symbol": res.get("us_symbol"),
+            "source_used": res.get("source_used"),
+            "segments": [
+                {"name": s["name"], "from": s["from"], "to": s["to"],
+                 "n_jp_bars": s["n_jp_bars"], "n_with_feature": s["n_with_feature"],
+                 "sanity": {k: {"r": v.get("pearson"), "t": v.get("t"),
+                                  "n": v.get("n"), "pass": v.get("pass")}
+                            for k, v in s["sanity"].items()},
+                 "labels": {k: {"n": m.get("n"), "hit_rate": m.get("hit_rate"),
+                                 "brier": m.get("brier"),
+                                 "avg_net_pct_ci": m.get("avg_net_pct_ci"),
+                                 "judge": m.get("judge")}
+                             for k, m in s["labels"].items()}}
+                for s in res.get("segments", [])
+            ],
+            "note": res.get("note"),
+        }
+        print(json.dumps(out, ensure_ascii=False, indent=2))
+        return 0
 
     # source 解決: --source 明示 > --smoke > 既定 (smoke).
     chosen = ns.source or ("smoke" if ns.smoke else "smoke")

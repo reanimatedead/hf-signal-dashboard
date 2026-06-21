@@ -91,6 +91,13 @@ REQUIRED_FILES = [
     "tests/test_local_loader.py",
     "tests/test_backtest_live.py",
     "tests/test_no_learning_code.py",
+    "SPEC_H1.md",                           # v4.7 Phase 1.9 contract
+    "backtest/h1.py",
+    "docs/assets/survival/h1_panel.js",
+    "tests/test_h1_feature_lookahead.py",
+    "tests/test_h1_labels.py",
+    "tests/test_h1_e2e.py",
+    "tests/test_h1_only.py",
 ]
 
 EXPECTED_LAG = {

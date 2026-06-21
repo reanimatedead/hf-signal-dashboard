@@ -33,6 +33,32 @@ without leaving the portfolio incomplete.
 
 ---
 
+## Features (v4.7 / Phase 1.9 — H1 single-hypothesis (US → JP overnight spillover))
+
+- **単一仮説 H1 のみ実装 (v4.7).** 「前セッションの US ^GSPC 終値リターンが、日本株の
+  翌オーバーナイト方向を同符号で予測する」を **固定仮説として** 評価する `backtest/h1.py`。
+  H2..H10 は本フェーズで実装しない (`tests/test_h1_only.py` が `backtest/h{2..10}.py` の
+  非存在を検知)。学習も追加していない (既存 `test_no_learning_code` で構造保証)。
+- **特徴量は前日 US 終値リターンのみ.** `build_features(jp_bars, us_returns)` が
+  JP date T に対して **strictly less than** な最大 US date のリターンを引く。
+  同日 US (= JST 翌朝確定) を 1 度でも触れたら `test_h1_feature_lookahead.py` が fail。
+  predictor は features dict のみを引数に取り、US 生バーには構造的に触れない。
+- **3 ラベル並列評価.** `overnight = (open[T] - close[T-1])/close[T-1]` /
+  `open_to_close = (close[T] - open[T])/open[T]` / `next_week = (close[T+5] - close[T])/close[T]`。
+  各ラベルで hit/Brier/EV 95% CI (bootstrap)/judge を出す。EV は `realized = label * sign(feature)`
+  のブートストラップ CI = 純粋な forecast 精度 (Phase 1.8 のトレード EV とは別物)。
+- **2 セグメント分割.** `pre_2023` (BOJ 正常化前) と `since_2023` で別々に judge 分類。
+  構造断絶を踏まえた評価。
+- **サニティチェック明示.** 各セグメントで Pearson(US 前日, ラベル) と t 値を出し、
+  `overnight = US-beta 正・有意` / `open_to_close = overnight より弱い同符号` で PASS 判定。
+  これが両方 PASS しない場合はデータのタイムゾーン/整列が壊れている疑い。
+- **SURVIVAL `#sv-h1`.** 銘柄、source、セグメント名、サニティ表 (r/t/n/PASS バッジ)、
+  ラベル別メトリクス表 (n/hit/Brier/EV CI/judge 色分け) を描画。
+  「単一仮説の素の予測力測定 / not investment advice / Phase 2 未実装」を最上部に明示。
+- **CLI.** `python3 -m backtest.cli --hypothesis=h1 --source=local` で実走。
+  結果は `docs/data/h1_summary_public.json` (公開) と `data/local/h1/<run>.json`
+  (リポ外) に分けて保存。
+
 ## Features (v4.6 / Phase 1.8 — live-rate walk-forward, system-only estimated accuracy)
 
 - **Real-rate backtest結線 (v4.6 / Phase 1.8).** `backtest/cli.py --source=local` で
