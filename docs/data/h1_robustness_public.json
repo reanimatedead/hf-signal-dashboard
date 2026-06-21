@@ -1,0 +1,1091 @@
+{
+  "ok": true,
+  "as_of_utc": "2026-06-21T09:45:40+00:00",
+  "hypothesis": "h1-robustness",
+  "jp_symbol": "^N225",
+  "us_symbol": "^GSPC",
+  "source_used": "jsonl",
+  "executable_assumption": "JP open is the 9:00 JST 板寄せ price; ETF (1306/1321) or NK225 futures fill at this price. Retail slippage + commission captured by 5/10/20 bps round-trip sensitivity.",
+  "segments": {
+    "since_2023": {
+      "label": "open_to_close",
+      "segment": "since_2023",
+      "n_trades": 846,
+      "ev_baseline": {
+        "n": 846,
+        "mean_net_pct": 0.088553,
+        "ev_ci": [
+          0.015703,
+          0.160564
+        ]
+      },
+      "cost": {
+        "table": [
+          {
+            "cost_bps": 5,
+            "cost_pct": 0.05,
+            "n": 846,
+            "mean_net_pct": 0.038553,
+            "ev_ci": [
+              -0.034297,
+              0.110564
+            ]
+          },
+          {
+            "cost_bps": 10,
+            "cost_pct": 0.1,
+            "n": 846,
+            "mean_net_pct": -0.011447,
+            "ev_ci": [
+              -0.084297,
+              0.060564
+            ]
+          },
+          {
+            "cost_bps": 20,
+            "cost_pct": 0.2,
+            "n": 846,
+            "mean_net_pct": -0.111447,
+            "ev_ci": [
+              -0.184297,
+              -0.039436
+            ]
+          }
+        ],
+        "verdict": {
+          "pass": false,
+          "levels": [
+            {
+              "cost_bps": 5,
+              "ev_ci": [
+                -0.034297,
+                0.110564
+              ],
+              "pass": false
+            },
+            {
+              "cost_bps": 10,
+              "ev_ci": [
+                -0.084297,
+                0.060564
+              ],
+              "pass": false
+            },
+            {
+              "cost_bps": 20,
+              "ev_ci": [
+                -0.184297,
+                -0.039436
+              ],
+              "pass": false
+            }
+          ]
+        }
+      },
+      "outlier": {
+        "table": [
+          {
+            "pct_excluded": 1.0,
+            "n_kept": 837,
+            "mean_net_pct": 0.056643,
+            "ev_ci": [
+              0.004464,
+              0.111773
+            ]
+          },
+          {
+            "pct_excluded": 5.0,
+            "n_kept": 803,
+            "mean_net_pct": 0.019212,
+            "ev_ci": [
+              -0.031338,
+              0.066723
+            ]
+          }
+        ],
+        "verdict": {
+          "pass": false,
+          "rows": [
+            {
+              "pct_excluded": 1.0,
+              "ev_ci": [
+                0.004464,
+                0.111773
+              ],
+              "pass": true
+            },
+            {
+              "pct_excluded": 5.0,
+              "ev_ci": [
+                -0.031338,
+                0.066723
+              ],
+              "pass": false
+            }
+          ]
+        }
+      },
+      "subperiod": {
+        "table": [
+          {
+            "year": "2023",
+            "n": 246,
+            "mean_net_pct": 0.016812,
+            "sum_net_pct": 4.135825
+          },
+          {
+            "year": "2024",
+            "n": 245,
+            "mean_net_pct": 0.021737,
+            "sum_net_pct": 5.325521
+          },
+          {
+            "year": "2025",
+            "n": 243,
+            "mean_net_pct": 0.106772,
+            "sum_net_pct": 25.945478
+          },
+          {
+            "year": "2026",
+            "n": 112,
+            "mean_net_pct": 0.352758,
+            "sum_net_pct": 39.508917
+          }
+        ],
+        "verdict": {
+          "pass": false,
+          "reason": "single year 2026 dominates (53%)",
+          "table": [
+            {
+              "year": "2023",
+              "n": 246,
+              "mean_net_pct": 0.016812,
+              "sum_net_pct": 4.135825
+            },
+            {
+              "year": "2024",
+              "n": 245,
+              "mean_net_pct": 0.021737,
+              "sum_net_pct": 5.325521
+            },
+            {
+              "year": "2025",
+              "n": 243,
+              "mean_net_pct": 0.106772,
+              "sum_net_pct": 25.945478
+            },
+            {
+              "year": "2026",
+              "n": 112,
+              "mean_net_pct": 0.352758,
+              "sum_net_pct": 39.508917
+            }
+          ]
+        }
+      },
+      "fade": {
+        "summary": {
+          "n": 846,
+          "hit_rate": 0.5,
+          "mean_net_pct": -0.088553,
+          "skew": -1.477513,
+          "max_dd_pct": -60.754204,
+          "worst_day_loss_pct": -10.754634
+        },
+        "verdict": {
+          "pass": false,
+          "reason": "neg-skew -1.48 AND worst-day -10.75%",
+          "summary": {
+            "n": 846,
+            "hit_rate": 0.5,
+            "mean_net_pct": -0.088553,
+            "skew": -1.477513,
+            "max_dd_pct": -60.754204,
+            "worst_day_loss_pct": -10.754634
+          },
+          "ok_skew": false,
+          "ok_worst": false
+        }
+      },
+      "verdict": {
+        "overall": "raw-cross-asset-not-tradeable → Completion-B候補",
+        "criteria": {
+          "cost": false,
+          "outlier": false,
+          "subperiod": false,
+          "fade": false
+        }
+      },
+      "note": "頑健性検証. 想定 + 取引可能性検証 / not investment advice. Phase 2 (学習) 未実装."
+    },
+    "pre_2023": {
+      "label": "open_to_close",
+      "segment": "pre_2023",
+      "n_trades": 14262,
+      "ev_baseline": {
+        "n": 14262,
+        "mean_net_pct": 0.048364,
+        "ev_ci": [
+          0.033863,
+          0.06421
+        ]
+      },
+      "cost": {
+        "table": [
+          {
+            "cost_bps": 5,
+            "cost_pct": 0.05,
+            "n": 14262,
+            "mean_net_pct": -0.001636,
+            "ev_ci": [
+              -0.016137,
+              0.01421
+            ]
+          },
+          {
+            "cost_bps": 10,
+            "cost_pct": 0.1,
+            "n": 14262,
+            "mean_net_pct": -0.051636,
+            "ev_ci": [
+              -0.066137,
+              -0.03579
+            ]
+          },
+          {
+            "cost_bps": 20,
+            "cost_pct": 0.2,
+            "n": 14262,
+            "mean_net_pct": -0.151636,
+            "ev_ci": [
+              -0.166137,
+              -0.13579
+            ]
+          }
+        ],
+        "verdict": {
+          "pass": false,
+          "levels": [
+            {
+              "cost_bps": 5,
+              "ev_ci": [
+                -0.016137,
+                0.01421
+              ],
+              "pass": false
+            },
+            {
+              "cost_bps": 10,
+              "ev_ci": [
+                -0.066137,
+                -0.03579
+              ],
+              "pass": false
+            },
+            {
+              "cost_bps": 20,
+              "ev_ci": [
+                -0.166137,
+                -0.13579
+              ],
+              "pass": false
+            }
+          ]
+        }
+      },
+      "outlier": {
+        "table": [
+          {
+            "pct_excluded": 1.0,
+            "n_kept": 14119,
+            "mean_net_pct": 0.032606,
+            "ev_ci": [
+              0.020229,
+              0.044884
+            ]
+          },
+          {
+            "pct_excluded": 5.0,
+            "n_kept": 13548,
+            "mean_net_pct": 0.016032,
+            "ev_ci": [
+              0.006102,
+              0.025981
+            ]
+          }
+        ],
+        "verdict": {
+          "pass": true,
+          "rows": [
+            {
+              "pct_excluded": 1.0,
+              "ev_ci": [
+                0.020229,
+                0.044884
+              ],
+              "pass": true
+            },
+            {
+              "pct_excluded": 5.0,
+              "ev_ci": [
+                0.006102,
+                0.025981
+              ],
+              "pass": true
+            }
+          ]
+        }
+      },
+      "subperiod": {
+        "table": [
+          {
+            "year": "1965",
+            "n": 243,
+            "mean_net_pct": 0.0,
+            "sum_net_pct": 0.0
+          },
+          {
+            "year": "1966",
+            "n": 245,
+            "mean_net_pct": 0.0,
+            "sum_net_pct": 0.0
+          },
+          {
+            "year": "1967",
+            "n": 247,
+            "mean_net_pct": 0.0,
+            "sum_net_pct": 0.0
+          },
+          {
+            "year": "1968",
+            "n": 246,
+            "mean_net_pct": 0.0,
+            "sum_net_pct": 0.0
+          },
+          {
+            "year": "1969",
+            "n": 244,
+            "mean_net_pct": 0.0,
+            "sum_net_pct": 0.0
+          },
+          {
+            "year": "1970",
+            "n": 248,
+            "mean_net_pct": 0.0,
+            "sum_net_pct": 0.0
+          },
+          {
+            "year": "1971",
+            "n": 243,
+            "mean_net_pct": 0.0,
+            "sum_net_pct": 0.0
+          },
+          {
+            "year": "1972",
+            "n": 248,
+            "mean_net_pct": 0.0,
+            "sum_net_pct": 0.0
+          },
+          {
+            "year": "1973",
+            "n": 245,
+            "mean_net_pct": 0.0,
+            "sum_net_pct": 0.0
+          },
+          {
+            "year": "1974",
+            "n": 245,
+            "mean_net_pct": 0.0,
+            "sum_net_pct": 0.0
+          },
+          {
+            "year": "1975",
+            "n": 244,
+            "mean_net_pct": 0.0,
+            "sum_net_pct": 0.0
+          },
+          {
+            "year": "1976",
+            "n": 245,
+            "mean_net_pct": 0.0,
+            "sum_net_pct": 0.0
+          },
+          {
+            "year": "1977",
+            "n": 245,
+            "mean_net_pct": 0.0,
+            "sum_net_pct": 0.0
+          },
+          {
+            "year": "1978",
+            "n": 247,
+            "mean_net_pct": 0.0,
+            "sum_net_pct": 0.0
+          },
+          {
+            "year": "1979",
+            "n": 248,
+            "mean_net_pct": 0.0,
+            "sum_net_pct": 0.0
+          },
+          {
+            "year": "1980",
+            "n": 249,
+            "mean_net_pct": 0.0,
+            "sum_net_pct": 0.0
+          },
+          {
+            "year": "1981",
+            "n": 249,
+            "mean_net_pct": 0.0,
+            "sum_net_pct": 0.0
+          },
+          {
+            "year": "1982",
+            "n": 246,
+            "mean_net_pct": 0.0,
+            "sum_net_pct": 0.0
+          },
+          {
+            "year": "1983",
+            "n": 247,
+            "mean_net_pct": 0.0,
+            "sum_net_pct": 0.0
+          },
+          {
+            "year": "1984",
+            "n": 251,
+            "mean_net_pct": 0.0,
+            "sum_net_pct": 0.0
+          },
+          {
+            "year": "1985",
+            "n": 247,
+            "mean_net_pct": 0.0,
+            "sum_net_pct": 0.0
+          },
+          {
+            "year": "1986",
+            "n": 248,
+            "mean_net_pct": 0.0,
+            "sum_net_pct": 0.0
+          },
+          {
+            "year": "1987",
+            "n": 247,
+            "mean_net_pct": 0.0,
+            "sum_net_pct": 0.0
+          },
+          {
+            "year": "1988",
+            "n": 246,
+            "mean_net_pct": 0.061157,
+            "sum_net_pct": 15.044588
+          },
+          {
+            "year": "1989",
+            "n": 248,
+            "mean_net_pct": -0.00098,
+            "sum_net_pct": -0.242955
+          },
+          {
+            "year": "1990",
+            "n": 246,
+            "mean_net_pct": 0.333013,
+            "sum_net_pct": 81.92118
+          },
+          {
+            "year": "1991",
+            "n": 246,
+            "mean_net_pct": 0.24721,
+            "sum_net_pct": 60.813726
+          },
+          {
+            "year": "1992",
+            "n": 247,
+            "mean_net_pct": 0.052561,
+            "sum_net_pct": 12.982654
+          },
+          {
+            "year": "1993",
+            "n": 246,
+            "mean_net_pct": -0.221884,
+            "sum_net_pct": -54.583524
+          },
+          {
+            "year": "1994",
+            "n": 247,
+            "mean_net_pct": 0.09362,
+            "sum_net_pct": 23.124101
+          },
+          {
+            "year": "1995",
+            "n": 249,
+            "mean_net_pct": 0.219193,
+            "sum_net_pct": 54.579017
+          },
+          {
+            "year": "1996",
+            "n": 247,
+            "mean_net_pct": 0.121552,
+            "sum_net_pct": 30.0233
+          },
+          {
+            "year": "1997",
+            "n": 246,
+            "mean_net_pct": 0.311029,
+            "sum_net_pct": 76.513082
+          },
+          {
+            "year": "1998",
+            "n": 247,
+            "mean_net_pct": 0.002023,
+            "sum_net_pct": 0.499771
+          },
+          {
+            "year": "1999",
+            "n": 245,
+            "mean_net_pct": 0.273508,
+            "sum_net_pct": 67.009372
+          },
+          {
+            "year": "2000",
+            "n": 248,
+            "mean_net_pct": 0.214782,
+            "sum_net_pct": 53.266011
+          },
+          {
+            "year": "2001",
+            "n": 246,
+            "mean_net_pct": -0.002192,
+            "sum_net_pct": -0.539157
+          },
+          {
+            "year": "2002",
+            "n": 246,
+            "mean_net_pct": 0.050779,
+            "sum_net_pct": 12.491661
+          },
+          {
+            "year": "2003",
+            "n": 245,
+            "mean_net_pct": 0.13021,
+            "sum_net_pct": 31.901386
+          },
+          {
+            "year": "2004",
+            "n": 246,
+            "mean_net_pct": 0.000819,
+            "sum_net_pct": 0.201377
+          },
+          {
+            "year": "2005",
+            "n": 245,
+            "mean_net_pct": -0.081404,
+            "sum_net_pct": -19.943893
+          },
+          {
+            "year": "2006",
+            "n": 248,
+            "mean_net_pct": -0.088584,
+            "sum_net_pct": -21.96892
+          },
+          {
+            "year": "2007",
+            "n": 245,
+            "mean_net_pct": -0.021407,
+            "sum_net_pct": -5.244625
+          },
+          {
+            "year": "2008",
+            "n": 245,
+            "mean_net_pct": 0.509331,
+            "sum_net_pct": 124.786074
+          },
+          {
+            "year": "2009",
+            "n": 242,
+            "mean_net_pct": 0.29715,
+            "sum_net_pct": 71.910348
+          },
+          {
+            "year": "2010",
+            "n": 243,
+            "mean_net_pct": 0.019698,
+            "sum_net_pct": 4.786698
+          },
+          {
+            "year": "2011",
+            "n": 245,
+            "mean_net_pct": 0.03859,
+            "sum_net_pct": 9.454432
+          },
+          {
+            "year": "2012",
+            "n": 248,
+            "mean_net_pct": -0.024526,
+            "sum_net_pct": -6.082529
+          },
+          {
+            "year": "2013",
+            "n": 245,
+            "mean_net_pct": 0.00405,
+            "sum_net_pct": 0.992156
+          },
+          {
+            "year": "2014",
+            "n": 244,
+            "mean_net_pct": 0.037618,
+            "sum_net_pct": 9.178685
+          },
+          {
+            "year": "2015",
+            "n": 244,
+            "mean_net_pct": -0.010539,
+            "sum_net_pct": -2.571536
+          },
+          {
+            "year": "2016",
+            "n": 245,
+            "mean_net_pct": 0.12207,
+            "sum_net_pct": 29.907133
+          },
+          {
+            "year": "2017",
+            "n": 247,
+            "mean_net_pct": -0.039766,
+            "sum_net_pct": -9.822314
+          },
+          {
+            "year": "2018",
+            "n": 246,
+            "mean_net_pct": 0.046505,
+            "sum_net_pct": 11.440267
+          },
+          {
+            "year": "2019",
+            "n": 241,
+            "mean_net_pct": -0.006503,
+            "sum_net_pct": -1.567123
+          },
+          {
+            "year": "2020",
+            "n": 242,
+            "mean_net_pct": 0.037229,
+            "sum_net_pct": 9.009355
+          },
+          {
+            "year": "2021",
+            "n": 245,
+            "mean_net_pct": -0.053158,
+            "sum_net_pct": -13.02365
+          },
+          {
+            "year": "2022",
+            "n": 244,
+            "mean_net_pct": 0.137359,
+            "sum_net_pct": 33.515583
+          }
+        ],
+        "verdict": {
+          "pass": false,
+          "reason": "negative year(s): ['1989', '1993', '2001', '2005', '2006', '2007', '2012', '2015', '2017', '2019', '2021']",
+          "table": [
+            {
+              "year": "1965",
+              "n": 243,
+              "mean_net_pct": 0.0,
+              "sum_net_pct": 0.0
+            },
+            {
+              "year": "1966",
+              "n": 245,
+              "mean_net_pct": 0.0,
+              "sum_net_pct": 0.0
+            },
+            {
+              "year": "1967",
+              "n": 247,
+              "mean_net_pct": 0.0,
+              "sum_net_pct": 0.0
+            },
+            {
+              "year": "1968",
+              "n": 246,
+              "mean_net_pct": 0.0,
+              "sum_net_pct": 0.0
+            },
+            {
+              "year": "1969",
+              "n": 244,
+              "mean_net_pct": 0.0,
+              "sum_net_pct": 0.0
+            },
+            {
+              "year": "1970",
+              "n": 248,
+              "mean_net_pct": 0.0,
+              "sum_net_pct": 0.0
+            },
+            {
+              "year": "1971",
+              "n": 243,
+              "mean_net_pct": 0.0,
+              "sum_net_pct": 0.0
+            },
+            {
+              "year": "1972",
+              "n": 248,
+              "mean_net_pct": 0.0,
+              "sum_net_pct": 0.0
+            },
+            {
+              "year": "1973",
+              "n": 245,
+              "mean_net_pct": 0.0,
+              "sum_net_pct": 0.0
+            },
+            {
+              "year": "1974",
+              "n": 245,
+              "mean_net_pct": 0.0,
+              "sum_net_pct": 0.0
+            },
+            {
+              "year": "1975",
+              "n": 244,
+              "mean_net_pct": 0.0,
+              "sum_net_pct": 0.0
+            },
+            {
+              "year": "1976",
+              "n": 245,
+              "mean_net_pct": 0.0,
+              "sum_net_pct": 0.0
+            },
+            {
+              "year": "1977",
+              "n": 245,
+              "mean_net_pct": 0.0,
+              "sum_net_pct": 0.0
+            },
+            {
+              "year": "1978",
+              "n": 247,
+              "mean_net_pct": 0.0,
+              "sum_net_pct": 0.0
+            },
+            {
+              "year": "1979",
+              "n": 248,
+              "mean_net_pct": 0.0,
+              "sum_net_pct": 0.0
+            },
+            {
+              "year": "1980",
+              "n": 249,
+              "mean_net_pct": 0.0,
+              "sum_net_pct": 0.0
+            },
+            {
+              "year": "1981",
+              "n": 249,
+              "mean_net_pct": 0.0,
+              "sum_net_pct": 0.0
+            },
+            {
+              "year": "1982",
+              "n": 246,
+              "mean_net_pct": 0.0,
+              "sum_net_pct": 0.0
+            },
+            {
+              "year": "1983",
+              "n": 247,
+              "mean_net_pct": 0.0,
+              "sum_net_pct": 0.0
+            },
+            {
+              "year": "1984",
+              "n": 251,
+              "mean_net_pct": 0.0,
+              "sum_net_pct": 0.0
+            },
+            {
+              "year": "1985",
+              "n": 247,
+              "mean_net_pct": 0.0,
+              "sum_net_pct": 0.0
+            },
+            {
+              "year": "1986",
+              "n": 248,
+              "mean_net_pct": 0.0,
+              "sum_net_pct": 0.0
+            },
+            {
+              "year": "1987",
+              "n": 247,
+              "mean_net_pct": 0.0,
+              "sum_net_pct": 0.0
+            },
+            {
+              "year": "1988",
+              "n": 246,
+              "mean_net_pct": 0.061157,
+              "sum_net_pct": 15.044588
+            },
+            {
+              "year": "1989",
+              "n": 248,
+              "mean_net_pct": -0.00098,
+              "sum_net_pct": -0.242955
+            },
+            {
+              "year": "1990",
+              "n": 246,
+              "mean_net_pct": 0.333013,
+              "sum_net_pct": 81.92118
+            },
+            {
+              "year": "1991",
+              "n": 246,
+              "mean_net_pct": 0.24721,
+              "sum_net_pct": 60.813726
+            },
+            {
+              "year": "1992",
+              "n": 247,
+              "mean_net_pct": 0.052561,
+              "sum_net_pct": 12.982654
+            },
+            {
+              "year": "1993",
+              "n": 246,
+              "mean_net_pct": -0.221884,
+              "sum_net_pct": -54.583524
+            },
+            {
+              "year": "1994",
+              "n": 247,
+              "mean_net_pct": 0.09362,
+              "sum_net_pct": 23.124101
+            },
+            {
+              "year": "1995",
+              "n": 249,
+              "mean_net_pct": 0.219193,
+              "sum_net_pct": 54.579017
+            },
+            {
+              "year": "1996",
+              "n": 247,
+              "mean_net_pct": 0.121552,
+              "sum_net_pct": 30.0233
+            },
+            {
+              "year": "1997",
+              "n": 246,
+              "mean_net_pct": 0.311029,
+              "sum_net_pct": 76.513082
+            },
+            {
+              "year": "1998",
+              "n": 247,
+              "mean_net_pct": 0.002023,
+              "sum_net_pct": 0.499771
+            },
+            {
+              "year": "1999",
+              "n": 245,
+              "mean_net_pct": 0.273508,
+              "sum_net_pct": 67.009372
+            },
+            {
+              "year": "2000",
+              "n": 248,
+              "mean_net_pct": 0.214782,
+              "sum_net_pct": 53.266011
+            },
+            {
+              "year": "2001",
+              "n": 246,
+              "mean_net_pct": -0.002192,
+              "sum_net_pct": -0.539157
+            },
+            {
+              "year": "2002",
+              "n": 246,
+              "mean_net_pct": 0.050779,
+              "sum_net_pct": 12.491661
+            },
+            {
+              "year": "2003",
+              "n": 245,
+              "mean_net_pct": 0.13021,
+              "sum_net_pct": 31.901386
+            },
+            {
+              "year": "2004",
+              "n": 246,
+              "mean_net_pct": 0.000819,
+              "sum_net_pct": 0.201377
+            },
+            {
+              "year": "2005",
+              "n": 245,
+              "mean_net_pct": -0.081404,
+              "sum_net_pct": -19.943893
+            },
+            {
+              "year": "2006",
+              "n": 248,
+              "mean_net_pct": -0.088584,
+              "sum_net_pct": -21.96892
+            },
+            {
+              "year": "2007",
+              "n": 245,
+              "mean_net_pct": -0.021407,
+              "sum_net_pct": -5.244625
+            },
+            {
+              "year": "2008",
+              "n": 245,
+              "mean_net_pct": 0.509331,
+              "sum_net_pct": 124.786074
+            },
+            {
+              "year": "2009",
+              "n": 242,
+              "mean_net_pct": 0.29715,
+              "sum_net_pct": 71.910348
+            },
+            {
+              "year": "2010",
+              "n": 243,
+              "mean_net_pct": 0.019698,
+              "sum_net_pct": 4.786698
+            },
+            {
+              "year": "2011",
+              "n": 245,
+              "mean_net_pct": 0.03859,
+              "sum_net_pct": 9.454432
+            },
+            {
+              "year": "2012",
+              "n": 248,
+              "mean_net_pct": -0.024526,
+              "sum_net_pct": -6.082529
+            },
+            {
+              "year": "2013",
+              "n": 245,
+              "mean_net_pct": 0.00405,
+              "sum_net_pct": 0.992156
+            },
+            {
+              "year": "2014",
+              "n": 244,
+              "mean_net_pct": 0.037618,
+              "sum_net_pct": 9.178685
+            },
+            {
+              "year": "2015",
+              "n": 244,
+              "mean_net_pct": -0.010539,
+              "sum_net_pct": -2.571536
+            },
+            {
+              "year": "2016",
+              "n": 245,
+              "mean_net_pct": 0.12207,
+              "sum_net_pct": 29.907133
+            },
+            {
+              "year": "2017",
+              "n": 247,
+              "mean_net_pct": -0.039766,
+              "sum_net_pct": -9.822314
+            },
+            {
+              "year": "2018",
+              "n": 246,
+              "mean_net_pct": 0.046505,
+              "sum_net_pct": 11.440267
+            },
+            {
+              "year": "2019",
+              "n": 241,
+              "mean_net_pct": -0.006503,
+              "sum_net_pct": -1.567123
+            },
+            {
+              "year": "2020",
+              "n": 242,
+              "mean_net_pct": 0.037229,
+              "sum_net_pct": 9.009355
+            },
+            {
+              "year": "2021",
+              "n": 245,
+              "mean_net_pct": -0.053158,
+              "sum_net_pct": -13.02365
+            },
+            {
+              "year": "2022",
+              "n": 244,
+              "mean_net_pct": 0.137359,
+              "sum_net_pct": 33.515583
+            }
+          ]
+        }
+      },
+      "fade": {
+        "summary": {
+          "n": 14262,
+          "hit_rate": 0.290422,
+          "mean_net_pct": -0.048364,
+          "skew": -0.989933,
+          "max_dd_pct": -99.946563,
+          "worst_day_loss_pct": -13.235928
+        },
+        "verdict": {
+          "pass": false,
+          "reason": "neg-skew -0.99 AND worst-day -13.24%",
+          "summary": {
+            "n": 14262,
+            "hit_rate": 0.290422,
+            "mean_net_pct": -0.048364,
+            "skew": -0.989933,
+            "max_dd_pct": -99.946563,
+            "worst_day_loss_pct": -13.235928
+          },
+          "ok_skew": false,
+          "ok_worst": false
+        }
+      },
+      "verdict": {
+        "overall": "raw-cross-asset-not-tradeable → Completion-B候補",
+        "criteria": {
+          "cost": false,
+          "outlier": true,
+          "subperiod": false,
+          "fade": false
+        }
+      },
+      "note": "頑健性検証. 想定 + 取引可能性検証 / not investment advice. Phase 2 (学習) 未実装."
+    }
+  },
+  "primary_verdict": {
+    "overall": "raw-cross-asset-not-tradeable → Completion-B候補",
+    "criteria": {
+      "cost": false,
+      "outlier": false,
+      "subperiod": false,
+      "fade": false
+    }
+  },
+  "note": "H1 open_to_close robustness analysis (Phase 1.9.1). Single-hypothesis raw predictive power tested against costs, outliers, subperiod stability, and fade skewness. Not investment advice. Phase 2 (learning) not implemented."
+}

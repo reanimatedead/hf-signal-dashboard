@@ -10,12 +10,12 @@ def _trade(net_pct):
 
 
 def test_drop_top_pct_removes_largest_abs():
-    # 100 trades, large fat-tail outliers ±10%
-    trades = [_trade(0.01)] * 90 + [_trade(10.0)] * 5 + [_trade(-10.0)] * 5
+    # 100 trades, fat-tail outliers ±10% は 5 件だけ → 全部除外できる
+    trades = [_trade(0.01)] * 95 + [_trade(10.0)] * 3 + [_trade(-10.0)] * 2
     pruned = hr.drop_top_abs_pct(trades, pct=5.0)
-    # top 5% = 5 件除外
+    # top 5% = 5 件除外, 残 95
     assert len(pruned) == 95
-    # 除外で平均が -inf 方向に動く保証はしないが、|10.0| 級は全部消える
+    # |10.0| 級が全部消えている (5 件 ≤ 5% カット)
     assert max(abs(t["net_pct"]) for t in pruned) < 10.0
 
 
