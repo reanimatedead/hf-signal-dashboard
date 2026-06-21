@@ -33,6 +33,37 @@ without leaving the portfolio incomplete.
 
 ---
 
+## Features (v4.7.2 / Phase 1.9.2 — 5-hypothesis anti-overfit loop)
+
+- **`loop/` パッケージ.** 5 仮説 (288MA cross/slope/band, index TSMOM, regime
+  TSMOM) を **1 回ずつ** ALLOWED_SYMBOLS (指数+主要FX のみ) に流し、Phase 1.9.1
+  の 4 ゲート + Bailey-de Prado 簡略 DSR + 半々 PBO で判定する。
+- **過学習を構造で防ぐ.**
+  - `tests/test_loop_no_autotuning.py`: 各 hypothesis は 1 ループあたり `run_one`
+    が 1 度だけ呼ばれることを担保 (パラメータの auto-search 検知).
+  - `tests/test_loop_holdout_block.py`: 直近 2 年を `loop.holdout.filter_pre_holdout`
+    が load 入口で削る. predict 関数は `backtest.walk_forward.WatchedBars` 経由で
+    `t_index` を越えるアクセスが物理 fail.
+  - `tests/test_loop_spec.py`: 5 仮説それぞれに 30 文字以上の理論根拠 (Fama-French,
+    Hong-Stein, Lehmann, Moskowitz-Ooi-Pedersen, Faber) が無いと登録不可.
+  - `tests/test_loop_e2e.test_universe_check_rejects_individual_stock_input`:
+    AAPL 等の個別株が入力されると ValueError.
+- **改竄不能試行ログ.** `loop/log.py` が `data/local/loop_trials.jsonl` に Phase 1.6
+  と同じ sha256 ハッシュチェーンで append-only. `loop_log.verify()` で改竄/挿入/削除
+  を検知.
+- **CLI.** `python3 -m backtest.cli --hypothesis=loop --source=local` で実走。
+  詳細は `data/local/loop/<run>.json`, 公開抜粋は `docs/data/loop_report_public.json`.
+
+## Features (v4.7.1 / Phase 1.9.1 — H1 open_to_close robustness gates → 撤退)
+
+- **`backtest/h1_robustness.py` 4 ゲート.** Phase 1.9 で「edge」と判定された
+  H1 open_to_close (since_2023, EV CI [+0.012, +0.157]) が本物か検証:
+  - (a) cost (5/10/20 bps round-trip 控除後の bootstrap CI)
+  - (b) outlier (|net_pct| top 1%/5% 除外後の CI)
+  - (c) subperiod (年単位分割で単一年集中 / 負年検知)
+  - (d) fade skew (US 符号逆張りで `skew >= -0.5 かつ worst_day >= -5%`)
+- **実走判定**: 全 4 ゲート FAIL → "raw-cross-asset-not-tradeable → Completion-B候補".
+
 ## Features (v4.7 / Phase 1.9 — H1 single-hypothesis (US → JP overnight spillover))
 
 - **単一仮説 H1 のみ実装 (v4.7).** 「前セッションの US ^GSPC 終値リターンが、日本株の

@@ -217,7 +217,60 @@ alignable). Japan stays placeholder rather than show stale or single-side data. 
 
 ---
 
-## v4.7 — H1 single-hypothesis (US → JP overnight spillover) / Phase 1.9 (this release)
+## v4.7.2 — 5-hypothesis anti-overfit loop / Phase 1.9.2 (this release)
+
+**Goal:** Phase 1.9.1 で「H1 open_to_close は raw-cross-asset-not-tradeable」と
+判定された上で、「288 線および指数モメンタムの **指数限定** 転用」を 5 仮説 1 回ずつ
+4 ゲート + DSR + PBO に流して、生き残る仮説の存否を確認する。p-hacking 物理ブロック。
+
+- **5 仮説 (固定パラメータ).** `loop/registry.py` に登録:
+  HA 288_cross / HB 288_slope / HC 288_band(±2σ) / HD index_tsmom(60d) / HE regime_tsmom.
+  各仮説に金融研究の理論根拠を 1 行必須 (Fama-French / Hong-Stein / Lehmann /
+  Moskowitz-Ooi-Pedersen / Faber).
+- **ループは 1 仮説 1 試行.** `loop.runner.run_loop` が `REGISTRY` を順に 1 度ずつ
+  実行. 同一仮説のパラメータを書き換えない (`test_loop_no_autotuning` で構造保証).
+- **直近 2 年ホールドアウトの物理ブロック.** `loop.holdout.filter_pre_holdout` が
+  load 入口で `ts >= today-2y` を削る. predict 関数は WatchedBars 経由で `t_index`
+  を越えるアクセスが AssertionError. テストで holdout の最大読み込み ts < cutoff を
+  実証.
+- **DSR + PBO.** `loop.overfit.expected_max_sr(N) = sqrt(2 ln N)` (Bailey-de Prado
+  簡略). `deflated_sharpe = SR_raw - expected_max_sr`. `pbo_split_sign_consistent`
+  で半々分割の符号一致を見る. 試行数で合格閾値が引き上がる (1: DSR>0, 2-5: DSR>0
+  ∧ PBO 一致, 6+: DSR>0.5 ∧ PBO<0.3).
+- **改竄不能試行ログ.** `loop/log.py` が data/local/loop_trials.jsonl に Phase 1.6
+  と同じ sha256 ハッシュチェーンで append-only.
+- **指数 / 主要 FX 限定.** ALLOWED_SYMBOLS は ^N225, ^GSPC, ^DJI, ^NDX, ^VIX,
+  ^MOVE, ^TNX, ^TYX, USDJPY=X, EURUSD=X, GBPUSD=X, AUDUSD=X, EURJPY=X.
+  個別株が混入したら ValueError.
+- **CLI.** `python3 -m backtest.cli --hypothesis=loop --source=local`.
+
+### 実走結果 (n_hypotheses=5, holdout 2024-06-21, slip 0.02% + fee 0.01%):
+
+| hypothesis     | n_trades | hit    | SR    | DSR    | PBO 一致 | gates (c/o/s/f) | verdict |
+|----------------|---------:|-------:|------:|-------:|:--------:|:----------------|:--------|
+| 288_cross      |    3,456 | 0.458  | -1.26 | -3.05  |   ✓      | 0/0/0/0         | fails (4g, dsr) |
+| 288_slope      |  122,616 | 0.480  | -0.48 | -2.27  |   ✓      | 0/0/0/0         | fails (4g, dsr) |
+| 288_band       |   19,087 | 0.454  | -0.04 | -1.84  |   ✗      | 0/0/0/0         | fails (4g, dsr, pbo) |
+| index_tsmom    |  125,429 | 0.475  | -0.60 | -2.39  |   ✓      | 0/0/0/0         | fails (4g, dsr) |
+| regime_tsmom   |   71,370 | 0.475  | -0.48 | -2.27  |   ✓      | 0/0/0/0         | fails (4g, dsr) |
+
+**最終判定**: `"empty-set under current gate → 指数転用は防御止まり / 転用Completion-B"`
+
+(hit_rate × skew) frontier から: 全仮説の hit_rate < 0.50, 多くが正 skew (288_band,
+288_cross) → 「高 hit 率は負スキュー側にしか存在しない」傾向は 5 仮説サンプルでも観察
+されたが、そもそも edge 自体が無い (DSR -1.8〜-3.0).
+
+---
+
+## v4.7.1 — H1 open_to_close robustness gates / Phase 1.9.1
+
+5 エージェント分担で Phase 1.9 の H1 open_to_close が本物の取引可能 edge かを判定.
+cost / outlier / subperiod / fade-skew の 4 ゲート全 FAIL →
+`"raw-cross-asset-not-tradeable → Completion-B候補"` で撤退判定.
+
+---
+
+## v4.7 — H1 single-hypothesis (US → JP overnight spillover) / Phase 1.9
 
 **Goal:** Phase 1.8 で「素の予測器では edge 無し」と分かった上で、
 **仮説駆動** で 1 本だけ素の予測力を測る。今回は H1 のみ:

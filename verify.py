@@ -105,6 +105,18 @@ REQUIRED_FILES = [
     "tests/test_h1_robustness_subperiods.py",
     "tests/test_h1_robustness_fade_skew.py",
     "tests/test_h1_robustness_verdict.py",
+    "SPEC_LOOP.md",                         # v4.7.2 Phase 1.9.2 contract
+    "loop/__init__.py",
+    "loop/registry.py",
+    "loop/holdout.py",
+    "loop/runner.py",
+    "loop/overfit.py",
+    "loop/log.py",
+    "tests/test_loop_spec.py",
+    "tests/test_loop_holdout_block.py",
+    "tests/test_loop_dsr_pbo.py",
+    "tests/test_loop_no_autotuning.py",
+    "tests/test_loop_e2e.py",
 ]
 
 EXPECTED_LAG = {

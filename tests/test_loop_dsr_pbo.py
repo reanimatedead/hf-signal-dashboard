@@ -33,7 +33,8 @@ def test_dsr_subtracts_expected_max():
     sr = of.sharpe_annualized(returns, period=252)
     dsr = of.deflated_sharpe(sr, n_trials=5)
     assert dsr is not None
-    assert abs(dsr - (sr - of.expected_max_sr(5))) < 1e-9
+    # round(6) 切捨ての許容
+    assert abs(dsr - (sr - of.expected_max_sr(5))) < 1e-5
 
 
 def test_pbo_sign_consistency_pass_when_both_halves_positive():
