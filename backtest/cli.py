@@ -438,12 +438,79 @@ def main(argv: Optional[List[str]] = None) -> int:
     p.add_argument("--fee-pct", type=float, default=0.01)
     p.add_argument("--size-pct", type=float, default=0.5)
     p.add_argument("--bootstrap-runs", type=int, default=500)
-    p.add_argument("--hypothesis", choices=("h1", "h1-robustness"), default=None,
-                   help="Phase 1.9: 'h1' / Phase 1.9.1: 'h1-robustness'.")
+    p.add_argument("--hypothesis", choices=("h1", "h1-robustness", "loop"),
+                   default=None,
+                   help="Phase 1.9: 'h1' / 1.9.1: 'h1-robustness' / 1.9.2: 'loop'.")
     p.add_argument("--jp-symbol", default="^N225")
     p.add_argument("--us-symbol", default="^GSPC")
     p.add_argument("--n-min", type=int, default=30)
     ns = p.parse_args(argv)
+
+    # ── Phase 1.9.2: anti-overfit loop (5 hypotheses) ─
+    if ns.hypothesis == "loop":
+        from loop.registry import ALLOWED_SYMBOLS
+        from loop.runner import run_loop
+        loaded = local_loader.load_all(interval="1d", min_bars=400,
+                                        source=(ns.source or "auto"))
+        bars_by = {s: loaded["symbols"][s]["bars"]
+                    for s in loaded["symbols"] if s in ALLOWED_SYMBOLS}
+        if not bars_by:
+            print(json.dumps({"ok": False,
+                              "error": "no allowed symbols in local store"}))
+            return 1
+        res = run_loop(bars_by_symbol=bars_by, bootstrap_runs=ns.bootstrap_runs)
+        # 公開抜粋 (trades は除外)
+        public = {k: v for k, v in res.items() if k not in ("trials",)}
+        public["trials"] = [
+            {k: v for k, v in tr.items() if not k.startswith("_")}
+            for tr in res["trials"]
+        ]
+        try:
+            (ROOT / "docs" / "data" / "loop_report_public.json").write_text(
+                json.dumps(public, ensure_ascii=False, indent=2),
+                encoding="utf-8")
+        except OSError:
+            pass
+        try:
+            (ROOT / "data" / "local" / "loop").mkdir(parents=True, exist_ok=True)
+            (ROOT / "data" / "local" / "loop"
+             / f"{res['as_of_utc'].replace(':','')}_{uuid.uuid4().hex[:10]}.json"
+             ).write_text(json.dumps(res, ensure_ascii=False, indent=2,
+                                       default=str), encoding="utf-8")
+        except OSError:
+            pass
+        # ターミナル要約
+        summary = {
+            "ok": True,
+            "as_of_utc": res["as_of_utc"],
+            "holdout_start": res["holdout_start"],
+            "universe_used": res["universe_used"],
+            "n_hypotheses": res["n_hypotheses"],
+            "dsr_threshold": res["dsr_threshold"],
+            "pbo_required": res["pbo_required"],
+            "trials": [
+                {"name": t["name"], "n_trades": t["n_trades"],
+                 "hit_rate": t["hit_rate"], "sr_raw": t["sr_raw"],
+                 "dsr": t["dsr"],
+                 "pbo_sign_consistent": t["pbo_sign_consistent"],
+                 "passed_4_gates": t["passed_4_gates"],
+                 "gates": {
+                     "cost":      t["cost"]["verdict"]["pass"],
+                     "outlier":   t["outlier"]["verdict"]["pass"],
+                     "subperiod": t["subperiod"]["verdict"]["pass"],
+                     "fade":      t["fade"]["verdict"]["pass"],
+                 },
+                 "fade_skew": t["fade"]["summary"].get("skew"),
+                 "fade_worst_day": t["fade"]["summary"].get("worst_day_loss_pct"),
+                 "verdict": t["verdict"]}
+                for t in res["trials"]
+            ],
+            "frontier": res["frontier"],
+            "verdict": res["verdict"],
+            "note": res["note"],
+        }
+        print(json.dumps(summary, ensure_ascii=False, indent=2))
+        return 0
 
     # ── Phase 1.9.1: H1 robustness analysis ──────────
     if ns.hypothesis == "h1-robustness":
