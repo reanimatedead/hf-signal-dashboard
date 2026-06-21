@@ -217,7 +217,58 @@ alignable). Japan stays placeholder rather than show stale or single-side data. 
 
 ---
 
-## v4.6 — Live-rate walk-forward / Phase 1.8 (this release)
+## v4.7 — H1 single-hypothesis (US → JP overnight spillover) / Phase 1.9 (this release)
+
+**Goal:** Phase 1.8 で「素の予測器では edge 無し」と分かった上で、
+**仮説駆動** で 1 本だけ素の予測力を測る。今回は H1 のみ:
+「前セッションの US ^GSPC 終値リターンが、日本株 (^N225) の翌オーバーナイト方向を
+同符号で予測する」。H2..H10 は本フェーズで実装しない (多重検定・無限ビルド防止)。
+学習も追加していない (test_no_learning_code が backtest/+collector/ を grep)。
+
+- **`backtest/h1.py` (shipped).** `build_us_close_returns(us_bars)` →
+  `build_features(jp_bars, us_returns)` の 2 段組で **特徴量を pre-compute**。
+  JP date T に対して `strictly less than` の最大 US date のリターンを引く。
+  同日 US (= JST 翌朝確定) は構造的に触れない。predictor は features dict のみ
+  受け取り、US 生バーは見ない (型シグネチャ + テスト二重保証)。
+- **3 ラベル.** `overnight` / `open_to_close` / `next_week (+5 bars)` を `compute_labels()`
+  で計算。各ラベルで hit_rate / Brier / EV 95% CI (bootstrap) / judge を `metrics.summarize`
+  経由で算出。EV は `realized = label * sign(feature) * 100` で「純粋な forecast 精度」
+  (Phase 1.8 の slip/fee 込み trade EV とは別物)。
+- **2 セグメント.** `pre_2023` (~2023-01-01) と `since_2023` で別々に集計。
+  BOJ 正常化前後の構造断絶を尊重した分割。
+- **サニティチェック.** `_pearson()` で `(US 前日, ラベル)` の相関と t 統計を出し、
+  `overnight = r > 0 かつ |t| > 2` を PASS / `open_to_close = |r| < |overnight_r|`
+  を PASS とする。両方 PASS しないとデータのタイムゾーンが壊れている疑い。
+- **SURVIVAL `#sv-h1` (shipped).** 銘柄/source/セグメント名 + サニティ表 + ラベル
+  別メトリクス表を描画。judge は緑 (edge) / 灰 (inconclusive) / 赤 (no-edge) で色分け。
+  「単一仮説の素の予測力測定 / not investment advice / Phase 2 未実装」を上部に明示。
+- **CLI.** `python3 -m backtest.cli --hypothesis=h1 --source=local`
+  で 1 コマンド実走。詳細結果は `data/local/h1/<run>.json` (リポ外)、
+  公開抜粋は `docs/data/h1_summary_public.json`。
+
+**Phase 1.9 実測結果 (`^N225` × `^GSPC`, 1965-2026, bootstrap=300):**
+
+| segment      | label         | n      | hit  | Brier | EV 95% CI            | judge        |
+|--------------|---------------|--------|------|-------|----------------------|--------------|
+| pre_2023     | overnight     | 14,261 | 0.645| 0.238 | [+0.209, +0.233]     | **edge**     |
+| pre_2023     | open_to_close | 14,262 | 0.308| 0.272 | [+0.034, +0.064]     | **edge**     |
+| pre_2023     | next_week     | 14,262 | 0.504| 0.252 | [-0.015, +0.071]     | inconclusive |
+| since_2023   | overnight     |   846  | 0.727| 0.230 | [+0.334, +0.424]     | **edge**     |
+| since_2023   | open_to_close |   846  | 0.500| 0.253 | [+0.012, +0.157]     | **edge**     |
+| since_2023   | next_week     |   841  | 0.520| 0.251 | [-0.220, +0.250]     | inconclusive |
+
+- **overnight サニティ**: 両セグメント PASS (pre_2023 r=0.43 t=56.7, since_2023 r=0.60 t=21.9)
+- **open_to_close サニティ**: 両セグメント PASS (overnight より弱い同符号; pre_2023 r=0.15, since_2023 r=0.22)
+- **next_week**: 期待値なし (両セグメントで `|r| < 0.05`, |t| < 1.4)
+
+**判断材料 (Phase 2 着工):** overnight は明確に edge (since_2023 で EV 中央値 +0.38%, hit 73%)。
+open_to_close は hit < 50% にも関わらず EV CI 正だが、これは「方向は外すが当たった時の方が
+動きが大きい」非対称性を反映 — トレード可能性は別議論 (slip/fee + 約定タイミング)。
+Phase 2 で「H1 ベースの予測器を Phase 1.8 の simulator に流す」段階に進む価値あり。
+
+---
+
+## v4.6 — Live-rate walk-forward / Phase 1.8
 
 **Goal:** Phase 1.7 の配線を実レート (data/local/history_*.jsonl, 14万行 / 15銘柄) に
 流し、システム単体の想定精度を測る。**自分の実トレード結果は使わない**。

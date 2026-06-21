@@ -1,0 +1,730 @@
+{
+  "ok": true,
+  "as_of_utc": "2026-06-21T09:23:44+00:00",
+  "hypothesis": "h1",
+  "jp_symbol": "^N225",
+  "us_symbol": "^GSPC",
+  "segments": [
+    {
+      "name": "pre_2023",
+      "from": null,
+      "to": "2023-01-01",
+      "n_jp_bars": 14262,
+      "n_with_feature": 14262,
+      "sanity": {
+        "overnight": {
+          "pearson": 0.429238,
+          "t": 56.7496,
+          "n": 14261,
+          "pass": true
+        },
+        "open_to_close": {
+          "pearson": 0.151278,
+          "t": 18.2752,
+          "n": 14262,
+          "pass": true
+        },
+        "next_week": {
+          "pearson": -0.006824,
+          "t": -0.815,
+          "n": 14262,
+          "pass": null
+        }
+      },
+      "labels": {
+        "overnight": {
+          "n": 14261,
+          "judge": "edge",
+          "hit_rate": 0.645397,
+          "brier": 0.23796,
+          "brier_decomposition": {
+            "reliability": 0.0091,
+            "resolution": 0.0,
+            "uncertainty": 0.22886
+          },
+          "calibration": [
+            {
+              "bin": [
+                0.0,
+                0.1
+              ],
+              "n": 0,
+              "pred_mean": null,
+              "obs_rate": null
+            },
+            {
+              "bin": [
+                0.1,
+                0.2
+              ],
+              "n": 0,
+              "pred_mean": null,
+              "obs_rate": null
+            },
+            {
+              "bin": [
+                0.2,
+                0.3
+              ],
+              "n": 0,
+              "pred_mean": null,
+              "obs_rate": null
+            },
+            {
+              "bin": [
+                0.3,
+                0.4
+              ],
+              "n": 0,
+              "pred_mean": null,
+              "obs_rate": null
+            },
+            {
+              "bin": [
+                0.4,
+                0.5
+              ],
+              "n": 0,
+              "pred_mean": null,
+              "obs_rate": null
+            },
+            {
+              "bin": [
+                0.5,
+                0.6
+              ],
+              "n": 14261,
+              "pred_mean": 0.55,
+              "obs_rate": 0.6454
+            },
+            {
+              "bin": [
+                0.6,
+                0.7
+              ],
+              "n": 0,
+              "pred_mean": null,
+              "obs_rate": null
+            },
+            {
+              "bin": [
+                0.7,
+                0.8
+              ],
+              "n": 0,
+              "pred_mean": null,
+              "obs_rate": null
+            },
+            {
+              "bin": [
+                0.8,
+                0.9
+              ],
+              "n": 0,
+              "pred_mean": null,
+              "obs_rate": null
+            },
+            {
+              "bin": [
+                0.9,
+                1.0
+              ],
+              "n": 0,
+              "pred_mean": null,
+              "obs_rate": null
+            }
+          ],
+          "avg_net_pct": 0.220359,
+          "avg_net_pct_ci": [
+            0.209097,
+            0.232843
+          ],
+          "ev_ambiguous": false,
+          "max_dd_pct": -18.033506
+        },
+        "open_to_close": {
+          "n": 14262,
+          "judge": "edge",
+          "hit_rate": 0.307531,
+          "brier": 0.271747,
+          "brier_decomposition": {
+            "reliability": 0.058791,
+            "resolution": 0.0,
+            "uncertainty": 0.212955
+          },
+          "calibration": [
+            {
+              "bin": [
+                0.0,
+                0.1
+              ],
+              "n": 0,
+              "pred_mean": null,
+              "obs_rate": null
+            },
+            {
+              "bin": [
+                0.1,
+                0.2
+              ],
+              "n": 0,
+              "pred_mean": null,
+              "obs_rate": null
+            },
+            {
+              "bin": [
+                0.2,
+                0.3
+              ],
+              "n": 0,
+              "pred_mean": null,
+              "obs_rate": null
+            },
+            {
+              "bin": [
+                0.3,
+                0.4
+              ],
+              "n": 0,
+              "pred_mean": null,
+              "obs_rate": null
+            },
+            {
+              "bin": [
+                0.4,
+                0.5
+              ],
+              "n": 0,
+              "pred_mean": null,
+              "obs_rate": null
+            },
+            {
+              "bin": [
+                0.5,
+                0.6
+              ],
+              "n": 14262,
+              "pred_mean": 0.55,
+              "obs_rate": 0.3075
+            },
+            {
+              "bin": [
+                0.6,
+                0.7
+              ],
+              "n": 0,
+              "pred_mean": null,
+              "obs_rate": null
+            },
+            {
+              "bin": [
+                0.7,
+                0.8
+              ],
+              "n": 0,
+              "pred_mean": null,
+              "obs_rate": null
+            },
+            {
+              "bin": [
+                0.8,
+                0.9
+              ],
+              "n": 0,
+              "pred_mean": null,
+              "obs_rate": null
+            },
+            {
+              "bin": [
+                0.9,
+                1.0
+              ],
+              "n": 0,
+              "pred_mean": null,
+              "obs_rate": null
+            }
+          ],
+          "avg_net_pct": 0.048364,
+          "avg_net_pct_ci": [
+            0.034602,
+            0.064048
+          ],
+          "ev_ambiguous": false,
+          "max_dd_pct": -54.403611
+        },
+        "next_week": {
+          "n": 14262,
+          "judge": "inconclusive",
+          "hit_rate": 0.503716,
+          "brier": 0.252128,
+          "brier_decomposition": {
+            "reliability": 0.002142,
+            "resolution": 0.0,
+            "uncertainty": 0.249986
+          },
+          "calibration": [
+            {
+              "bin": [
+                0.0,
+                0.1
+              ],
+              "n": 0,
+              "pred_mean": null,
+              "obs_rate": null
+            },
+            {
+              "bin": [
+                0.1,
+                0.2
+              ],
+              "n": 0,
+              "pred_mean": null,
+              "obs_rate": null
+            },
+            {
+              "bin": [
+                0.2,
+                0.3
+              ],
+              "n": 0,
+              "pred_mean": null,
+              "obs_rate": null
+            },
+            {
+              "bin": [
+                0.3,
+                0.4
+              ],
+              "n": 0,
+              "pred_mean": null,
+              "obs_rate": null
+            },
+            {
+              "bin": [
+                0.4,
+                0.5
+              ],
+              "n": 0,
+              "pred_mean": null,
+              "obs_rate": null
+            },
+            {
+              "bin": [
+                0.5,
+                0.6
+              ],
+              "n": 14262,
+              "pred_mean": 0.55,
+              "obs_rate": 0.5037
+            },
+            {
+              "bin": [
+                0.6,
+                0.7
+              ],
+              "n": 0,
+              "pred_mean": null,
+              "obs_rate": null
+            },
+            {
+              "bin": [
+                0.7,
+                0.8
+              ],
+              "n": 0,
+              "pred_mean": null,
+              "obs_rate": null
+            },
+            {
+              "bin": [
+                0.8,
+                0.9
+              ],
+              "n": 0,
+              "pred_mean": null,
+              "obs_rate": null
+            },
+            {
+              "bin": [
+                0.9,
+                1.0
+              ],
+              "n": 0,
+              "pred_mean": null,
+              "obs_rate": null
+            }
+          ],
+          "avg_net_pct": 0.025427,
+          "avg_net_pct_ci": [
+            -0.015384,
+            0.07135
+          ],
+          "ev_ambiguous": true,
+          "max_dd_pct": -99.589872
+        }
+      }
+    },
+    {
+      "name": "since_2023",
+      "from": "2023-01-01",
+      "to": null,
+      "n_jp_bars": 846,
+      "n_with_feature": 846,
+      "sanity": {
+        "overnight": {
+          "pearson": 0.601999,
+          "t": 21.9025,
+          "n": 846,
+          "pass": true
+        },
+        "open_to_close": {
+          "pearson": 0.223843,
+          "t": 6.6723,
+          "n": 846,
+          "pass": true
+        },
+        "next_week": {
+          "pearson": -0.044995,
+          "t": -1.3046,
+          "n": 841,
+          "pass": null
+        }
+      },
+      "labels": {
+        "overnight": {
+          "n": 846,
+          "judge": "edge",
+          "hit_rate": 0.72695,
+          "brier": 0.229805,
+          "brier_decomposition": {
+            "reliability": 0.031311,
+            "resolution": 0.0,
+            "uncertainty": 0.198494
+          },
+          "calibration": [
+            {
+              "bin": [
+                0.0,
+                0.1
+              ],
+              "n": 0,
+              "pred_mean": null,
+              "obs_rate": null
+            },
+            {
+              "bin": [
+                0.1,
+                0.2
+              ],
+              "n": 0,
+              "pred_mean": null,
+              "obs_rate": null
+            },
+            {
+              "bin": [
+                0.2,
+                0.3
+              ],
+              "n": 0,
+              "pred_mean": null,
+              "obs_rate": null
+            },
+            {
+              "bin": [
+                0.3,
+                0.4
+              ],
+              "n": 0,
+              "pred_mean": null,
+              "obs_rate": null
+            },
+            {
+              "bin": [
+                0.4,
+                0.5
+              ],
+              "n": 0,
+              "pred_mean": null,
+              "obs_rate": null
+            },
+            {
+              "bin": [
+                0.5,
+                0.6
+              ],
+              "n": 846,
+              "pred_mean": 0.55,
+              "obs_rate": 0.727
+            },
+            {
+              "bin": [
+                0.6,
+                0.7
+              ],
+              "n": 0,
+              "pred_mean": null,
+              "obs_rate": null
+            },
+            {
+              "bin": [
+                0.7,
+                0.8
+              ],
+              "n": 0,
+              "pred_mean": null,
+              "obs_rate": null
+            },
+            {
+              "bin": [
+                0.8,
+                0.9
+              ],
+              "n": 0,
+              "pred_mean": null,
+              "obs_rate": null
+            },
+            {
+              "bin": [
+                0.9,
+                1.0
+              ],
+              "n": 0,
+              "pred_mean": null,
+              "obs_rate": null
+            }
+          ],
+          "avg_net_pct": 0.378606,
+          "avg_net_pct_ci": [
+            0.333926,
+            0.4241
+          ],
+          "ev_ambiguous": false,
+          "max_dd_pct": -3.531112
+        },
+        "open_to_close": {
+          "n": 846,
+          "judge": "edge",
+          "hit_rate": 0.5,
+          "brier": 0.2525,
+          "brier_decomposition": {
+            "reliability": 0.0025,
+            "resolution": 0.0,
+            "uncertainty": 0.25
+          },
+          "calibration": [
+            {
+              "bin": [
+                0.0,
+                0.1
+              ],
+              "n": 0,
+              "pred_mean": null,
+              "obs_rate": null
+            },
+            {
+              "bin": [
+                0.1,
+                0.2
+              ],
+              "n": 0,
+              "pred_mean": null,
+              "obs_rate": null
+            },
+            {
+              "bin": [
+                0.2,
+                0.3
+              ],
+              "n": 0,
+              "pred_mean": null,
+              "obs_rate": null
+            },
+            {
+              "bin": [
+                0.3,
+                0.4
+              ],
+              "n": 0,
+              "pred_mean": null,
+              "obs_rate": null
+            },
+            {
+              "bin": [
+                0.4,
+                0.5
+              ],
+              "n": 0,
+              "pred_mean": null,
+              "obs_rate": null
+            },
+            {
+              "bin": [
+                0.5,
+                0.6
+              ],
+              "n": 846,
+              "pred_mean": 0.55,
+              "obs_rate": 0.5
+            },
+            {
+              "bin": [
+                0.6,
+                0.7
+              ],
+              "n": 0,
+              "pred_mean": null,
+              "obs_rate": null
+            },
+            {
+              "bin": [
+                0.7,
+                0.8
+              ],
+              "n": 0,
+              "pred_mean": null,
+              "obs_rate": null
+            },
+            {
+              "bin": [
+                0.8,
+                0.9
+              ],
+              "n": 0,
+              "pred_mean": null,
+              "obs_rate": null
+            },
+            {
+              "bin": [
+                0.9,
+                1.0
+              ],
+              "n": 0,
+              "pred_mean": null,
+              "obs_rate": null
+            }
+          ],
+          "avg_net_pct": 0.088553,
+          "avg_net_pct_ci": [
+            0.011725,
+            0.156566
+          ],
+          "ev_ambiguous": false,
+          "max_dd_pct": -17.293018
+        },
+        "next_week": {
+          "n": 841,
+          "judge": "inconclusive",
+          "hit_rate": 0.51962,
+          "brier": 0.250538,
+          "brier_decomposition": {
+            "reliability": 0.000923,
+            "resolution": 0.0,
+            "uncertainty": 0.249615
+          },
+          "calibration": [
+            {
+              "bin": [
+                0.0,
+                0.1
+              ],
+              "n": 0,
+              "pred_mean": null,
+              "obs_rate": null
+            },
+            {
+              "bin": [
+                0.1,
+                0.2
+              ],
+              "n": 0,
+              "pred_mean": null,
+              "obs_rate": null
+            },
+            {
+              "bin": [
+                0.2,
+                0.3
+              ],
+              "n": 0,
+              "pred_mean": null,
+              "obs_rate": null
+            },
+            {
+              "bin": [
+                0.3,
+                0.4
+              ],
+              "n": 0,
+              "pred_mean": null,
+              "obs_rate": null
+            },
+            {
+              "bin": [
+                0.4,
+                0.5
+              ],
+              "n": 0,
+              "pred_mean": null,
+              "obs_rate": null
+            },
+            {
+              "bin": [
+                0.5,
+                0.6
+              ],
+              "n": 841,
+              "pred_mean": 0.55,
+              "obs_rate": 0.5196
+            },
+            {
+              "bin": [
+                0.6,
+                0.7
+              ],
+              "n": 0,
+              "pred_mean": null,
+              "obs_rate": null
+            },
+            {
+              "bin": [
+                0.7,
+                0.8
+              ],
+              "n": 0,
+              "pred_mean": null,
+              "obs_rate": null
+            },
+            {
+              "bin": [
+                0.8,
+                0.9
+              ],
+              "n": 0,
+              "pred_mean": null,
+              "obs_rate": null
+            },
+            {
+              "bin": [
+                0.9,
+                1.0
+              ],
+              "n": 0,
+              "pred_mean": null,
+              "obs_rate": null
+            }
+          ],
+          "avg_net_pct": 0.033193,
+          "avg_net_pct_ci": [
+            -0.219946,
+            0.24993
+          ],
+          "ev_ambiguous": true,
+          "max_dd_pct": -62.281571
+        }
+      }
+    }
+  ],
+  "note": "Single-hypothesis raw predictive-power measurement. Not investment advice. Phase 2 (learning) is not implemented.",
+  "source_used": "jsonl",
+  "persisted": "/Users/takahiroyamada/hf-signal-dashboard/data/local/h1/2026-06-21T092344+0000_e4a38237f1.json"
+}

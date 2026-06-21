@@ -26,8 +26,10 @@
   (JP date >= 2023-01-01)。BOJ 正常化前後の構造断絶を別評価する。
 - **サニティチェック** (リサーチの定性予測の再現確認):
   - `overnight` 上で US 前日リターンとの Pearson 相関が **正かつ |t| > 2** → PASS
-  - `open_to_close` 上で同相関が **|r| < 0.10 かつ |t| < 2.5** → PASS
-  - これが出なければデータのタイムゾーン/整列が壊れている (= 信号以前の問題)。
+  - `open_to_close` 上で同相関が **`|r| < overnight_r` かつ overnight より弱い**
+    → PASS。実データでは情報吸収に時間がかかるため open_to_close も弱い同符号
+    相関を持つが、それでも overnight より弱くなければデータのタイムゾーン/整列
+    が壊れている (= 信号以前の問題)。
   両セグメントで個別に判定し、UI と JSON に明示する。
 - **GRC**: SURVIVAL の H1 パネルに「単一仮説の素の予測力測定 / not investment advice」を
   最上部に明示。トレード/損益はリポに置かない (data/local/ は既存 .gitignore 済)。

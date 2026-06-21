@@ -438,6 +438,10 @@
     if (typeof window.__survivalBackfillRefresh === "function") {
       try { window.__survivalBackfillRefresh(); } catch (e) {}
     }
+    // H1 単独検証パネル (Phase 1.9).
+    if (typeof window.__survivalH1Refresh === "function") {
+      try { window.__survivalH1Refresh(); } catch (e) {}
+    }
   }
 
   window.__survivalShow = function(){

@@ -35,9 +35,8 @@ def test_next_week_is_5_bars_forward():
     bars = [_bar(f"2024-01-{d:02d}T00:00:00", open_=1000.0, close=1000.0 + d)
             for d in range(1, 11)]
     labels = h1.compute_labels(bars)
-    # bar[1].next_week uses bars[1+5] = bars[6]; close = 1006
-    # (1006 - 1002) / 1002
-    expected = (1006.0 - 1002.0) / 1002.0
+    # bars[1] is d=2 (close=1002); bars[1+5] = bars[6] is d=7 (close=1007).
+    expected = (1007.0 - 1002.0) / 1002.0
     assert abs(labels[1]["next_week"] - expected) < 1e-9
 
 
