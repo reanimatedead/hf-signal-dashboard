@@ -98,6 +98,13 @@ REQUIRED_FILES = [
     "tests/test_h1_labels.py",
     "tests/test_h1_e2e.py",
     "tests/test_h1_only.py",
+    "SPEC_H1_ROBUSTNESS.md",                # v4.7.1 Phase 1.9.1 contract
+    "backtest/h1_robustness.py",
+    "tests/test_h1_robustness_costs.py",
+    "tests/test_h1_robustness_outliers.py",
+    "tests/test_h1_robustness_subperiods.py",
+    "tests/test_h1_robustness_fade_skew.py",
+    "tests/test_h1_robustness_verdict.py",
 ]
 
 EXPECTED_LAG = {

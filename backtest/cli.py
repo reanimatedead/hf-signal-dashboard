@@ -28,12 +28,15 @@ from typing import Any, Dict, List, Optional
 
 from . import local_loader, metrics, simulator, walk_forward as wf
 from . import h1 as h1_mod   # Phase 1.9 — single-hypothesis evaluation
+from . import h1_robustness as h1r_mod   # Phase 1.9.1 — robustness analysis
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 PUBLIC_RESULT_PATH = ROOT / "docs" / "data" / "backtest_summary_public.json"
 LIVE_RESULT_DIR = ROOT / "data" / "local" / "backtest"
 H1_PUBLIC_PATH = ROOT / "docs" / "data" / "h1_summary_public.json"
 H1_RESULT_DIR = ROOT / "data" / "local" / "h1"
+H1R_PUBLIC_PATH = ROOT / "docs" / "data" / "h1_robustness_public.json"
+H1R_RESULT_DIR = ROOT / "data" / "local" / "h1_robustness"
 
 
 # ── 仮装データ (random walk) ─────────────────────────
@@ -376,6 +379,43 @@ def run_h1_local(*, jp_symbol: str = "^N225",
     return res
 
 
+# ──────────────────────────────────────────────
+# Phase 1.9.1 — H1 robustness (open_to_close, since_2023)
+# ──────────────────────────────────────────────
+def _build_oc_trades_with_raw(jp_bars, us_bars, segment_from: Optional[str],
+                              segment_to: Optional[str]) -> List[Dict[str, Any]]:
+    """Phase 1.9 と同じロジックで open_to_close trades を作るが、各 trade に
+    label_value と feature を付与する (Agent 4 fade で使う)."""
+    us_returns = h1_mod.build_us_close_returns(us_bars)
+    features = h1_mod.build_features(jp_bars, us_returns)
+    labels = h1_mod.compute_labels(jp_bars)
+    out: List[Dict[str, Any]] = []
+    for lab in labels:
+        ts = str(lab.get("ts") or "")
+        date = ts[:10]
+        if segment_from is not None and date < segment_from:
+            continue
+        if segment_to is not None and date >= segment_to:
+            continue
+        f = features.get(date)
+        if f is None:
+            continue
+        value = lab.get("open_to_close")
+        if value is None:
+            continue
+        direction = 1 if f > 0 else -1
+        realized = float(value) * direction * 100.0
+        out.append({
+            "ts": ts,
+            "net_pct": round(realized, 6),
+            "outcome01": 1 if realized > 0 else 0,
+            "predicted_prob": 0.55,
+            "label_value": float(value),
+            "feature": float(f),
+        })
+    return out
+
+
 def main(argv: Optional[List[str]] = None) -> int:
     p = argparse.ArgumentParser(prog="backtest.cli",
                                 description="Walk-forward backtest harness (smoke + real).")
@@ -398,12 +438,105 @@ def main(argv: Optional[List[str]] = None) -> int:
     p.add_argument("--fee-pct", type=float, default=0.01)
     p.add_argument("--size-pct", type=float, default=0.5)
     p.add_argument("--bootstrap-runs", type=int, default=500)
-    p.add_argument("--hypothesis", choices=("h1",), default=None,
-                   help="Phase 1.9: 単一仮説評価. 'h1' のみ実装.")
+    p.add_argument("--hypothesis", choices=("h1", "h1-robustness"), default=None,
+                   help="Phase 1.9: 'h1' / Phase 1.9.1: 'h1-robustness'.")
     p.add_argument("--jp-symbol", default="^N225")
     p.add_argument("--us-symbol", default="^GSPC")
     p.add_argument("--n-min", type=int, default=30)
     ns = p.parse_args(argv)
+
+    # ── Phase 1.9.1: H1 robustness analysis ──────────
+    if ns.hypothesis == "h1-robustness":
+        loaded = local_loader.load_all(interval="1d", min_bars=200,
+                                        source=(ns.source or "auto"))
+        if ns.jp_symbol not in loaded["symbols"]:
+            print(json.dumps({"ok": False,
+                              "error": f"jp_symbol {ns.jp_symbol!r} not in store"}))
+            return 1
+        if ns.us_symbol not in loaded["symbols"]:
+            print(json.dumps({"ok": False,
+                              "error": f"us_symbol {ns.us_symbol!r} not in store"}))
+            return 1
+        jp = loaded["symbols"][ns.jp_symbol]["bars"]
+        us = loaded["symbols"][ns.us_symbol]["bars"]
+        # since_2023 を対象に open_to_close trades を構築
+        seg_trades = _build_oc_trades_with_raw(jp, us, "2023-01-01", None)
+        # オプションで pre_2023 もまとめる (参照表示用)
+        pre_trades = _build_oc_trades_with_raw(jp, us, None, "2023-01-01")
+        res_since = h1r_mod.run_robustness(seg_trades,
+                                            bootstrap_runs=ns.bootstrap_runs,
+                                            label="open_to_close",
+                                            segment="since_2023")
+        res_pre = h1r_mod.run_robustness(pre_trades,
+                                          bootstrap_runs=ns.bootstrap_runs,
+                                          label="open_to_close",
+                                          segment="pre_2023")
+        out_full = {
+            "ok": True,
+            "as_of_utc": datetime.datetime.now(datetime.timezone.utc)
+                .replace(microsecond=0).isoformat(),
+            "hypothesis": "h1-robustness",
+            "jp_symbol": ns.jp_symbol, "us_symbol": ns.us_symbol,
+            "source_used": loaded["source_used"],
+            "executable_assumption":
+                "JP open is the 9:00 JST 板寄せ price; ETF (1306/1321) or "
+                "NK225 futures fill at this price. Retail slippage + commission "
+                "captured by 5/10/20 bps round-trip sensitivity.",
+            "segments": {
+                "since_2023": res_since,
+                "pre_2023": res_pre,        # 参照のみ
+            },
+            "primary_verdict": res_since["verdict"],
+            "note": "H1 open_to_close robustness analysis (Phase 1.9.1). "
+                    "Single-hypothesis raw predictive power tested against costs, "
+                    "outliers, subperiod stability, and fade skewness. "
+                    "Not investment advice. Phase 2 (learning) not implemented.",
+        }
+        # 詳細は data/local
+        try:
+            H1R_RESULT_DIR.mkdir(parents=True, exist_ok=True)
+            rid = uuid.uuid4().hex[:10]
+            (H1R_RESULT_DIR / f"{out_full['as_of_utc'].replace(':','')}_{rid}.json"
+             ).write_text(json.dumps(out_full, ensure_ascii=False, indent=2),
+                          encoding="utf-8")
+        except OSError:
+            pass
+        # 公開抜粋
+        try:
+            H1R_PUBLIC_PATH.parent.mkdir(parents=True, exist_ok=True)
+            H1R_PUBLIC_PATH.write_text(json.dumps(out_full, ensure_ascii=False,
+                                                    indent=2),
+                                        encoding="utf-8")
+        except OSError:
+            pass
+        # ターミナル要約 (判定テーブル中心)
+        print(json.dumps({
+            "ok": True,
+            "hypothesis": "h1-robustness",
+            "jp_symbol": ns.jp_symbol, "us_symbol": ns.us_symbol,
+            "source_used": loaded["source_used"],
+            "executable_assumption": out_full["executable_assumption"],
+            "since_2023": {
+                "n_trades": res_since["n_trades"],
+                "ev_baseline": res_since["ev_baseline"],
+                "cost_table": res_since["cost"]["table"],
+                "cost_verdict": res_since["cost"]["verdict"],
+                "outlier_table": res_since["outlier"]["table"],
+                "outlier_verdict": res_since["outlier"]["verdict"],
+                "subperiod_table": res_since["subperiod"]["table"],
+                "subperiod_verdict": res_since["subperiod"]["verdict"],
+                "fade_summary": res_since["fade"]["summary"],
+                "fade_verdict": res_since["fade"]["verdict"],
+                "verdict": res_since["verdict"],
+            },
+            "pre_2023_reference": {
+                "n_trades": res_pre["n_trades"],
+                "ev_baseline": res_pre["ev_baseline"],
+                "primary_verdict": res_pre["verdict"],
+            },
+            "note": out_full["note"],
+        }, ensure_ascii=False, indent=2))
+        return 0
 
     # ── Phase 1.9 hypothesis branch ──────────────────
     if ns.hypothesis == "h1":
