@@ -1,0 +1,207 @@
+{
+  "as_of_utc": "2026-06-21T19:21:11+00:00",
+  "data_status_counts": {
+    "auto_cftc": 6,
+    "auto_mof": 3,
+    "live": 5,
+    "manual_csv": 1,
+    "placeholder": 1,
+    "unknown": 390
+  },
+  "date": "2026-06-22",
+  "mode_b_intents": [],
+  "money_flow_snapshot": {
+    "eu": {
+      "cb_assets": {
+        "as_of": "2026-06-12",
+        "data_status": "weekly",
+        "label": "ECB total assets",
+        "lag_days": 9,
+        "source": "FRED:ECBASSETSW",
+        "unit": "EUR_TN",
+        "value_usd_tn": 6.1356,
+        "wow_change": -0.00068
+      },
+      "debt": {
+        "as_of": null,
+        "change_prev_day": null,
+        "data_status": "quarterly",
+        "label": "EU general govt debt",
+        "lag_days": null,
+        "source": "placeholder (Eurostat quarterly not yet wired)",
+        "unit": "EUR_TN",
+        "value_local_tn": null
+      },
+      "freshness_badge": "weekly"
+    },
+    "jp": {
+      "cb_assets": {
+        "as_of": "2026-05-01",
+        "data_status": "stale",
+        "label": "BoJ total assets",
+        "lag_days": 51,
+        "source": "FRED:JPNASSETS",
+        "unit": "JPY_TN",
+        "value_usd_tn": 664.363,
+        "wow_change": 1.1097
+      },
+      "debt": {
+        "as_of": null,
+        "change_prev_day": null,
+        "data_status": "quarterly",
+        "label": "JP central govt debt",
+        "lag_days": null,
+        "source": "placeholder (MoF quarterly not yet wired)",
+        "unit": "JPY_TN",
+        "value_local_tn": null
+      },
+      "freshness_badge": "stale"
+    },
+    "us": {
+      "cb_assets": {
+        "as_of": "2026-06-17",
+        "data_status": "weekly",
+        "label": "Fed total assets",
+        "lag_days": 4,
+        "source": "FRED:WALCL",
+        "unit": "USD_TN",
+        "value_usd_tn": 6.7364,
+        "wow_change": 0.01103
+      },
+      "debt": {
+        "as_of": "2026-06-17",
+        "change_prev_day": -0.0068,
+        "data_status": "stale",
+        "label": "US gross national debt",
+        "lag_days": 4,
+        "source": "fiscaldata:debt_to_penny",
+        "unit": "USD_TN",
+        "value_local_tn": 39.2831
+      },
+      "freshness_badge": "weekly"
+    }
+  },
+  "survival_loop": {
+    "auto_risk": {
+      "dd_shrink_pct": -10.0,
+      "dd_stop_pct": -15.0,
+      "kelly_fraction": 0.25,
+      "max_concurrent": 3,
+      "per_trade_pct": 0.14739395272396244,
+      "position_size_pct": 0.0,
+      "realized_vol_pct": 3.3923,
+      "source": "inverse_vol_scaling, kelly_quarter (Phase 1)",
+      "target_vol_pct": 1.0
+    },
+    "candidates_top": [
+      {
+        "data_status": "live",
+        "direction_hint": "short",
+        "edge_score": 91.3,
+        "name": "Takashimaya",
+        "symbol": "8233.T"
+      },
+      {
+        "data_status": "live",
+        "direction_hint": "short",
+        "edge_score": 90.8,
+        "name": "Nissan Chemical",
+        "symbol": "4021.T"
+      },
+      {
+        "data_status": "live",
+        "direction_hint": "long",
+        "edge_score": 89.4,
+        "name": "Chevron",
+        "symbol": "CVX"
+      },
+      {
+        "data_status": "live",
+        "direction_hint": "long",
+        "edge_score": 89.4,
+        "name": "CVX",
+        "symbol": "CVX"
+      },
+      {
+        "data_status": "live",
+        "direction_hint": "short",
+        "edge_score": 89.4,
+        "name": "GE",
+        "symbol": "GE"
+      }
+    ],
+    "mode_a_positions": [
+      {
+        "data_status": "live",
+        "direction": "short",
+        "entry_date": "2026-06-21",
+        "entry_edge_score": 91.3,
+        "exit": {
+          "stop_loss_pct": -1.8,
+          "take_profit_pct": 3.5
+        },
+        "market": "nikkei225",
+        "name": "Takashimaya",
+        "note": "Mode A virtual entry (machine). Macro environment context only — not investment advice.",
+        "pattern": {
+          "distortion": "high",
+          "regime": "high_vol"
+        },
+        "size_pct": 0.14739395272396244,
+        "symbol": "8233.T"
+      },
+      {
+        "data_status": "live",
+        "direction": "short",
+        "entry_date": "2026-06-21",
+        "entry_edge_score": 90.8,
+        "exit": {
+          "stop_loss_pct": -1.8,
+          "take_profit_pct": 3.5
+        },
+        "market": "nikkei225",
+        "name": "Nissan Chemical",
+        "note": "Mode A virtual entry (machine). Macro environment context only — not investment advice.",
+        "pattern": {
+          "distortion": "high",
+          "regime": "high_vol"
+        },
+        "size_pct": 0.14739395272396244,
+        "symbol": "4021.T"
+      },
+      {
+        "data_status": "live",
+        "direction": "long",
+        "entry_date": "2026-06-21",
+        "entry_edge_score": 89.4,
+        "exit": {
+          "stop_loss_pct": -1.8,
+          "take_profit_pct": 3.5
+        },
+        "market": "dow30",
+        "name": "Chevron",
+        "note": "Mode A virtual entry (machine). Macro environment context only — not investment advice.",
+        "pattern": {
+          "distortion": "high",
+          "regime": "high_vol"
+        },
+        "size_pct": 0.14739395272396244,
+        "symbol": "CVX"
+      }
+    ],
+    "risk_gate": {
+      "color": "green",
+      "inputs": {
+        "money_flow_wow": 0.01103,
+        "vix": 16.4,
+        "yield_curve_state": "normal_or_steepening"
+      },
+      "label": "risk-on",
+      "note": "Macro environment indicator. Not investment advice.",
+      "reasons": [
+        "Fed assets expanding"
+      ],
+      "score": 1
+    }
+  }
+}
