@@ -1,0 +1,207 @@
+{
+  "as_of_utc": "2026-06-28T19:07:54+00:00",
+  "data_status_counts": {
+    "auto_cftc": 6,
+    "auto_mof": 3,
+    "live": 5,
+    "manual_csv": 1,
+    "placeholder": 1,
+    "unknown": 390
+  },
+  "date": "2026-06-29",
+  "mode_b_intents": [],
+  "money_flow_snapshot": {
+    "eu": {
+      "cb_assets": {
+        "as_of": "2026-06-19",
+        "data_status": "weekly",
+        "label": "ECB total assets",
+        "lag_days": 9,
+        "source": "FRED:ECBASSETSW",
+        "unit": "EUR_TN",
+        "value_usd_tn": 6.1199,
+        "wow_change": -0.01569
+      },
+      "debt": {
+        "as_of": null,
+        "change_prev_day": null,
+        "data_status": "quarterly",
+        "label": "EU general govt debt",
+        "lag_days": null,
+        "source": "placeholder (Eurostat quarterly not yet wired)",
+        "unit": "EUR_TN",
+        "value_local_tn": null
+      },
+      "freshness_badge": "weekly"
+    },
+    "jp": {
+      "cb_assets": {
+        "as_of": "2026-05-01",
+        "data_status": "stale",
+        "label": "BoJ total assets",
+        "lag_days": 58,
+        "source": "FRED:JPNASSETS",
+        "unit": "JPY_TN",
+        "value_usd_tn": 664.363,
+        "wow_change": 1.1097
+      },
+      "debt": {
+        "as_of": null,
+        "change_prev_day": null,
+        "data_status": "quarterly",
+        "label": "JP central govt debt",
+        "lag_days": null,
+        "source": "placeholder (MoF quarterly not yet wired)",
+        "unit": "JPY_TN",
+        "value_local_tn": null
+      },
+      "freshness_badge": "stale"
+    },
+    "us": {
+      "cb_assets": {
+        "as_of": "2026-06-24",
+        "data_status": "weekly",
+        "label": "Fed total assets",
+        "lag_days": 4,
+        "source": "FRED:WALCL",
+        "unit": "USD_TN",
+        "value_usd_tn": 6.7356,
+        "wow_change": -0.00078
+      },
+      "debt": {
+        "as_of": null,
+        "change_prev_day": null,
+        "data_status": "placeholder",
+        "label": "US gross national debt",
+        "lag_days": null,
+        "source": "fiscaldata:debt_to_penny",
+        "unit": "USD_TN",
+        "value_local_tn": null
+      },
+      "freshness_badge": "weekly"
+    }
+  },
+  "survival_loop": {
+    "auto_risk": {
+      "dd_shrink_pct": -10.0,
+      "dd_stop_pct": -15.0,
+      "kelly_fraction": 0.25,
+      "max_concurrent": 3,
+      "per_trade_pct": 0.14487662216777453,
+      "position_size_pct": 0.0,
+      "realized_vol_pct": 3.4512,
+      "source": "inverse_vol_scaling, kelly_quarter (Phase 1)",
+      "target_vol_pct": 1.0
+    },
+    "candidates_top": [
+      {
+        "data_status": "live",
+        "direction_hint": "short",
+        "edge_score": 94.4,
+        "name": "Travelers",
+        "symbol": "TRV"
+      },
+      {
+        "data_status": "live",
+        "direction_hint": "short",
+        "edge_score": 94.0,
+        "name": "Kao",
+        "symbol": "4452.T"
+      },
+      {
+        "data_status": "live",
+        "direction_hint": "short",
+        "edge_score": 93.6,
+        "name": "Johnson & Johnson",
+        "symbol": "JNJ"
+      },
+      {
+        "data_status": "live",
+        "direction_hint": "short",
+        "edge_score": 93.6,
+        "name": "JNJ",
+        "symbol": "JNJ"
+      },
+      {
+        "data_status": "live",
+        "direction_hint": "short",
+        "edge_score": 93.3,
+        "name": "Takashimaya",
+        "symbol": "8233.T"
+      }
+    ],
+    "mode_a_positions": [
+      {
+        "data_status": "live",
+        "direction": "short",
+        "entry_date": "2026-06-28",
+        "entry_edge_score": 94.4,
+        "exit": {
+          "stop_loss_pct": -1.8,
+          "take_profit_pct": 3.5
+        },
+        "market": "dow30",
+        "name": "Travelers",
+        "note": "Mode A virtual entry (machine). Macro environment context only — not investment advice.",
+        "pattern": {
+          "distortion": "high",
+          "regime": "high_vol"
+        },
+        "size_pct": 0.14487662216777453,
+        "symbol": "TRV"
+      },
+      {
+        "data_status": "live",
+        "direction": "short",
+        "entry_date": "2026-06-28",
+        "entry_edge_score": 94.0,
+        "exit": {
+          "stop_loss_pct": -1.8,
+          "take_profit_pct": 3.5
+        },
+        "market": "nikkei225",
+        "name": "Kao",
+        "note": "Mode A virtual entry (machine). Macro environment context only — not investment advice.",
+        "pattern": {
+          "distortion": "high",
+          "regime": "high_vol"
+        },
+        "size_pct": 0.14487662216777453,
+        "symbol": "4452.T"
+      },
+      {
+        "data_status": "live",
+        "direction": "short",
+        "entry_date": "2026-06-28",
+        "entry_edge_score": 93.6,
+        "exit": {
+          "stop_loss_pct": -1.8,
+          "take_profit_pct": 3.5
+        },
+        "market": "dow30",
+        "name": "Johnson & Johnson",
+        "note": "Mode A virtual entry (machine). Macro environment context only — not investment advice.",
+        "pattern": {
+          "distortion": "high",
+          "regime": "high_vol"
+        },
+        "size_pct": 0.14487662216777453,
+        "symbol": "JNJ"
+      }
+    ],
+    "risk_gate": {
+      "color": "red",
+      "inputs": {
+        "money_flow_wow": -0.00078,
+        "vix": 18.41,
+        "yield_curve_state": "normal_or_steepening"
+      },
+      "label": "risk-off",
+      "note": "Macro environment indicator. Not investment advice.",
+      "reasons": [
+        "Fed assets contracting"
+      ],
+      "score": -1
+    }
+  }
+}
