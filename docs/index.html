@@ -568,6 +568,11 @@ tbody tr.section-row,tbody tr.section-row:hover{background:var(--bg3);cursor:def
 // ══ State ══════════════════════════════════════════
 let DATA=null, tab="survival", scol="composite_score", sdir=-1;
 let fsig=null, sv="", wlOnly=false;
+// v4.x: macro-fx-base（別リポ・14派生指標のバックエンド）を rates_vol タブに1データソースとして差し込む。
+// 計算は macro-fx-base が単独所有・自動デプロイ。ここは live JSON を読むだけ（二重メンテ回避）。
+// Cloudflare Pages は静的アセットに ACAO:* を付与するため cross-origin fetch 可（検証済）。
+const MACRO_FX_URL = "https://macro-fx-base.pages.dev/api/latest.json";
+let MACRO_FX = null;
 let WL=new Set(JSON.parse(localStorage.getItem("hf_wl")||"[]"));
 let light=localStorage.getItem("hf_theme")==="light";
 
@@ -755,6 +760,7 @@ async function loadData(){
     st.textContent="Rendering…";
     await new Promise(r=>setTimeout(r,300));
     init();
+    loadMacroFx();   // v4.x: 別リポの14派生指標を非ブロッキングで読み込み（失敗しても既存は無影響）
   }catch(e){
     st.textContent="Error: "+e.message;
     setTimeout(()=>{
@@ -907,6 +913,12 @@ function getCombinedRows(){
     }));
     sections.push({title: "Rates / Bonds", rows: rates});
     sections.push({title: "Volatility (VIX / MOVE)", rows: vol});
+    // v4.x: macro-fx-base 由来の 14 派生指標（イールドカーブ3 / 実質利回り5 / FX相関6）。
+    // MACRO_FX 未取得（オフライン等）なら section 自体を出さない＝グレースフル劣化。
+    const macroRows = buildMacroFxRows();
+    if (macroRows.length) {
+      sections.push({title: "Macro-FX Derived · 14 (yield curve / real yield / FX-rate corr)", rows: macroRows});
+    }
   } else if (tab === "pos_val") {
     const imm = (DATA.markets?.imm||[]).map(r => ({
       __orig: "imm",
@@ -955,6 +967,76 @@ function getCombinedRows(){
     }
   });
   return out;
+}
+
+// ── macro-fx-base 14 派生指標 → rates_vol の unified columns へ写像 ──
+// value は文字列で渡す（cell() の string 分岐でそのまま表示・独自精度制御）。
+// delta は series 末尾2点の差（数値）。risk はシグナル解釈トークン、data_status は鮮度。
+const MACRO_FX_ORDER = [
+  "yield_curve.slope.10y_2y","yield_curve.slope.10y_3m","yield_curve.slope.30y_5y",
+  "real_yield.1y","real_yield.2y","real_yield.5y","real_yield.10y","real_yield.30y",
+  "fx_rate_corr.usdeur.2y.30d","fx_rate_corr.usdeur.10y.30d",
+  "fx_rate_corr.jpyeur.2y.30d","fx_rate_corr.jpyeur.10y.30d",
+  "fx_rate_corr.gbpeur.2y.30d","fx_rate_corr.gbpeur.10y.30d",
+];
+function macroFxSymbol(id){
+  if (id.startsWith("yield_curve.slope.")) return id.slice(18).replace("_"," − ").toUpperCase();
+  if (id.startsWith("real_yield.")) return "RY " + id.slice(11).toUpperCase();
+  if (id.startsWith("fx_rate_corr.")){
+    const p = id.split("."); // fx_rate_corr, usdeur, 2y, 30d
+    const pair = (p[1]||"").toUpperCase().replace(/^(...)(...)$/, "$1/$2");
+    return pair + "·" + (p[2]||"").toUpperCase();
+  }
+  return id;
+}
+function macroFxRisk(family, v){
+  if (v==null || !isFinite(v)) return "—";
+  if (family==="slope")      return v < 0 ? "high" : v < 0.1 ? "medium" : "low";
+  if (family==="real_yield") return v < 0 ? "medium" : "low";
+  if (family==="fx_corr")    return Math.abs(v) >= 0.5 ? "medium" : "low";
+  return "—";
+}
+function buildMacroFxRows(){
+  if (!MACRO_FX || !MACRO_FX.meta || !MACRO_FX.series) return [];
+  const now = Date.now();
+  const rows = [];
+  for (const id of MACRO_FX_ORDER){
+    const m = MACRO_FX.meta[id];
+    const pts = MACRO_FX.series[id];
+    if (!m || !pts || !pts.length) continue;
+    const last = pts[pts.length-1];
+    const prev = pts.length>=2 ? pts[pts.length-2] : null;
+    const v = last.value;
+    const isCorr = m.family === "fx_corr";
+    const unit = m.family === "slope" ? " pp" : m.family === "real_yield" ? "%" : "";
+    const valStr = (v>0?"+":"") + Number(v).toFixed(isCorr?3:2);
+    const delta = prev ? (v - prev.value) : null;
+    const ageDays = (now - Date.parse(String(last.observed_at).slice(0,10)+"T00:00:00Z"))/86400000;
+    rows.push({
+      __orig: "macro_fx",
+      symbol: macroFxSymbol(id),
+      name: m.label_ja || id,
+      type_label: m.family === "slope" ? "Slope" : m.family === "real_yield" ? "Real" : "Corr",
+      value: valStr, unit,
+      delta: (delta!=null && isFinite(delta)) ? delta : null,
+      risk: macroFxRisk(m.family, v),
+      data_status: ageDays <= 4 ? "live" : "stale",
+    });
+  }
+  return rows;
+}
+async function loadMacroFx(){
+  try{
+    const r = await fetch(MACRO_FX_URL + (MACRO_FX_URL.includes("?")?"&":"?") + "t=" + Date.now(), {cache:"no-cache"});
+    if(!r.ok) throw new Error("HTTP "+r.status);
+    MACRO_FX = await r.json();
+    window.MACRO_FX = MACRO_FX;
+    // 現在 rates_vol を見ているなら即再描画（他タブなら次回 sw() で反映）
+    if (tab === "rates_vol" && typeof applyF === "function") applyF();
+  }catch(e){
+    MACRO_FX = null;   // グレースフル：macro section を出さないだけ。既存タブは無影響。
+    console.warn("macro-fx load failed (section omitted):", e && e.message);
+  }
 }
 
 function renderHead(){
