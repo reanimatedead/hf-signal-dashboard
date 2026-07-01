@@ -302,7 +302,10 @@ body.light .cname{color:var(--text-dim)}
   .cname{max-width:80px}
   #clock{display:none}
   .mf-grid{grid-template-columns:1fr !important}
+  /* v5(4): 上部チップ帯は内部スクロールで封じ、ページ全体の横スクロールを防ぐ */
+  #sum-bar,#tabs,#toolbar{overflow-x:auto;-webkit-overflow-scrolling:touch}
 }
+html,body{overflow-x:hidden}
 
 /* ══════════════════════════════════════════════════
    BACKGROUND ANIMATION LAYER (Agent A, SPEC §4)
@@ -430,6 +433,41 @@ tbody tr.section-row,tbody tr.section-row:hover{background:var(--bg3);cursor:def
                 color:var(--accent);text-transform:uppercase;padding:8px 12px;border-right:none}
 .cell-section{color:var(--text-dim);font-size:10px;font-family:var(--cond);font-weight:700;
               letter-spacing:0.05em;text-transform:uppercase}
+
+/* ── v5: rates_vol UX（情報階層 / 意味 / 鮮度 / モバイル）— rates_vol 専用・他タブ非影響 ── */
+/* (1) 情報階層：異常/注意行を強調、平常行を後退 */
+tbody tr.mrow-alert{background:rgba(255,69,96,0.07)}
+tbody tr.mrow-alert td:first-child{box-shadow:inset 3px 0 0 var(--red)}
+tbody tr.mrow-warn td:first-child{box-shadow:inset 3px 0 0 var(--yellow)}
+tbody tr.mrow-normal{opacity:.6}
+tbody tr.mrow-normal:hover{opacity:1}
+.mv-dot{color:var(--accent);font-size:9px;margin-left:5px;vertical-align:middle}
+/* (2) 意味ラベル */
+.rv-meaning{white-space:normal;font-size:11px;line-height:1.35;color:var(--text-dim)}
+.rv-meaning.t-alert{color:var(--red);font-weight:700}
+.rv-meaning.t-warn{color:var(--yellow)}
+.rv-meaning.t-normal{color:var(--text-dim)}
+/* (3) 鮮度・状態 */
+.dstat{font-family:var(--cond);font-weight:700;font-size:10px;letter-spacing:0.05em;text-transform:uppercase}
+.dstat .age{opacity:.7;font-size:9px;margin-left:3px}
+.dstat-live{color:var(--green)}
+.dstat-stale{color:var(--yellow)}
+.dstat-error{color:var(--red)}
+.dstat-loading{color:var(--text-dim)}
+/* (4) モバイルカード：<=480px、.rv-cards（rates_vol 時のみ .tbl-wrap に付与）にスコープ */
+@media(max-width:480px){
+  .rv-cards table,.rv-cards tbody,.rv-cards tr,.rv-cards td{display:block;width:auto}
+  .rv-cards thead{display:none}
+  .rv-cards tbody tr{border:1px solid var(--border);border-radius:8px;margin:8px 6px;padding:6px 10px;background:var(--bg2)}
+  .rv-cards tbody tr.section-row{background:var(--bg3);border:none;border-radius:0;margin:12px 0 2px;padding:8px 10px}
+  .rv-cards tbody tr.section-row td{padding:0;box-shadow:none}
+  .rv-cards tbody td{border:none;padding:3px 0;display:flex;justify-content:space-between;align-items:baseline;gap:12px;white-space:normal;text-align:right}
+  .rv-cards tbody td::before{content:attr(data-label);color:var(--text-dim);font-size:9px;font-family:var(--cond);font-weight:700;letter-spacing:0.06em;text-transform:uppercase;text-align:left;flex:0 0 auto}
+  .rv-cards tbody td[data-label="Type"],.rv-cards tbody td[data-label="Risk"]{display:none}
+  .rv-cards .rv-meaning{text-align:right}
+  .rv-cards tbody tr.mrow-normal{opacity:1}
+  .rv-cards tbody tr.mrow-alert td:first-child,.rv-cards tbody tr.mrow-warn td:first-child{box-shadow:none}
+}
 </style>
 </head>
 <body>
@@ -573,6 +611,7 @@ let fsig=null, sv="", wlOnly=false;
 // Cloudflare Pages は静的アセットに ACAO:* を付与するため cross-origin fetch 可（検証済）。
 const MACRO_FX_URL = "https://macro-fx-base.pages.dev/api/latest.json";
 let MACRO_FX = null;
+let MACRO_FX_STATE = "loading";   // "loading" | "ok" | "error" — 古い値を最新と誤認させないため状態を持つ
 let WL=new Set(JSON.parse(localStorage.getItem("hf_wl")||"[]"));
 let light=localStorage.getItem("hf_theme")==="light";
 
@@ -654,12 +693,13 @@ const C_VALUATION=[
 // Rows from sub-sections are mapped to these columns; missing fields render as "—".
 const C_RATES_VOL=[
   {k:"symbol",      l:"Symbol",   a:"left",  w:120},
-  {k:"name",        l:"Name",     a:"left",  w:240},
-  {k:"type_label",  l:"Type",     a:"center",w:84},
-  {k:"value",       l:"Value",    a:"right", w:100},
-  {k:"delta",       l:"Δ",        a:"right", w:80},
-  {k:"risk",        l:"Risk",     a:"center",w:90},
-  {k:"data_status", l:"Data",     a:"center",w:100},
+  {k:"name",        l:"Name",     a:"left",  w:210},
+  {k:"type_label",  l:"Type",     a:"center",w:76},
+  {k:"value",       l:"Value",    a:"right", w:96},
+  {k:"delta",       l:"Δ",        a:"right", w:72},
+  {k:"meaning",     l:"Meaning",  a:"left",  w:240},
+  {k:"risk",        l:"Risk",     a:"center",w:82},
+  {k:"data_status", l:"Data",     a:"center",w:104},
 ];
 const C_POS_VAL=[
   {k:"symbol",      l:"Symbol",   a:"left",  w:160},
@@ -896,28 +936,43 @@ function getRows(){
 function getCombinedRows(){
   const sections = [];
   if (tab === "rates_vol") {
-    const rates = (DATA.markets?.rates||[]).map(r => ({
-      __orig: "rates",
-      symbol: r.symbol, name: r.name,
-      type_label: r.tenor || "—",
-      value: r.yield, delta: r.change,
-      risk: r.risk, data_status: r.data_status,
-    }));
-    const vol = (DATA.markets?.volatility||[]).map(r => ({
-      __orig: "volatility",
-      symbol: r.symbol, name: r.name,
-      type_label: "Vol",
-      value: r.price, delta: r.change_pct,
-      risk: r.risk,
-      data_status: r.data_status || (r.error ? "placeholder" : "live"),
-    }));
-    sections.push({title: "Rates / Bonds", rows: rates});
-    sections.push({title: "Volatility (VIX / MOVE)", rows: vol});
-    // v4.x: macro-fx-base 由来の 14 派生指標（イールドカーブ3 / 実質利回り5 / FX相関6）。
-    // MACRO_FX 未取得（オフライン等）なら section 自体を出さない＝グレースフル劣化。
-    const macroRows = buildMacroFxRows();
-    if (macroRows.length) {
-      sections.push({title: "Macro-FX Derived · 14 (yield curve / real yield / FX-rate corr)", rows: macroRows});
+    const rates = (DATA.markets?.rates||[]).map(r => {
+      const mn = ratesMeaning(r.symbol), delta = r.change;
+      return {
+        __orig: "rates",
+        symbol: r.symbol, name: r.name,
+        type_label: r.tenor || "—",
+        value: r.yield, delta,
+        meaning: mn.text, tone: mn.tone,
+        moved: Math.abs(delta||0) >= 0.05,
+        risk: r.risk, data_status: r.data_status || "live",
+      };
+    });
+    const vol = (DATA.markets?.volatility||[]).map(r => {
+      const mn = volMeaning(r.symbol, r.price), delta = r.change_pct;
+      return {
+        __orig: "volatility",
+        symbol: r.symbol, name: r.name,
+        type_label: "Vol",
+        value: r.price, delta,
+        meaning: mn.text, tone: mn.tone,
+        moved: Math.abs(delta||0) >= 3,
+        risk: r.risk,
+        data_status: r.data_status || (r.error ? "placeholder" : "live"),
+      };
+    });
+    sections.push({title: "Rates / Bonds", rows: secSort(rates)});
+    sections.push({title: "Volatility (VIX / MOVE)", rows: secSort(vol)});
+    // v5: macro-fx-base 14 派生指標。loading/error/ok の3状態を明示（要件3：古い値を最新と誤認させない）。
+    if (MACRO_FX_STATE === "loading") {
+      sections.push({title: "Macro-FX Derived · 14", rows: [macroStateRow("loading","読み込み中…")]});
+    } else if (MACRO_FX_STATE === "error") {
+      sections.push({title: "Macro-FX Derived · 14", rows: [macroStateRow("error","取得に失敗（最新値は表示しません）")]});
+    } else {
+      const macroRows = secSort(buildMacroFxRows());
+      if (macroRows.length) {
+        sections.push({title: "Macro-FX Derived · 14 (yield curve / real yield / FX-rate corr)", rows: macroRows});
+      }
     }
   } else if (tab === "pos_val") {
     const imm = (DATA.markets?.imm||[]).map(r => ({
@@ -996,8 +1051,41 @@ function macroFxRisk(family, v){
   if (family==="fx_corr")    return Math.abs(v) >= 0.5 ? "medium" : "low";
   return "—";
 }
+// (1) 情報階層：tone(alert>warn>normal) と moved を優先度化してセクション内を並べ替え。
+//     同順位は |Δ| 降順→元順で安定。平常値は下がり、今日動いた/異常値が上に来る。
+function secSort(rows){
+  const pri = {alert:3, warn:2, normal:1};
+  return rows.map((r,i)=>({r,i})).sort((a,b)=>{
+    const pa=(pri[a.r.tone]||1)+(a.r.moved?0.5:0), pb=(pri[b.r.tone]||1)+(b.r.moved?0.5:0);
+    if(pb!==pa) return pb-pa;
+    const da=Math.abs(a.r.delta||0), db=Math.abs(b.r.delta||0);
+    if(db!==da) return db-da;
+    return a.i-b.i;
+  }).map(x=>x.r);
+}
+// (2) RATES/VOL 行の簡潔な意味ラベル（HF 自前データ＝macro-fx とは無関係・再計算ではない静的ラベル）
+const RATES_MEANING={
+  US2Y:{text:"米2年金利（政策金利の織り込み）",tone:"normal"},
+  US10Y:{text:"米長期金利（景気・インフレ期待）",tone:"normal"},
+  JP2Y:{text:"日本2年金利",tone:"normal"},
+  JP10Y:{text:"日本長期金利（緩和の出口観測）",tone:"normal"},
+};
+function ratesMeaning(sym){ return RATES_MEANING[sym] || {text:"国債利回り",tone:"normal"}; }
+function volMeaning(sym, price){
+  const s=(sym||"").toUpperCase();
+  if(s.includes("VIX"))  return {text: (price>=25?"株式の恐怖指数（高VOL・警戒）":"株式の恐怖指数（VIX）"), tone:(price>=25?"warn":"normal")};
+  if(s.includes("MOVE")) return {text:"債券市場のVOL（MOVE）", tone:"normal"};
+  return {text:"ボラティリティ指標", tone:"normal"};
+}
+// (3) macro-fx セクションの loading/error 表示用の擬似行
+function macroStateRow(state, msg){
+  return { __orig:"macro_fx", symbol:"macro-fx", name:"macro-fx-base", type_label:"—",
+           value:"—", delta:null, meaning:msg, tone:(state==="error"?"alert":"normal"),
+           moved:false, risk:"—", data_status:state };
+}
 function buildMacroFxRows(){
   if (!MACRO_FX || !MACRO_FX.meta || !MACRO_FX.series) return [];
+  const interps = MACRO_FX.interpretations || {};
   const now = Date.now();
   const rows = [];
   for (const id of MACRO_FX_ORDER){
@@ -1011,7 +1099,9 @@ function buildMacroFxRows(){
     const unit = m.family === "slope" ? " pp" : m.family === "real_yield" ? "%" : "";
     const valStr = (v>0?"+":"") + Number(v).toFixed(isCorr?3:2);
     const delta = prev ? (v - prev.value) : null;
-    const ageDays = (now - Date.parse(String(last.observed_at).slice(0,10)+"T00:00:00Z"))/86400000;
+    const movedThresh = isCorr ? 0.1 : 0.05;
+    const ip = interps[id] || {text:"", tone:"normal"};   // (2) 解釈は macro-fx が算出済み＝読むだけ
+    const ageDays = Math.floor((now - Date.parse(String(last.observed_at).slice(0,10)+"T00:00:00Z"))/86400000);
     rows.push({
       __orig: "macro_fx",
       symbol: macroFxSymbol(id),
@@ -1019,8 +1109,11 @@ function buildMacroFxRows(){
       type_label: m.family === "slope" ? "Slope" : m.family === "real_yield" ? "Real" : "Corr",
       value: valStr, unit,
       delta: (delta!=null && isFinite(delta)) ? delta : null,
+      meaning: ip.text, tone: ip.tone || "normal",
+      moved: (delta!=null && Math.abs(delta) >= movedThresh),
       risk: macroFxRisk(m.family, v),
-      data_status: ageDays <= 4 ? "live" : "stale",
+      age_label: (ageDays<=0?"today":ageDays+"d"),
+      data_status: ageDays > 3 ? "stale" : "live",   // (3) 3日超で STALE 警告
     });
   }
   return rows;
@@ -1031,12 +1124,14 @@ async function loadMacroFx(){
     if(!r.ok) throw new Error("HTTP "+r.status);
     MACRO_FX = await r.json();
     window.MACRO_FX = MACRO_FX;
-    // 現在 rates_vol を見ているなら即再描画（他タブなら次回 sw() で反映）
-    if (tab === "rates_vol" && typeof applyF === "function") applyF();
+    MACRO_FX_STATE = "ok";
   }catch(e){
-    MACRO_FX = null;   // グレースフル：macro section を出さないだけ。既存タブは無影響。
-    console.warn("macro-fx load failed (section omitted):", e && e.message);
+    MACRO_FX = null;
+    MACRO_FX_STATE = "error";   // (3) 取得失敗を明示。古い値は出さず ERROR 行を表示。
+    console.warn("macro-fx load failed:", e && e.message);
   }
+  // rates_vol 表示中なら状態変化を即反映（他タブなら次回 sw() で反映）
+  if (tab === "rates_vol" && typeof applyF === "function") applyF();
 }
 
 function renderHead(){
@@ -1066,12 +1161,17 @@ function renderBody(rows){
       return `<tr class="section-row"><td colspan="${colset.length}">${r.__section}</td></tr>`;
     }
     if (r.symbol) ROWMAP[r.symbol] = r;
-    const cls = WL.has(r.symbol) ? "wl-row" : "";
+    // (1) 情報階層：tone があれば強調/後退クラスを付す（tone を持たない他タブの行は無影響）。
+    const toneCls = r.tone ? " mrow-" + r.tone : "";
+    const cls = (WL.has(r.symbol) ? "wl-row" : "") + toneCls;
     const click = detailable
       ? `onclick="toggleDetail(event,'${r.symbol}')" style="cursor:pointer"`
       : "";
     return `<tr class="${cls}" data-sym="${r.symbol||''}" ${click}>${colset.map(c=>cell(c,r)).join("")}</tr>`;
   }).join("");
+  // (4) モバイルカード化は rates_vol のときだけ有効化（他タブは従来表示のまま）
+  const wrap = document.querySelector(".tbl-wrap");
+  if (wrap) wrap.classList.toggle("rv-cards", tab === "rates_vol");
   const rc = document.getElementById("rowcount");
   if (rc) rc.textContent = dataRowCount + " symbols";
 }
@@ -1342,7 +1442,7 @@ function toggleStar(sym,el){
 function cell(c,r){
   const al=`text-align:${c.a}`;
   if(r.error&&!["symbol","name","signal"].includes(c.k))
-    return`<td style="${al}"><span style="color:var(--text-faint)">—</span></td>`;
+    return`<td style="${al}" data-label="${esc(c.l)}"><span style="color:var(--text-faint)">—</span></td>`;
 
   let h="";
   switch(c.k){
@@ -1450,11 +1550,26 @@ function cell(c,r){
     }
     case"type_label": h=`<span class="cell-section">${esc(r.type_label||"—")}</span>`; break;
     case"context":    h=`<span style="color:var(--text-dim)">${esc(r.context||r.valuation_context||"—")}</span>`; break;
+    case"meaning":{
+      // (2) 数字→意味の翻訳。tone で強調（alert/warn/normal）。移動マーカーも表示。
+      const t = r.tone || "normal";
+      const mv = r.moved ? `<span class="mv-dot" title="今日Δが動いた">●</span>` : "";
+      h=`<span class="rv-meaning t-${esc(t)}">${esc(r.meaning||"—")}</span>${mv}`;
+      break;
+    }
     case"data_status":{
+      // (3) 鮮度・状態：LIVE / STALE / ERROR / LOADING ＋ 経過時間、STALE は警告。
       const s = r.data_status || "—";
-      const col = s==="live" ? "var(--green)"
-              : s==="weekly" || s==="monthly" ? "var(--blue)"
-              : s==="placeholder" || s==="stale" ? "var(--text-faint)"
+      const cls = {live:"dstat-live",stale:"dstat-stale",error:"dstat-error",loading:"dstat-loading"}[s];
+      if (cls || r.age_label){
+        const warn = s==="stale" ? " ⚠" : "";
+        const age = r.age_label ? `<span class="age">${esc(r.age_label)}</span>` : "";
+        h=`<span class="dstat ${cls||"dstat-live"}">${esc(String(s).toUpperCase())}${warn}${age}</span>`;
+        break;
+      }
+      // legacy tokens（他タブ：weekly/monthly/placeholder/auto_cftc 等）は従来表示を維持
+      const col = s==="weekly" || s==="monthly" ? "var(--blue)"
+              : s==="placeholder" ? "var(--text-faint)"
               : "var(--text-dim)";
       h=`<span style="color:${col};font-family:var(--cond);font-weight:700;font-size:10px;letter-spacing:0.05em;text-transform:uppercase">${esc(s)}</span>`;
       break;
@@ -1472,7 +1587,7 @@ function cell(c,r){
     }
     default: h=esc(r[c.k]==null?"—":r[c.k]);
   }
-  return`<td style="${al}">${h}</td>`;
+  return`<td style="${al}" data-label="${esc(c.l)}">${h}</td>`;
 }
 // Long-term valuation-regime label (v4.0). Context only — no buy/sell semantics.
 function valCtxLabel(c){
