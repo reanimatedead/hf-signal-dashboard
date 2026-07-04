@@ -595,6 +595,9 @@ tbody tr.mrow-normal:hover{opacity:1}
       </p>
     </div>
   </div>
+  <!-- v5.x additive: マクロFXシナリオ帯グラフ（macro-fx-base/scenario が単独所有する scenarios.json を live 参照。
+       取得失敗時は非表示のみ＝既存タブ無影響。単一数値の強調はしない（レンジ帯のみ）。 -->
+  <div id="scenarioPanel" style="display:none;padding:12px 16px 16px;border-top:1px solid var(--border)"></div>
 </div>
 
 <div id="footer" style="padding:10px 16px;font-size:10px;color:var(--text-faint);border-top:1px solid var(--border);text-align:center;display:none">
@@ -1656,6 +1659,75 @@ function bbColor(b){
   if(b>=0.65)return"var(--yellow)";
   return"var(--text-dim)";
 }
+
+// ══ v5.x additive: マクロFXシナリオ（帯グラフ） ═══════════════════
+// macro-fx-base の scenario エンジンが夜間生成する scenarios.json を live 参照（latest.json と同じ
+// 二重メンテ回避パターン）。表示は rates_vol タブのみ。レンジ帯で描画し、一点値の強調表示はしない。
+// ?scenario_url=<url> でローカル検証用に差し替え可。
+const SCENARIO_URL = (new URLSearchParams(location.search).get("scenario_url"))
+  || "https://macro-fx-base.pages.dev/api/scenarios.json";
+let SCENARIOS = null, SCENARIO_STATE = "loading";
+const SCENARIO_COLORS = { optimistic:"#4da3ff", central:"#9aa5b1", pessimistic:"#ff9f43", tail:"#e05260" };
+
+async function loadScenarios(){
+  try{
+    const r = await fetch(SCENARIO_URL + (SCENARIO_URL.includes("?")?"&":"?") + "t=" + Date.now(), {cache:"no-cache"});
+    if(!r.ok) throw new Error("HTTP "+r.status);
+    const doc = await r.json();
+    if(!doc || !Array.isArray(doc.scenarios) || !doc.scenarios.length) throw new Error("empty scenarios");
+    SCENARIOS = doc; SCENARIO_STATE = "ok";
+  }catch(e){
+    SCENARIOS = null; SCENARIO_STATE = "error";   // 非表示のみ。既存タブ無影響のグレースフル劣化
+    console.warn("scenario load failed:", e && e.message);
+  }
+  renderScenarioPanel();
+}
+
+function scenEsc(s){ return String(s==null?"":s).replace(/[&<>"]/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
+
+function renderScenarioPanel(){
+  const el = document.getElementById("scenarioPanel");
+  if (!el) return;
+  if (tab !== "rates_vol" || SCENARIO_STATE !== "ok" || !SCENARIOS){ el.style.display="none"; return; }
+  const scs = SCENARIOS.scenarios;
+  const base = SCENARIOS.baseline || {};
+  let lo = Math.min(...scs.map(s=>s.usdjpy_range[0])), hi = Math.max(...scs.map(s=>s.usdjpy_range[1]));
+  if (isFinite(base.usdjpy)){ lo = Math.min(lo, base.usdjpy); hi = Math.max(hi, base.usdjpy); }
+  const pad = (hi-lo)*0.05 || 1; lo -= pad; hi += pad;
+  const W=760, LBL=104, RGT=12, ROWH=46, TOP=18, H=TOP+scs.length*ROWH+24;
+  const x = v => LBL + (v-lo)/(hi-lo)*(W-LBL-RGT);
+  let svg = `<svg viewBox="0 0 ${W} ${H}" style="width:100%;max-width:900px;height:auto;display:block" role="img" aria-label="USD/JPY scenario ranges">`;
+  if (isFinite(base.usdjpy)){
+    svg += `<line x1="${x(base.usdjpy)}" y1="${TOP-6}" x2="${x(base.usdjpy)}" y2="${H-20}" stroke="var(--text-dim)" stroke-dasharray="3,3" stroke-width="1"/>`
+        + `<text x="${x(base.usdjpy)}" y="${TOP-8}" text-anchor="middle" font-size="9" style="fill:var(--text-dim)">現在 ${base.usdjpy}</text>`;
+  }
+  scs.forEach((s,i)=>{
+    const y = TOP + i*ROWH, c = SCENARIO_COLORS[s.id] || "#888";
+    const x0 = x(s.usdjpy_range[0]), x1 = x(s.usdjpy_range[1]);
+    svg += `<text x="${LBL-8}" y="${y+17}" text-anchor="end" font-size="11" style="fill:var(--text)">${scenEsc(s.name_ja||s.id)}</text>`
+        + `<rect x="${x0}" y="${y+6}" width="${Math.max(x1-x0,2)}" height="16" rx="3" fill="${c}" opacity="0.55"/>`
+        + `<text x="${x0-4}" y="${y+17}" text-anchor="end" font-size="9" style="fill:var(--text-faint)">${s.usdjpy_range[0]}</text>`
+        + `<text x="${x1+4}" y="${y+17}" text-anchor="start" font-size="9" style="fill:var(--text-faint)">${s.usdjpy_range[1]}</text>`;
+    const jgb = s.jgb10y_range ? `JGB10y ${s.jgb10y_range[0]}–${s.jgb10y_range[1]}%` : "";
+    if (jgb) svg += `<text x="${LBL}" y="${y+34}" font-size="9" style="fill:var(--text-faint)">${jgb}</text>`;
+  });
+  svg += `</svg>`;
+  const memos = scs.filter(s=>s.memo_ja).map(s =>
+    `<div style="margin-top:4px;font-size:10px;color:var(--text-faint)"><b style="color:var(--text-dim)">${scenEsc(s.name_ja)}</b>: ${scenEsc(s.memo_ja).replace(/\n/g," ")}</div>`
+  ).join("");
+  el.innerHTML =
+    `<div style="font-size:12px;color:var(--text-dim);margin-bottom:6px">USD/JPY シナリオレンジ`
+    + `<span style="font-size:9px;color:var(--text-faint);margin-left:8px">generated ${scenEsc(String(SCENARIOS.generated_at||"").slice(0,10))} · macro-fx-base/scenario</span></div>`
+    + svg + memos
+    + `<div style="margin-top:6px;font-size:9px;color:var(--text-faint)">${scenEsc(SCENARIOS.disclaimer||"")} · 幅（レンジ）のみ表示・一点予測なし</div>`;
+  el.style.display = "block";
+}
+
+// タブ切替に追従（既存 sw() は無改変で後付けラップ）
+const __swBeforeScenario = sw;
+sw = function(key, btn){ __swBeforeScenario(key, btn); renderScenarioPanel(); };
+
+loadScenarios();
 </script>
 
 <!-- Shared particle engine (Agent A + Agent C / SPEC §4.1) -->
