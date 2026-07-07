@@ -1,12 +1,13 @@
 {
   "meta": {
-    "generated_at": "2026-07-06T17:45:58Z",
+    "generated_at": "2026-07-07T17:16:22Z",
     "pipeline_version": "macro-0.1",
     "reference_seed": false,
     "branch": "feat/macro-environment",
     "note": "JP rates / IMM(CFTC) / VIX / yield_curve は docs/data.json を再利用。FRED 系は FRED_API_KEY 設定時のみ live、未設定なら missing。捏造はしない。",
     "sources_as_of": {
-      "coingecko": "2026-07-06T17:45:58Z",
+      "treasury_tga": "2026-07-03",
+      "coingecko": "2026-07-07T17:16:22Z",
       "fred": "2026-07-01",
       "fred_gdpnow": "2026-04-01",
       "fred_cpi": "2026-05-01"
@@ -24,11 +25,11 @@
   },
   "flow": {
     "net_liquidity": {
-      "value_usd_tn": 6.0,
+      "value_usd_tn": 5.951,
       "wow_change_tn": 0.0,
       "z": 0.0,
       "trend": "expand",
-      "status": "missing"
+      "status": "ok"
     },
     "clock_phase": "stagflation",
     "policy_rate_friction": 1.0,
@@ -40,18 +41,18 @@
     },
     "currents": {
       "foreign_jp_flow_z": 0.0,
-      "cot_jpy_z": -1.461,
+      "cot_jpy_z": -1.551,
       "risk_off": 0.0
     }
   },
   "tiles": {
     "usdjpy_carry": {
       "label": "ドル円 金利差（US10Y − JP10Y）",
-      "value": 1.791,
+      "value": 1.833,
       "unit": "%",
       "z": 0.0,
       "color": "neutral",
-      "as_of": "2026-07-07T02:44:24.048765+09:00",
+      "as_of": "2026-07-08T02:14:51.935297+09:00",
       "lag_days": -1,
       "status": "ok",
       "source": "docs/data.json (再利用)",
@@ -61,27 +62,27 @@
     "cot_jpy": {
       "label": "円 投機ポジション(CFTC COT)",
       "value": {
-        "net": -146104,
-        "wow": 4028,
+        "net": -155092,
+        "wow": -8988,
         "crowd": "high"
       },
       "unit": "contracts",
       "z": 0.0,
       "color": "red",
-      "as_of": "2026-06-23",
-      "lag_days": 13,
-      "status": "stale",
+      "as_of": "2026-06-30",
+      "lag_days": 7,
+      "status": "ok",
       "source": "docs/data.json (CFTC COT, 再利用)",
       "explain": "投機筋の円ネットポジション。極端な円売り(マイナス大)は巻き戻しの燃料。",
       "caveat": "週次・火曜集計の金曜公表。zは履歴ストア未配線のため0（本番で配線）。"
     },
     "vix": {
       "label": "VIX",
-      "value": 15.89,
+      "value": 15.72,
       "unit": "pt",
       "z": 0.0,
       "color": "green",
-      "as_of": "2026-07-07T02:44:24.048765+09:00",
+      "as_of": "2026-07-08T02:14:51.935297+09:00",
       "lag_days": -1,
       "status": "ok",
       "source": "docs/data.json (yfinance, 再利用)",
@@ -95,7 +96,7 @@
       "z": 0.0,
       "color": "red",
       "as_of": "2025-10-01",
-      "lag_days": 278,
+      "lag_days": 279,
       "status": "stale",
       "source": "FRED (fredgraph.csv): NCBEILQ027S, GDP",
       "explain": "米株時価総額 / 米GDP。長期の過熱/割安の温度計。",
@@ -103,24 +104,24 @@
     },
     "tga": {
       "label": "米財務省 TGA 残高",
-      "value": null,
+      "value": 770.6,
       "unit": "USD十億",
       "z": 0.0,
       "color": "neutral",
-      "as_of": null,
-      "lag_days": null,
-      "status": "missing",
+      "as_of": "2026-07-03",
+      "lag_days": 4,
+      "status": "ok",
       "source": "fiscaldata.treasury.gov DTS",
-      "explain": "TGA(政府預金)。",
-      "caveat": "取得不可のため missing。"
+      "explain": "TGA(政府預金)。増えると市場から流動性を吸う。WALCL/RRPと並ぶ純流動性の3要素。",
+      "caveat": "代理指標。会計サイクル(税収/国債発行)で揺れる。"
     },
     "btc_price": {
       "label": "BTC価格",
-      "value": 63660.0,
+      "value": 63939.0,
       "unit": "USD",
       "z": 0.0,
       "color": "neutral",
-      "as_of": "2026-07-06T17:45:58Z",
+      "as_of": "2026-07-07T17:16:22Z",
       "lag_days": 0,
       "status": "ok",
       "source": "CoinGecko (キーレス)",
@@ -130,13 +131,13 @@
     "stablecoin_peg": {
       "label": "ステーブルコイン ペグ",
       "value": {
-        "USDT": 0.999194,
-        "USDC": 0.99988
+        "USDT": 0.999154,
+        "USDC": 0.999863
       },
       "unit": "USD",
-      "z": 0.16,
+      "z": 0.17,
       "color": "green",
-      "as_of": "2026-07-06T17:45:58Z",
+      "as_of": "2026-07-07T17:16:22Z",
       "lag_days": 0,
       "status": "ok",
       "source": "CoinGecko (キーレス)",
@@ -150,7 +151,7 @@
       "z": 0.0,
       "color": "neutral",
       "as_of": "2026-07-01",
-      "lag_days": 5,
+      "lag_days": 6,
       "status": "ok",
       "source": "FRED:WALCL",
       "explain": "FRBの総資産。お金の総量の源泉。",
@@ -158,12 +159,12 @@
     },
     "rrp": {
       "label": "翌日物RRP",
-      "value": 2.175,
+      "value": 2.719,
       "unit": "USD十億",
       "z": 0.0,
       "color": "neutral",
-      "as_of": "2026-07-02",
-      "lag_days": 4,
+      "as_of": "2026-07-06",
+      "lag_days": 1,
       "status": "ok",
       "source": "FRED:RRPONTSYD",
       "explain": "中銀に置かれた余り金。増えると市場から流動性を吸う。",
@@ -171,11 +172,11 @@
     },
     "real_yield": {
       "label": "10年実質金利(DFII10)",
-      "value": 2.25,
+      "value": 2.26,
       "unit": "%",
       "z": 0.0,
       "color": "neutral",
-      "as_of": "2026-07-01",
+      "as_of": "2026-07-02",
       "lag_days": 5,
       "status": "ok",
       "source": "FRED:DFII10",
@@ -184,12 +185,12 @@
     },
     "hy_spread": {
       "label": "HY信用スプレッド",
-      "value": 2.75,
+      "value": 2.72,
       "unit": "%",
       "z": 0.0,
       "color": "green",
-      "as_of": "2026-07-02",
-      "lag_days": 4,
+      "as_of": "2026-07-06",
+      "lag_days": 1,
       "status": "ok",
       "source": "FRED:BAMLH0A0HYM2",
       "explain": "低格付け社債と国債の利回り差。広がる=リスクオフ。株安に先行しやすい。",
@@ -197,22 +198,22 @@
     },
     "net_liquidity": {
       "label": "米ネット流動性 (WALCL−TGA−RRP)",
-      "value": null,
+      "value": 5.951,
       "unit": "USD兆",
       "z": 0.0,
       "color": "neutral",
-      "as_of": null,
-      "lag_days": null,
-      "status": "missing",
-      "source": "FRED + Treasury",
-      "explain": "市場で実際に使えるドルの総量。",
-      "caveat": "WALCL/RRPはFREDキー必須。欠損時アニメは中立値(6.0兆)で動作。"
+      "as_of": "2026-07-01",
+      "lag_days": 6,
+      "status": "ok",
+      "source": "FRED + Treasury (合成)",
+      "explain": "市場で実際に使えるドルの総量。増=追い風、減=逆風。",
+      "caveat": "代理指標。単位整合必須(WALCL百万/RRP/TGA十億)。構成で誤誘導しうる。"
     },
     "clock_phase_tile": {
       "label": "景気局面 (GDPNow+CPI)",
       "value": {
         "phase": "stagflation",
-        "gdpnow": 1.19,
+        "gdpnow": 1.36,
         "gdpnow_as_of": "2026-04-01",
         "cpi_yoy": 4.17,
         "cpi_as_of": "2026-05-01"
@@ -221,7 +222,7 @@
       "z": 0.0,
       "color": "neutral",
       "as_of": "2026-05-01",
-      "lag_days": 66,
+      "lag_days": 67,
       "status": "ok",
       "source": "FRED:GDPNOW + FRED:CPIAUCSL (キーレスCSV)",
       "explain": "リフレ/回復/過熱/スタグ。お金がどの器に傾くかを決める。",
