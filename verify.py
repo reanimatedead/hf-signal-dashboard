@@ -391,4 +391,339 @@ try:
 except Exception as e:
     fail("gate10_exclusions", str(e))
 
+
+# =============================================================================
+# 相関パネル (feat/corr-panel) ゲート群 — docs/data.json の
+# correlations / money_flow.<region>.sink_metrics を検証する。
+# macro.json (上の Gate-2〜10) とは独立に docs/data.json を直接読む。
+# =============================================================================
+
+CORR_LABELS_EXPECTED = [
+    "N225", "SPX", "US5Y", "US10Y", "US30Y",
+    "JGB5Y", "JGB10Y", "JGB30Y", "USDJPY", "US-JP10Yspread",
+]
+CORR_REQUIRED_KEYS = [
+    "as_of", "window", "n_obs", "matrix_60d", "matrix_20d",
+    "labels", "key_pairs", "data_status", "lag_days", "sources",
+]
+CORR_KEY_PAIRS_EXPECTED = [
+    ["N225", "USDJPY"], ["SPX", "US10Y"], ["USDJPY", "US-JP10Yspread"],
+]
+YIELD_LABELS = ["US5Y", "US10Y", "US30Y", "JGB5Y", "JGB10Y", "JGB30Y"]
+US_YIELD_LABELS = ["US5Y", "US10Y", "US30Y"]
+JP_YIELD_LABELS = ["JGB5Y", "JGB10Y", "JGB30Y"]
+
+SINK_SYMBOLS_EXPECTED = {
+    "us": {"stocks": "^GSPC", "cash": "DX-Y.NYB"},
+    "eu": {"stocks": "^STOXX50E", "cash": "EURUSD=X"},
+    "jp": {"stocks": "^N225", "cash": "JPY=X"},
+}
+
+corr_existing = (existing or {}).get("correlations") if existing else None
+mf_existing = (existing or {}).get("money_flow") if existing else None
+
+
+def _corr_cell_decimals_ok(v):
+    """小数4桁以下(丸め漏れ検出)。整数・None は無条件OK。"""
+    if v is None:
+        return True
+    s = repr(float(v))
+    if "e" in s or "E" in s:
+        return False
+    if "." not in s:
+        return True
+    return len(s.split(".")[1]) <= 4
+
+
+# Gate-corr-schema: 必須キー・labels順序・data_status・key_pairs
+try:
+    if not isinstance(corr_existing, dict):
+        fail("gate_corr_schema", "data.json.correlations missing or not dict")
+    else:
+        problems = []
+        missing_keys = [k for k in CORR_REQUIRED_KEYS if k not in corr_existing]
+        if missing_keys:
+            problems.append(f"missing keys: {missing_keys}")
+        if corr_existing.get("labels") != CORR_LABELS_EXPECTED:
+            problems.append(f"labels mismatch: {corr_existing.get('labels')}")
+        if corr_existing.get("data_status") not in ("live", "stale", "placeholder"):
+            problems.append(f"data_status invalid: {corr_existing.get('data_status')}")
+        kp = corr_existing.get("key_pairs")
+        if not isinstance(kp, list) or len(kp) != 3:
+            problems.append(f"key_pairs must have 3 entries: {kp}")
+        else:
+            kp_pairs = [item.get("pair") for item in kp if isinstance(item, dict)]
+            if kp_pairs != CORR_KEY_PAIRS_EXPECTED:
+                problems.append(f"key_pairs order/content mismatch: {kp_pairs}")
+        if problems:
+            fail("gate_corr_schema", "; ".join(problems))
+        else:
+            ok("gate_corr_schema")
+except Exception as e:
+    fail("gate_corr_schema", str(e))
+
+
+# Gate-corr-matrix: 60d/20d 両方 10x10・対称性・対角・値域
+def _check_matrix(name, labels, matrix):
+    problems = []
+    n = len(labels)
+    if not isinstance(matrix, list) or len(matrix) != n or any(
+        not isinstance(row, list) or len(row) != n for row in matrix
+    ):
+        return [f"{name}: not {n}x{n}"]
+    for i in range(n):
+        for j in range(n):
+            a, b = matrix[i][j], matrix[j][i]
+            if a is None and b is None:
+                continue
+            if a is None or b is None:
+                problems.append(f"{name}[{i}][{j}] asymmetric null mismatch: {a} vs {b}")
+                continue
+            if abs(a - b) > 1e-9:
+                problems.append(f"{name}[{i}][{j}]={a} != {name}[{j}][{i}]={b}")
+    for i in range(n):
+        diag = matrix[i][i]
+        col_has_data = any(matrix[i][j] is not None for j in range(n) if j != i) or diag is not None
+        if diag is not None and diag != 1.0:
+            problems.append(f"{name} diag[{i}]={diag} != 1.0")
+        # データがある列(対角含め非null値が存在)は1.0のはず。全null列のみnull許容。
+        row_all_null = all(v is None for v in matrix[i])
+        col_all_null = all(matrix[k][i] is None for k in range(n))
+        if diag is None and not (row_all_null and col_all_null):
+            problems.append(f"{name} diag[{i}] is null but row/col has data")
+    for i in range(n):
+        for j in range(n):
+            v = matrix[i][j]
+            if v is not None and not (-1.0 <= v <= 1.0):
+                problems.append(f"{name}[{i}][{j}]={v} out of [-1,1]")
+    return problems
+
+
+try:
+    if not isinstance(corr_existing, dict):
+        fail("gate_corr_matrix", "correlations missing")
+    else:
+        labels = corr_existing.get("labels") or []
+        problems = []
+        problems += _check_matrix("matrix_60d", labels, corr_existing.get("matrix_60d"))
+        problems += _check_matrix("matrix_20d", labels, corr_existing.get("matrix_20d"))
+        if problems:
+            fail("gate_corr_matrix", "; ".join(problems))
+        else:
+            ok("gate_corr_matrix")
+except Exception as e:
+    fail("gate_corr_matrix", str(e))
+
+
+# Gate-corr-level-misuse: 水準相関の誤実装検出（bp変化なら起こらない特徴）
+def detect_level_correlation_misuse(labels, matrix60):
+    """クロスカントリー利回りペアの|r|>0.95、または利回り15ペア中|r|>0.98が4本以上なら
+    水準相関の疑いとして問題リストを返す(空なら健全)。labels/matrix60 は10x10想定。
+    """
+    problems = []
+    idx = {l: i for i, l in enumerate(labels)}
+
+    def cell(a, b):
+        if a not in idx or b not in idx:
+            return None
+        return matrix60[idx[a]][idx[b]]
+
+    for a in US_YIELD_LABELS:
+        for b in JP_YIELD_LABELS:
+            v = cell(a, b)
+            if v is not None and abs(v) > 0.95:
+                problems.append(f"cross-country {a}-{b} |r|={abs(v)} > 0.95 (level-correlation suspected)")
+
+    high_count = 0
+    for i2, a in enumerate(YIELD_LABELS):
+        for b in YIELD_LABELS[i2 + 1:]:
+            v = cell(a, b)
+            if v is not None and abs(v) > 0.98:
+                high_count += 1
+    if high_count >= 4:
+        problems.append(f"{high_count}/15 yield pairs have |r|>0.98 (level-correlation suspected)")
+
+    return problems
+
+
+try:
+    if not isinstance(corr_existing, dict):
+        fail("gate_corr_level_misuse", "correlations missing")
+    else:
+        problems = detect_level_correlation_misuse(
+            corr_existing.get("labels") or [], corr_existing.get("matrix_60d") or []
+        )
+        if problems:
+            fail("gate_corr_level_misuse", "; ".join(problems))
+        else:
+            ok("gate_corr_level_misuse")
+except Exception as e:
+    fail("gate_corr_level_misuse", str(e))
+
+
+# Gate-corr-era: pipeline.corr_sources.era_to_iso の単体テスト（和暦変換）
+try:
+    sys.path.insert(0, str(ROOT / "pipeline"))
+    from corr_sources import era_to_iso  # noqa: E402
+
+    cases = [
+        (("R8.7.1",), "2026-07-01"),
+        (("H31.4.30",), "2019-04-30"),
+        (("S49.9.24",), "1974-09-24"),
+        (("garbage",), None),
+        (("R8.13.1",), None),
+    ]
+    problems = []
+    for args, expected in cases:
+        got = era_to_iso(*args)
+        if got != expected:
+            problems.append(f"era_to_iso{args} = {got!r}, expected {expected!r}")
+    if problems:
+        fail("gate_corr_era", "; ".join(problems))
+    else:
+        ok("gate_corr_era")
+except Exception as e:
+    fail("gate_corr_era", str(e))
+
+
+# Gate-corr-nobs: n_obs >= window.long。未達なら data_status=="placeholder" を要求
+try:
+    if not isinstance(corr_existing, dict):
+        fail("gate_corr_nobs", "correlations missing")
+    else:
+        n_obs = corr_existing.get("n_obs")
+        window_long = (corr_existing.get("window") or {}).get("long")
+        status = corr_existing.get("data_status")
+        if n_obs is None or window_long is None:
+            fail("gate_corr_nobs", f"n_obs={n_obs} window.long={window_long} missing")
+        elif n_obs < window_long and status != "placeholder":
+            fail("gate_corr_nobs", f"n_obs={n_obs} < window.long={window_long} but data_status={status!r} != placeholder")
+        else:
+            ok("gate_corr_nobs")
+except Exception as e:
+    fail("gate_corr_nobs", str(e))
+
+
+# Gate-corr-determinism: as_of が wall-clock 由来でない（過去営業日のはず）+ 丸め4桁
+try:
+    if not isinstance(corr_existing, dict):
+        fail("gate_corr_determinism", "correlations missing")
+    else:
+        problems = []
+        as_of = corr_existing.get("as_of")
+        if as_of:
+            try:
+                as_of_date = datetime.date.fromisoformat(str(as_of)[:10])
+                if as_of_date >= datetime.date.today():
+                    problems.append(f"as_of={as_of} is today or future (wall-clock suspected)")
+            except Exception as exc:
+                problems.append(f"as_of={as_of!r} unparsable: {exc}")
+        else:
+            problems.append("as_of missing")
+
+        m60 = corr_existing.get("matrix_60d") or []
+        bad_cells = [
+            (i, j, m60[i][j])
+            for i in range(len(m60))
+            for j in range(len(m60[i]) if isinstance(m60[i], list) else 0)
+            if not _corr_cell_decimals_ok(m60[i][j])
+        ]
+        if bad_cells:
+            problems.append(f"matrix_60d cells with >4 decimals: {bad_cells}")
+
+        if problems:
+            fail("gate_corr_determinism", "; ".join(problems))
+        else:
+            ok("gate_corr_determinism")
+except Exception as e:
+    fail("gate_corr_determinism", str(e))
+
+
+# Gate-corr-selftest: 水準相関検出ロジック自体の自己テスト（合成データ・シード固定・オフライン）
+try:
+    import numpy as _np
+
+    def _build_synthetic_matrix(series_a, series_b):
+        """labels=[A,B] の2x2相関行列を作る(gate_corr_matrix互換の形)。"""
+        r = float(_np.corrcoef(series_a, series_b)[0, 1])
+        r = round(r, 4)
+        return ["US5Y", "JGB5Y"], [[1.0, r], [r, 1.0]]
+
+    rng = _np.random.default_rng(42)
+    n = 300
+
+    # (1) 水準トレンド系列2本 → 高相関(>0.95)になるはず → 検出器は疑いありと判定すべき
+    level_a = _np.linspace(0, 10, n) + rng.normal(0, 0.05, n)
+    level_b = _np.linspace(0, 10, n) + rng.normal(0, 0.05, n)
+    labels_lvl, matrix_lvl = _build_synthetic_matrix(level_a, level_b)
+    problems_lvl = detect_level_correlation_misuse(labels_lvl, matrix_lvl)
+
+    # (2) ランダムウォークの差分系列2本(定常・独立) → 相関≈0 → 検出器は素通りさせるべき
+    diff_a = rng.normal(0, 1, n)
+    diff_b = rng.normal(0, 1, n)
+    labels_diff, matrix_diff = _build_synthetic_matrix(diff_a, diff_b)
+    problems_diff = detect_level_correlation_misuse(labels_diff, matrix_diff)
+
+    selftest_problems = []
+    if not problems_lvl:
+        selftest_problems.append(
+            f"detector failed to flag synthetic level-trend series (r={matrix_lvl[0][1]})"
+        )
+    if problems_diff:
+        selftest_problems.append(
+            f"detector false-positived on synthetic differenced random-walk series "
+            f"(r={matrix_diff[0][1]}): {problems_diff}"
+        )
+
+    if selftest_problems:
+        fail("gate_corr_selftest", "; ".join(selftest_problems))
+    else:
+        ok("gate_corr_selftest")
+except Exception as e:
+    fail("gate_corr_selftest", str(e))
+
+
+# Gate-sink-metrics: money_flow.<region>.sink_metrics の契約
+try:
+    if not isinstance(mf_existing, dict):
+        fail("gate_sink_metrics", "data.json.money_flow missing")
+    else:
+        problems = []
+        for region in ("us", "eu", "jp"):
+            blk = (mf_existing.get(region) or {}).get("sink_metrics")
+            if not isinstance(blk, dict):
+                problems.append(f"money_flow.{region}.sink_metrics missing")
+                continue
+            if blk.get("label_type") != "weekly_change":
+                problems.append(f"{region}.sink_metrics.label_type != weekly_change")
+            note = blk.get("note", "")
+            if "visual effect" not in note:
+                problems.append(f"{region}.sink_metrics.note missing 'visual effect'")
+            for sink in ("stocks", "gold", "crypto", "cash"):
+                s = blk.get(sink)
+                if not isinstance(s, dict):
+                    problems.append(f"{region}.sink_metrics.{sink} missing")
+                    continue
+                if not s.get("symbol"):
+                    problems.append(f"{region}.sink_metrics.{sink}.symbol empty")
+                wow = s.get("wow_pct")
+                if wow is not None and not isinstance(wow, (int, float)):
+                    problems.append(f"{region}.sink_metrics.{sink}.wow_pct not number|null: {wow!r}")
+                st = s.get("data_status")
+                if st not in ("live", "placeholder"):
+                    problems.append(f"{region}.sink_metrics.{sink}.data_status invalid: {st!r}")
+                if wow is None and st != "placeholder":
+                    problems.append(f"{region}.sink_metrics.{sink} wow_pct=null but data_status={st!r} != placeholder")
+            expected_syms = SINK_SYMBOLS_EXPECTED.get(region, {})
+            for sink, expected_sym in expected_syms.items():
+                actual_sym = (blk.get(sink) or {}).get("symbol")
+                if actual_sym != expected_sym:
+                    problems.append(f"{region}.sink_metrics.{sink}.symbol={actual_sym!r} != expected {expected_sym!r}")
+        if problems:
+            fail("gate_sink_metrics", "; ".join(problems))
+        else:
+            ok("gate_sink_metrics")
+except Exception as e:
+    fail("gate_sink_metrics", str(e))
+
 finish()
