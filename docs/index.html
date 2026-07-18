@@ -399,6 +399,12 @@ body.light .mf-cv-wrap{background:radial-gradient(ellipse at 50% 18%,#e8edf3,#f7
 .cp-net-tip{position:absolute;pointer-events:none;background:var(--bg4);border:1px solid var(--border2);
             border-radius:3px;padding:4px 7px;font-size:10.5px;color:var(--text);white-space:nowrap;
             z-index:3;display:none;font-variant-numeric:tabular-nums}
+.cp-net-legend{position:absolute;top:6px;left:8px;z-index:2;display:flex;gap:10px;
+               background:rgba(0,0,0,0.0);pointer-events:none;font-size:9.5px;color:var(--text-dim)}
+.cp-net-legend span{display:inline-flex;align-items:center;gap:4px}
+.cp-net-legend i{display:inline-block;width:16px;height:0;border-top-width:2px;border-top-style:solid}
+.cp-net-legend i.pos{border-top-color:var(--blue)}
+.cp-net-legend i.neg{border-top-color:var(--orange);border-top-style:dashed}
 .cp-heat-wrap{overflow-x:auto;margin-bottom:12px}
 table.cp-heat{border-collapse:collapse;font-size:10px}
 table.cp-heat th{position:sticky;top:0;background:var(--bg3);color:var(--text-dim);
@@ -1843,8 +1849,10 @@ loadScenarios();
       corr_foot1: "FX×米金利の相関は金利・債券・VOLタブ参照",
       corr_foot2: "For data visualization purposes only. Not investment advice.",
       corr_rolling: "日ローリング",
-      corr_net_foot: "|r|<0.3 のペアはノイズ域としてネットワーク図から除外",
+      corr_net_foot: "|r|<0.25 のペアは非表示。0.25〜0.35 は減光表示(崖効果の排除)",
       corr_net_empty: "データ不足",
+      corr_net_legend_pos: "正 (実線/青)",
+      corr_net_legend_neg: "負 (破線/橙)",
       corr_net_labels: {N225:"日経225", SPX:"S&P500", US5Y:"米5年", US10Y:"米10年", US30Y:"米30年",
                          JGB5Y:"日5年", JGB10Y:"日10年", JGB30Y:"日30年", USDJPY:"ドル円",
                          "US-JP10Yspread":"日米10年差"},
@@ -1870,8 +1878,10 @@ loadScenarios();
       corr_foot1: "For FX × US-rates correlations, see the Rates/Bonds/Vol tab.",
       corr_foot2: "For data visualization purposes only. Not investment advice.",
       corr_rolling: "d rolling",
-      corr_net_foot: "Pairs with |r|<0.3 are treated as noise and excluded from the network graph.",
+      corr_net_foot: "Pairs with |r|<0.25 are hidden. 0.25–0.35 fade in linearly (no hard cliff).",
       corr_net_empty: "Insufficient data",
+      corr_net_legend_pos: "Positive (solid/blue)",
+      corr_net_legend_neg: "Negative (dashed/orange)",
       corr_net_labels: {},
     },
   };
@@ -2113,6 +2123,7 @@ loadScenarios();
     'USDJPY': 100, 'US-JP10Yspread': 80,
   };
   let corrNetHover = null; // {type:'edge', i, j, r} | null
+  let corrNetPinned = null; // a4-UX #3: {type:'edge', i, j, r} | null — persists across redraws until cleared by a tap on empty space
   let corrNetResizeTimer = null;
   let corrNetLastGeom = null; // cached for hit-testing on mousemove without full recompute
 
@@ -2138,10 +2149,20 @@ loadScenarios();
     });
   }
 
+  // Dual-encoding (a4-UX #1): color is redundant with line style (solid/dashed),
+  // never relies on color alone. Blue/orange only — green/red avoided for
+  // color-vision-deficiency accessibility (see CSS vars --blue/--orange).
   function corrNetColor(rVal, alpha){
     return rVal >= 0
-      ? 'rgba(0,232,162,'+alpha.toFixed(2)+')'   // var(--green) ~ #00e8a2
-      : 'rgba(255,69,96,'+alpha.toFixed(2)+')';  // var(--red) ~ #ff4560
+      ? 'rgba(59,130,246,'+alpha.toFixed(2)+')'  // var(--blue) #3b82f6 — positive
+      : 'rgba(255,140,48,'+alpha.toFixed(2)+')'; // var(--orange) #ff8c30 — negative
+  }
+
+  // a4-UX #2: opacity ramp (no hard cliff). |r|<0.25 not drawn (caller filters).
+  // 0.25<=|r|<0.35 ramps alpha 0->1 linearly; |r|>=0.35 fully opaque (alpha=1).
+  function corrNetAlpha(absR){
+    if (absR >= 0.35) return 1;
+    return Math.max(0, Math.min(1, (absR - 0.25) / 0.10));
   }
 
   function drawCorrNetwork(matrix, labels, nObs){
@@ -2162,7 +2183,7 @@ loadScenarios();
     const n = labels.length;
     const nodes = corrNetLayout(labels, rectW, rectH);
 
-    // build edge list: upper-triangle only, |r|>=0.3, non-null
+    // build edge list: upper-triangle only, |r|>=0.25 (a4-UX #2 threshold), non-null
     const edges = [];
     let nulls = 0;
     for (let i = 0; i < n; i++){
@@ -2172,13 +2193,28 @@ loadScenarios();
           nulls++;
           continue;
         }
-        if (Math.abs(rVal) >= 0.3){
+        if (Math.abs(rVal) >= 0.25){
           edges.push({ i, j, r: rVal });
         }
       }
     }
 
-    // cache geometry for hit-testing (hover) independent of redraw
+    // a4-UX #4: quadratic-bezier control point per edge, bulging outward
+    // (away from the ring center) so edges don't bundle through the middle.
+    const cx0 = rectW/2, cy0 = rectH/2 + 6;
+    edges.forEach(e => {
+      const a = nodes[e.i], b = nodes[e.j];
+      const mx = (a.x+b.x)/2, my = (a.y+b.y)/2;
+      let ox = mx - cx0, oy = my - cy0;
+      const od = Math.sqrt(ox*ox + oy*oy) || 1;
+      ox /= od; oy /= od;
+      const chord = Math.sqrt((b.x-a.x)*(b.x-a.x) + (b.y-a.y)*(b.y-a.y));
+      const bulge = chord * 0.2; // 0.15-0.25 range per spec
+      e.cpx = mx + ox * bulge;
+      e.cpy = my + oy * bulge;
+    });
+
+    // cache geometry for hit-testing (hover/click) independent of redraw
     corrNetLastGeom = { nodes, edges, rectW, rectH };
 
     const totalPairs = n*(n-1)/2;
@@ -2196,20 +2232,33 @@ loadScenarios();
     }
 
     // draw edges first (under nodes)
+    // a4-UX #1 (dual-encoding): positive=solid, negative=dashed, in addition
+    // to the blue/positive vs orange/negative color split (corrNetColor).
+    // a4-UX #2 (opacity ramp): corrNetAlpha() replaces the old hard cutoff.
+    // a4-UX #4 (bezier): quadraticCurveTo via each edge's cached cpx/cpy.
     edges.forEach(e => {
       const a = nodes[e.i], b = nodes[e.j];
       const absR = Math.min(1, Math.abs(e.r));
-      const isHover = corrNetHover && corrNetHover.type === 'edge' &&
-                       corrNetHover.i === e.i && corrNetHover.j === e.j;
+      const isHover = (corrNetHover && corrNetHover.type === 'edge' &&
+                       corrNetHover.i === e.i && corrNetHover.j === e.j) ||
+                       (corrNetPinned && corrNetPinned.type === 'edge' &&
+                       corrNetPinned.i === e.i && corrNetPinned.j === e.j);
       const width = 1 + absR * 4; // 1px..5px
-      const alpha = isHover ? 0.95 : (0.28 + 0.5 * absR);
+      const rampAlpha = corrNetAlpha(absR);
+      const alpha = isHover ? Math.max(0.95, rampAlpha) : rampAlpha;
       ctx.beginPath();
       ctx.moveTo(a.x, a.y);
-      ctx.lineTo(b.x, b.y);
+      ctx.quadraticCurveTo(e.cpx, e.cpy, b.x, b.y);
       ctx.strokeStyle = corrNetColor(e.r, alpha);
       ctx.lineWidth = isHover ? width + 1.2 : width;
       ctx.lineCap = 'round';
+      if (e.r < 0){
+        ctx.setLineDash([5, 4]);
+      } else {
+        ctx.setLineDash([]);
+      }
       ctx.stroke();
+      ctx.setLineDash([]); // reset so node strokes / other edges are unaffected
     });
 
     // draw nodes
@@ -2218,8 +2267,10 @@ loadScenarios();
     const textColor = getComputedStyle(document.documentElement).getPropertyValue('--text').trim() || '#e8edf3';
     const border2Color = getComputedStyle(document.documentElement).getPropertyValue('--border2').trim() || '#33404f';
     nodes.forEach((node, idx) => {
-      const isHoverNode = corrNetHover && corrNetHover.type === 'edge' &&
-                           (corrNetHover.i === idx || corrNetHover.j === idx);
+      const isHoverNode = (corrNetHover && corrNetHover.type === 'edge' &&
+                           (corrNetHover.i === idx || corrNetHover.j === idx)) ||
+                           (corrNetPinned && corrNetPinned.type === 'edge' &&
+                           (corrNetPinned.i === idx || corrNetPinned.j === idx));
       ctx.beginPath();
       ctx.arc(node.x, node.y, isHoverNode ? 5.5 : 4.5, 0, Math.PI*2);
       ctx.fillStyle = isHoverNode ? accentColor : bg2Color;
@@ -2243,7 +2294,18 @@ loadScenarios();
 
     window.__corrNetworkStats = {window: corrWindow, edges: edges.length, nulls: nulls};
 
-    // hover wiring (bind once per redraw is fine — canvas element is replaced by innerHTML each render)
+    // legend (a4-UX #1) — small HTML overlay inside .cp-net-wrap, rebuilt
+    // alongside the canvas since renderCorrPanel() replaces innerHTML wholesale.
+    if (!wrap.querySelector('.cp-net-legend')){
+      const legend = document.createElement('div');
+      legend.className = 'cp-net-legend';
+      legend.innerHTML =
+        '<span><i class="pos"></i>'+tr('corr_net_legend_pos')+'</span>'+
+        '<span><i class="neg"></i>'+tr('corr_net_legend_neg')+'</span>';
+      wrap.appendChild(legend);
+    }
+
+    // event wiring (bind once per redraw is fine — canvas element is replaced by innerHTML each render)
     if (!cv.__corrNetBound){
       cv.__corrNetBound = true;
       cv.addEventListener('mousemove', function(ev){
@@ -2251,8 +2313,13 @@ loadScenarios();
       });
       cv.addEventListener('mouseleave', function(){
         corrNetHover = null;
-        if (tip) tip.style.display = 'none';
+        if (!corrNetPinned && tip) tip.style.display = 'none';
         corrNetRedrawCurrent();
+      });
+      // a4-UX #3: tap/click to pin a tooltip; tap empty space to unpin.
+      // pointerdown covers touch + mouse reliably across mobile widths.
+      cv.addEventListener('pointerdown', function(ev){
+        corrNetHandleTap(ev, cv, tip);
       });
     }
   }
@@ -2266,36 +2333,75 @@ loadScenarios();
     if (matrix && labels.length) drawCorrNetwork(matrix, labels, corr.n_obs);
   }
 
+  // Finds the nearest edge (bezier-aware) to a canvas-local point, or null.
+  function corrNetPickEdge(mx, my){
+    if (!corrNetLastGeom) return null;
+    const { nodes, edges } = corrNetLastGeom;
+    const HIT = 8;
+    let best = null, bestDist = HIT;
+    edges.forEach(e => {
+      const a = nodes[e.i], b = nodes[e.j];
+      const d = ptQuadDist(mx, my, a.x, a.y, e.cpx, e.cpy, b.x, b.y);
+      if (d < bestDist){ bestDist = d; best = e; }
+    });
+    return best;
+  }
+
+  function corrNetShowTip(tip, mx, my, best, rectW, rectH){
+    if (!tip || !corrNetLastGeom) return;
+    const { nodes } = corrNetLastGeom;
+    const la = corrNetLabel(nodes[best.i].label);
+    const lb = corrNetLabel(nodes[best.j].label);
+    tip.textContent = la+' × '+lb+': r='+best.r.toFixed(2);
+    tip.style.display = 'block';
+    // keep tooltip inside the wrap bounds (rough estimate; tip is small)
+    const tw = tip.offsetWidth || 120, th = tip.offsetHeight || 20;
+    let left = mx + 10, top = my + 10;
+    if (rectW && left + tw > rectW) left = mx - tw - 10;
+    if (rectH && top + th > rectH) top = my - th - 10;
+    if (left < 0) left = 2;
+    if (top < 0) top = 2;
+    tip.style.left = left + 'px';
+    tip.style.top = top + 'px';
+  }
+
   function corrNetHandleHover(ev, cv, tip){
     if (!corrNetLastGeom) return;
     const rect = cv.getBoundingClientRect();
     const mx = ev.clientX - rect.left;
     const my = ev.clientY - rect.top;
-    const { nodes, edges } = corrNetLastGeom;
-    const HIT = 6;
-    let best = null, bestDist = HIT;
-    edges.forEach(e => {
-      const a = nodes[e.i], b = nodes[e.j];
-      const d = ptSegDist(mx, my, a.x, a.y, b.x, b.y);
-      if (d < bestDist){ bestDist = d; best = e; }
-    });
+    const best = corrNetPickEdge(mx, my);
     const prev = corrNetHover;
-    if (best){
-      corrNetHover = { type:'edge', i: best.i, j: best.j, r: best.r };
-      if (tip){
-        const la = corrNetLabel(nodes[best.i].label);
-        const lb = corrNetLabel(nodes[best.j].label);
-        tip.textContent = la+' × '+lb+': r='+best.r.toFixed(2);
-        tip.style.left = (mx + 10) + 'px';
-        tip.style.top = (my + 10) + 'px';
-        tip.style.display = 'block';
-      }
-    } else {
-      corrNetHover = null;
-      if (tip) tip.style.display = 'none';
+    corrNetHover = best ? { type:'edge', i: best.i, j: best.j, r: best.r } : null;
+    // pinned tooltip takes priority over hover tooltip; hover only shown when unpinned
+    if (!corrNetPinned){
+      if (best) corrNetShowTip(tip, mx, my, best, corrNetLastGeom.rectW, corrNetLastGeom.rectH);
+      else if (tip) tip.style.display = 'none';
     }
     const changed = !prev || !best || prev.i !== best.i || prev.j !== best.j;
     if (changed) corrNetRedrawCurrent();
+  }
+
+  // a4-UX #3: click/tap on an edge pins its tooltip; click/tap on empty
+  // canvas space clears the pin. Pin state survives redraw (window toggle,
+  // resize) since corrNetPinned is module-level state, not recomputed geometry.
+  function corrNetHandleTap(ev, cv, tip){
+    if (!corrNetLastGeom) return;
+    const rect = cv.getBoundingClientRect();
+    const clientX = ev.clientX != null ? ev.clientX : (ev.touches && ev.touches[0] && ev.touches[0].clientX);
+    const clientY = ev.clientY != null ? ev.clientY : (ev.touches && ev.touches[0] && ev.touches[0].clientY);
+    if (clientX == null || clientY == null) return;
+    const mx = clientX - rect.left;
+    const my = clientY - rect.top;
+    const best = corrNetPickEdge(mx, my);
+    if (best){
+      corrNetPinned = { type:'edge', i: best.i, j: best.j, r: best.r };
+      corrNetShowTip(tip, mx, my, best, corrNetLastGeom.rectW, corrNetLastGeom.rectH);
+    } else {
+      corrNetPinned = null;
+      if (tip) tip.style.display = 'none';
+    }
+    corrNetRedrawCurrent();
   }
 
   function ptSegDist(px, py, x1, y1, x2, y2){
@@ -2305,6 +2411,26 @@ loadScenarios();
     t = Math.max(0, Math.min(1, t));
     const cx = x1 + t*dx, cy = y1 + t*dy;
     return Math.sqrt((px-cx)*(px-cx) + (py-cy)*(py-cy));
+  }
+
+  // a4-UX #4 hit-testing: edges are now quadratic beziers, not straight
+  // lines. Exact point-to-bezier distance has no closed form, so we sample
+  // the curve at a fixed resolution and take the nearest sampled point —
+  // sufficient precision for an 8px hit radius on a ~300x340 canvas.
+  function ptQuadDist(px, py, x0, y0, cx, cy, x1, y1){
+    const STEPS = 16;
+    let best = Infinity;
+    let prevX = x0, prevY = y0;
+    for (let s = 1; s <= STEPS; s++){
+      const t = s / STEPS;
+      const mt = 1 - t;
+      const bx = mt*mt*x0 + 2*mt*t*cx + t*t*x1;
+      const by = mt*mt*y0 + 2*mt*t*cy + t*t*y1;
+      const d = ptSegDist(px, py, prevX, prevY, bx, by);
+      if (d < best) best = d;
+      prevX = bx; prevY = by;
+    }
+    return best;
   }
 
   window.addEventListener('resize', function(){
