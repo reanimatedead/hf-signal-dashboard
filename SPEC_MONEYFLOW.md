@@ -385,3 +385,80 @@ renderBody で `data-section` 行をテーブル先頭/中央に挿入し、`IMM
 
 既存ゲート (Gate-1〜Gate-10, Gate-1c, Gate-1d) は無改変。上記8件はそれに
 追加される形で `verify.py` の末尾に実装されている。
+
+### 8.6 相関ネットワーク集約図 (corr-network)
+
+> 本副節は §8.1-8.5 (相関パネル) の後続拡張。`correlations.matrix_60d` /
+> `matrix_20d` / `labels` を**そのまま**可視化するフロント専用の追加であり、
+> `data.json` スキーマへの変更は伴わない (フロントは既存 `correlations` を
+> 読むだけ)。
+
+#### 8.6.1 配置
+
+- `<canvas id="corr-network">` を相関パネル (`.cp-net-wrap`) 内、**ヒートマップ
+  の上**に配置する (相関パネルの表示順は上から: ネットワーク図 → ヒート
+  マップ → key_pairs 時系列)。
+- 10ノードを**固定円環配置**とし、`labels` 10本を3つの弧に分ける:
+  - **左弧**: `N225`, `JGB5Y`, `JGB10Y`, `JGB30Y` (220°/193°/167°/140°)
+  - **右弧**: `SPX`, `US5Y`, `US10Y`, `US30Y` (-40°/-13°/13°/40°)
+  - **下弧**: `USDJPY`, `US-JP10Yspread` (100°/80°)
+  - 角度は楕円 (`rx = w/2 - 74`, `ry = h/2 - 46` を下限60pxでクランプ) 上の
+    固定座標であり、**物理シミュレーション (force-directed / spring layout)
+    は禁止**。ノード位置は `labels` の並びと角度テーブルのみで決定論的に
+    決まり、フレーム間・日間で揺れない (毎日の見た目比較可能性を担保する
+    ため)。
+
+#### 8.6.2 エッジ描画契約
+
+- 対象ペアは上三角 (`i<j`) のみ、対角は描画しない。
+- **しきい値**: `|r| >= 0.3` のペアのみエッジを描く。`|r| < 0.3` は非描画
+  (関係なしとして間引く。捏造で薄いエッジを足さない)。
+- **太さ**: `|r|` に比例 (`1 + |r|*4` px、`|r|` は1にクランプ)。
+- **色**: `r >= 0` は緑 (`--green` 系, `rgba(0,232,162,α)`)、`r < 0` は赤
+  (`--red` 系, `rgba(255,69,96,α)`)。不透明度もベースα + `|r|` 比例で強弱を
+  つける。
+- **null ペア非描画**: 行列値が `null`/`undefined`/`NaN` のペアはエッジを
+  描かない。カウントのみ `nulls` に積み増す (§0 捏造禁止の継承。null を 0
+  や中間値として描かない)。
+- **全ペア null 時**: 上三角の全ペアが null (`nulls === n*(n-1)/2`) の場合は
+  エッジもノード強調も描かず、キャンバス中央に i18n 文言
+  `corr_net_empty` (JA:「データ不足」/ EN:"Insufficient data") のみを表示
+  する。
+
+#### 8.6.3 60d/20d トグル連動・ラベル・ホバー
+
+- 相関パネル既存の 60d/20d ウィンドウ切替ボタン (`.cp-wbtn`) と状態を共有
+  する (`corrWindow` 変数)。切替時は対応する `matrix_60d` / `matrix_20d` で
+  再描画し、`window.__corrNetworkStats.window` を `"60d"` / `"20d"` に更新
+  する。
+- ノードラベルは JA 表示時のみ短縮辞書 (`I18N.ja.corr_net_labels`) を経由
+  して短縮名を表示する (例: `N225`, `USDJPY` 等は英字のまま/短縮のいずれ
+  か、辞書に無いラベルは元の識別子をフォールバック表示)。EN 表示時は
+  `labels` の識別子をそのまま表示する。
+- ホバー: マウスがエッジに近接すると該当エッジと両端ノードをハイライト
+  (強調色・太字ラベル) し、ツールチップ (`#corr-net-tip`) に **r値とペア名**
+  (JA短縮名込み) を表示する。ホバー判定はキャッシュ済みジオメトリ
+  (`corrNetLastGeom`) に対して行い、再描画を伴わない。
+
+#### 8.6.4 機械検証契約
+
+- 描画関数は毎回 `window.__corrNetworkStats = {window, edges, nulls}` を
+  グローバルに公開する。
+  - `window`: 現在表示中のウィンドウ (`"60d"` | `"20d"`)。
+  - `edges`: 実際に描画した上三角エッジ数 (`|r|>=0.3` かつ非null)。
+  - `nulls`: 上三角の null ペア数。
+  - 全ペア null で「データ不足」表示に分岐した場合も `edges:0` と実際の
+    `nulls` 値を公開する (早期returnでも省略しない)。
+- `verify_render.mjs` はブラウザが公開したこの値を、`docs/data.json` の
+  `correlations.matrix_60d`/`matrix_20d` から**フロントの実装と独立に**
+  再計算した期待値 (`computeCorrExpected()` / `countEdgesNulls()`) と突合
+  する (`corr_network_edge_parity` ゲート)。フロント側のロジックにバグが
+  あっても、検証側は自前で数え直すため見逃さない。
+
+#### 8.6.5 `verify_render.mjs` 新ゲート一覧 (3件)
+
+| ゲート名 | 検証内容 |
+|---|---|
+| `corr_network_canvas` | `#corr-network` が moneyflow タブ表示後に存在し、非ゼロサイズ (w>0, h>0) で描画されている |
+| `corr_network_edge_parity` | `window.__corrNetworkStats` の `edges`/`nulls` が、`docs/data.json` から独立計算した期待値と 60d 初期表示・20d トグル後の両方で一致する |
+| `corr_network_js_errors` | corr-network の描画・60d→20dトグル操作中に console error / pageerror が発生しない (favicon 404 等の既知ノイズは除外) |
