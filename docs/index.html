@@ -2118,6 +2118,10 @@ loadScenarios();
     html += '<span class="mf-badge '+badgeCls+'">'+status+'</span>';
     html += '<span class="cp-asof">'+tr('corr_asof')+' '+(corr.as_of ? String(corr.as_of).slice(0,10) : '—')+
             ' ('+tr('corr_lag')+' '+(lag!=null?lag+tr('days'):'—')+')</span>';
+    const srcs = Array.isArray(corr.sources) ? corr.sources.filter(Boolean) : [];
+    if (srcs.length){
+      html += '<span class="cp-asof"><b>'+tr('source')+':</b> '+srcs.join(' · ')+'</span>';
+    }
     html += '</div>';
     if (corr.method){
       html += '<div class="cp-method">'+tr('corr_method_label')+': '+corr.method+'</div>';
