@@ -67,9 +67,27 @@ jobs:
           git diff --cached --quiet && echo "No changes to commit" || \
             git commit -m "chore(corr): $(date -u '+%Y-%m-%d %H:%M UTC')"
 
-      # ── 6. Push ────────────────────────────────────────
-      - name: Push changes
-        uses: ad-m/github-push-action@v0.8.0
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          branch: ${{ github.ref }}
+      # ── 6. Push (競合リトライ付き) ─────────────────────
+      # 並走push(人間/他workflow)による non-fast-forward 拒否で赤×に
+      # なるのを防ぐ。rebase採用の根拠: bot commit は生成物のみで、
+      # rebase 後も直前のビルド結果として正しいまま。
+      # 同内容が先に反映済みの場合は rebase が commit を落とし、push は
+      # "Everything up-to-date" となり「commitなし=成功」で緑終了する。
+      # rebase 衝突は自己解決せず abort して exit 1。
+      - name: Push changes (with conflict retry)
+        run: |
+          BRANCH="$GITHUB_REF_NAME"
+          for attempt in 1 2 3 4; do   # 1=初回, 2-4=リトライ最大3回
+            if ! git pull --rebase --autostash origin "$BRANCH"; then
+              git rebase --abort || true
+              echo "::error::git pull --rebase failed (attempt ${attempt}): conflict requires manual resolution"
+              exit 1
+            fi
+            if git push origin "HEAD:${BRANCH}"; then
+              echo "Push succeeded (attempt ${attempt})"
+              exit 0
+            fi
+            echo "Push rejected (attempt ${attempt}), re-rebasing..."
+          done
+          echo "::error::Push failed after 3 retries"
+          exit 1
