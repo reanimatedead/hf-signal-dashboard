@@ -359,6 +359,65 @@ body.light .mf-cv-wrap{background:radial-gradient(ellipse at 50% 18%,#e8edf3,#f7
 .mf-meta .mf-status{padding:1px 5px;border:1px solid var(--border);border-radius:3px;
                     color:var(--text-dim);font-family:var(--cond);font-weight:700}
 
+/* ── Real-value line (cb_assets.wow_change) + sink weekly-change grid ── */
+.mf-real{font-size:11px;font-variant-numeric:tabular-nums;display:flex;align-items:baseline;gap:6px;
+         padding:4px 8px;background:var(--bg3);border:1px solid var(--border);border-radius:4px}
+.mf-real b{color:var(--text-dim);font-weight:600;font-size:10px;letter-spacing:0.04em}
+.mf-real .v{font-weight:700}
+.mf-real .v.pos{color:var(--green)}
+.mf-real .v.neg{color:var(--orange)}
+.mf-real .v.na{color:var(--text-faint)}
+.mf-sinks{display:grid;grid-template-columns:1fr 1fr;gap:4px 8px}
+.mf-sink{display:flex;align-items:center;justify-content:space-between;gap:6px;
+         font-size:10.5px;padding:3px 7px;background:var(--bg3);border:1px solid var(--border);border-radius:3px}
+.mf-sink .lbl{color:var(--text-dim)}
+.mf-sink .lbl .sym{color:var(--text-faint);font-size:9px;margin-left:3px}
+.mf-sink .val{font-variant-numeric:tabular-nums;font-weight:700}
+.mf-sink .val.pos{color:var(--green)}
+.mf-sink .val.neg{color:var(--red)}
+.mf-sink .val.na{color:var(--text-faint)}
+.mf-sink-note{font-size:9.5px;color:var(--text-faint)}
+
+/* ══════════════════════════════════════════════════
+   CORRELATION PANEL (mf-pane, additive)
+══════════════════════════════════════════════════ */
+#corr-panel{margin-top:16px;background:var(--bg2);border:1px solid var(--border);border-radius:6px;padding:12px 14px}
+.cp-head{display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:8px}
+.cp-title{font-family:var(--cond);font-weight:700;font-size:13px;letter-spacing:0.06em;
+          color:var(--sym-color);text-transform:uppercase}
+.cp-asof{font-size:10px;color:var(--text-dim)}
+.cp-method{font-size:9.5px;color:var(--text-faint);margin:2px 0 10px}
+.cp-toolbar{display:flex;gap:6px;margin-bottom:10px}
+.cp-wbtn{font-family:var(--cond);font-weight:700;font-size:11px;letter-spacing:0.05em;
+         padding:4px 10px;border:1px solid var(--border);border-radius:3px;
+         color:var(--text-dim);transition:all .15s}
+.cp-wbtn:hover{border-color:var(--border2);color:var(--text)}
+.cp-wbtn.active{background:rgba(0,255,200,0.1);border-color:var(--green);color:var(--green)}
+.cp-heat-wrap{overflow-x:auto;margin-bottom:12px}
+table.cp-heat{border-collapse:collapse;font-size:10px}
+table.cp-heat th{position:sticky;top:0;background:var(--bg3);color:var(--text-dim);
+                 font-family:var(--cond);font-weight:700;padding:3px 5px;text-align:center;
+                 border:1px solid var(--border);white-space:nowrap}
+table.cp-heat th.cp-rowlabel{position:sticky;left:0;z-index:2;text-align:right}
+table.cp-heat td{padding:0;border:1px solid var(--border);text-align:center;min-width:34px;height:22px}
+table.cp-heat td.cp-rowlabel{position:sticky;left:0;background:var(--bg3);color:var(--text-dim);
+                             font-family:var(--cond);font-weight:700;padding:3px 6px;text-align:right;
+                             white-space:nowrap;z-index:1}
+table.cp-heat td.cp-cell{font-variant-numeric:tabular-nums;cursor:default}
+table.cp-heat td.cp-diag{background:var(--bg4);color:var(--text-faint)}
+.cp-spark-grid{display:grid;grid-template-columns:1fr;gap:10px;margin-bottom:10px}
+@media(min-width:900px){.cp-spark-grid{grid-template-columns:1fr 1fr 1fr}}
+.cp-spark{background:var(--bg3);border:1px solid var(--border);border-radius:4px;padding:6px 8px}
+.cp-spark-hd{display:flex;justify-content:space-between;align-items:baseline;font-size:10px;
+             color:var(--text-dim);margin-bottom:4px}
+.cp-spark-r{font-weight:700;font-variant-numeric:tabular-nums}
+.cp-spark-r.pos{color:var(--green)}
+.cp-spark-r.neg{color:var(--red)}
+.cp-spark svg{width:100%;height:60px;display:block}
+.cp-foot{font-size:10px;color:var(--text-dim);line-height:1.6;margin-top:6px}
+.cp-foot .cp-disc{color:var(--text-faint)}
+.cp-empty{font-size:11px;color:var(--text-dim);padding:8px 0}
+
 /* ══════════════════════════════════════════════════
    SURVIVAL PANE (Agent A + Agent D, SPEC_SURVIVAL §5)
 ══════════════════════════════════════════════════ */
@@ -560,22 +619,29 @@ tbody tr.mrow-normal:hover{opacity:1}
       <article class="mf-region" data-region="us">
         <div class="mf-head"><span id="mf-head-us">米国</span><span class="mf-badge stale" id="mf-fresh-us">—</span></div>
         <div class="mf-counter" id="mf-counter-us"></div>
+        <div class="mf-real" id="mf-real-us" style="display:none"></div>
         <div class="mf-cv-wrap"><canvas id="mf-cv-us"></canvas></div>
+        <div class="mf-sinks" id="mf-sinks-us"></div>
         <div class="mf-meta" id="mf-meta-us"></div>
       </article>
       <article class="mf-region" data-region="eu">
         <div class="mf-head"><span id="mf-head-eu">欧州</span><span class="mf-badge stale" id="mf-fresh-eu">—</span></div>
         <div class="mf-counter" id="mf-counter-eu"></div>
+        <div class="mf-real" id="mf-real-eu" style="display:none"></div>
         <div class="mf-cv-wrap"><canvas id="mf-cv-eu"></canvas></div>
+        <div class="mf-sinks" id="mf-sinks-eu"></div>
         <div class="mf-meta" id="mf-meta-eu"></div>
       </article>
       <article class="mf-region" data-region="jp">
         <div class="mf-head"><span id="mf-head-jp">日本</span><span class="mf-badge stale" id="mf-fresh-jp">—</span></div>
         <div class="mf-counter" id="mf-counter-jp"></div>
+        <div class="mf-real" id="mf-real-jp" style="display:none"></div>
         <div class="mf-cv-wrap"><canvas id="mf-cv-jp"></canvas></div>
+        <div class="mf-sinks" id="mf-sinks-jp"></div>
         <div class="mf-meta" id="mf-meta-jp"></div>
       </article>
     </div>
+    <section id="corr-panel"></section>
   </div>
   <div class="tbl-wrap">
     <table><thead id="thead"></thead><tbody id="tbody"></tbody></table>
@@ -1762,6 +1828,15 @@ loadScenarios();
       as_of: "as_of", source: "出典", elapsed: "経過",
       cb_short: "中央銀行", supply: "供給↑", absorb: "吸収↓",
       bg_btn: "背景", lng_btn: "JA", days: "日",
+      real_actual: "実データ", real_na: "実額データなし",
+      sink_weekly: "週次変化", sink_note: "粒の到着%は演出値（実測フローではない）",
+      corr_title: "クロスアセット相関", corr_asof: "as_of", corr_lag: "遅延",
+      corr_w60: "60日", corr_w20: "20日", corr_nobs: "観測数",
+      corr_method_label: "算出方法",
+      corr_missing: "相関データ未生成 (placeholder)",
+      corr_foot1: "FX×米金利の相関は金利・債券・VOLタブ参照",
+      corr_foot2: "For data visualization purposes only. Not investment advice.",
+      corr_rolling: "日ローリング",
     },
     en: {
       tabs: {nikkei225:"Nikkei 225", dow30:"Dow 30", nasdaq100:"Nasdaq 100",
@@ -1775,6 +1850,15 @@ loadScenarios();
       as_of: "as_of", source: "source", elapsed: "elapsed",
       cb_short: "CB", supply: "supply↑", absorb: "absorb↓",
       bg_btn: "BG", lng_btn: "EN", days: "d",
+      real_actual: "actual data", real_na: "no actual-value data",
+      sink_weekly: "weekly change", sink_note: "particle arrival % is a visual effect, not measured flow",
+      corr_title: "Cross-Asset Correlations", corr_asof: "as_of", corr_lag: "lag",
+      corr_w60: "60d", corr_w20: "20d", corr_nobs: "n_obs",
+      corr_method_label: "method",
+      corr_missing: "Correlation data not yet generated (placeholder)",
+      corr_foot1: "For FX × US-rates correlations, see the Rates/Bonds/Vol tab.",
+      corr_foot2: "For data visualization purposes only. Not investment advice.",
+      corr_rolling: "d rolling",
     },
   };
   let lang = (localStorage.getItem("hf_lang") || "ja");
@@ -1879,6 +1963,57 @@ loadScenarios();
       }
       c.innerHTML = html;
     }
+    // real-value line: cb_assets.wow_change actual (T unit), directly above canvas
+    const rv = document.getElementById('mf-real-'+r);
+    if (rv){
+      const cb0 = block.cb_assets || {};
+      const wow0 = cb0.wow_change;
+      const unit = unitTn(cb0.unit);
+      if (wow0 === null || wow0 === undefined || Number.isNaN(+wow0)){
+        rv.style.display = 'none';
+        rv.innerHTML = '';
+      } else {
+        rv.style.display = '';
+        const pos = wow0 >= 0;
+        const cls = pos ? 'pos' : 'neg';
+        const sign = pos ? '+' : '';
+        const arrowLabel = pos ? tr('supply') : tr('absorb');
+        rv.innerHTML = '<b>'+arrowLabel+'</b><span class="v '+cls+'">'+sign+fmtNum(wow0,3)+' '+unit+'</span>'+
+                        '<span style="color:var(--text-faint)">('+tr('real_actual')+')</span>';
+      }
+    }
+    // sink weekly-change grid (2x2): stocks/gold/crypto/cash wow_pct
+    const sk = document.getElementById('mf-sinks-'+r);
+    if (sk){
+      const sm = block.sink_metrics;
+      if (!sm){
+        sk.innerHTML = '';
+        sk.style.display = 'none';
+      } else {
+        sk.style.display = '';
+        const order = ['stocks','gold','crypto','cash'];
+        sk.title = tr('sink_note');
+        const grid = order.map(key=>{
+          const s = sm[key];
+          if (!s) return '';
+          const v = s.wow_pct;
+          let valHtml;
+          if (v === null || v === undefined || Number.isNaN(+v)){
+            valHtml = '<span class="val na">—</span>';
+          } else {
+            const cls = v > 0 ? 'pos' : (v < 0 ? 'neg' : 'na');
+            const sign = v > 0 ? '+' : '';
+            valHtml = '<span class="val '+cls+'">'+sign+fmtNum(v,2)+'%</span>';
+          }
+          const sym = s.symbol ? '<span class="sym">'+s.symbol+'</span>' : '';
+          return '<div class="mf-sink" title="'+tr('sink_weekly')+' — '+tr('sink_note')+'">'+
+                 '<span class="lbl">'+trSink(key)+sym+'</span>'+valHtml+'</div>';
+        }).join('');
+        sk.innerHTML = '<div class="mf-sink-hd" style="grid-column:1/-1;font-size:9.5px;color:var(--text-dim);'+
+                        'letter-spacing:0.04em;text-transform:uppercase">'+tr('sink_weekly')+'</div>'+grid+
+                        '<div class="mf-sink-note" style="grid-column:1/-1" title="'+tr('sink_note')+'">'+tr('sink_note')+'</div>';
+      }
+    }
     // meta line (CB assets + source)
     const m = document.getElementById('mf-meta-'+r);
     if (m){
@@ -1918,11 +2053,149 @@ loadScenarios();
     }
   }
 
+  // ── Correlation panel (mf-pane bottom, additive) ---------------
+  let corrWindow = "60d"; // "60d" | "20d"
+  function corrColor(rVal){
+    // r>0 blue gradient, r<0 red gradient, |r|<0.3 grey (noise zone)
+    if (rVal === null || rVal === undefined || Number.isNaN(rVal)) return {bg:'transparent', fg:'var(--text-faint)'};
+    const a = Math.min(1, Math.abs(rVal));
+    if (Math.abs(rVal) < 0.3){
+      return {bg:'rgba(90,106,126,'+(0.10+0.10*a).toFixed(2)+')', fg:'var(--text-dim)'};
+    }
+    if (rVal > 0){
+      return {bg:'rgba(59,130,246,'+(0.15+0.55*a).toFixed(2)+')', fg:'#eaf2ff'};
+    }
+    return {bg:'rgba(255,69,96,'+(0.15+0.55*a).toFixed(2)+')', fg:'#ffeef1'};
+  }
+  function corrSparkSVG(series, latestR){
+    const W=260,H=60,L=4,R=4,T=6,B=6;
+    const vals = (series||[]).map(p=>p && typeof p.r==='number' ? p.r : null);
+    const n = vals.length;
+    const X = i => L+(n<=1?0:i/(n-1)*(W-L-R));
+    // fixed y-domain [-1,1]
+    const Y = v => T+(1-((v+1)/2))*(H-T-B);
+    const band30Top = Y(0.3), band30Bot = Y(-0.3);
+    const pts = vals.map((v,i)=> v==null?null:`${X(i).toFixed(1)},${Y(v).toFixed(1)}`).filter(Boolean).join(' ');
+    const zero = Y(0);
+    let svg = `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="rolling correlation sparkline">`;
+    svg += `<rect x="${L}" y="${band30Top.toFixed(1)}" width="${W-L-R}" height="${(band30Bot-band30Top).toFixed(1)}" style="fill:var(--text-faint);opacity:0.14"/>`;
+    svg += `<line x1="${L}" y1="${zero.toFixed(1)}" x2="${W-R}" y2="${zero.toFixed(1)}" style="stroke:var(--border2);stroke-width:0.6"/>`;
+    if (pts){
+      const cls = (latestR!=null && latestR<0) ? 'var(--red)' : 'var(--accent)';
+      svg += `<polyline points="${pts}" style="fill:none;stroke:${cls};stroke-width:1.4"/>`;
+    }
+    svg += `</svg>`;
+    return svg;
+  }
+  function renderCorrPanel(){
+    const panel = document.getElementById('corr-panel');
+    if (!panel) return;
+    const D = window.DATA;
+    const corr = D && D.correlations;
+    if (!corr){
+      panel.innerHTML =
+        '<div class="cp-head"><span class="cp-title">'+tr('corr_title')+'</span></div>'+
+        '<div class="cp-empty">'+tr('corr_missing')+'</div>';
+      return;
+    }
+    const status = corr.data_status || 'placeholder';
+    if (status === 'placeholder'){
+      panel.innerHTML =
+        '<div class="cp-head"><span class="cp-title">'+tr('corr_title')+'</span>'+
+        '<span class="mf-badge stale">'+status+'</span></div>'+
+        '<div class="cp-empty">'+tr('corr_missing')+'</div>';
+      return;
+    }
+    const labels = corr.labels || [];
+    const nObs = corr.n_obs;
+    const matrix = corrWindow === '60d' ? corr.matrix_60d : corr.matrix_20d;
+    const badgeCls = status === 'live' ? 'daily' : (status === 'stale' ? 'stale' : 'stale');
+    const lag = corr.lag_days;
+
+    let html = '';
+    html += '<div class="cp-head">';
+    html += '<span class="cp-title">'+tr('corr_title')+'</span>';
+    html += '<span class="mf-badge '+badgeCls+'">'+status+'</span>';
+    html += '<span class="cp-asof">'+tr('corr_asof')+' '+(corr.as_of ? String(corr.as_of).slice(0,10) : '—')+
+            ' ('+tr('corr_lag')+' '+(lag!=null?lag+tr('days'):'—')+')</span>';
+    const srcs = Array.isArray(corr.sources) ? corr.sources.filter(Boolean) : [];
+    if (srcs.length){
+      html += '<span class="cp-asof"><b>'+tr('source')+':</b> '+srcs.join(' · ')+'</span>';
+    }
+    html += '</div>';
+    if (corr.method){
+      html += '<div class="cp-method">'+tr('corr_method_label')+': '+corr.method+'</div>';
+    }
+
+    // window toggle
+    html += '<div class="cp-toolbar">';
+    html += '<button type="button" class="cp-wbtn'+(corrWindow==='60d'?' active':'')+'" onclick="window.__corrSetWindow(\'60d\')">'+tr('corr_w60')+'</button>';
+    html += '<button type="button" class="cp-wbtn'+(corrWindow==='20d'?' active':'')+'" onclick="window.__corrSetWindow(\'20d\')">'+tr('corr_w20')+'</button>';
+    html += '</div>';
+
+    // heatmap (DOM table — consistent with existing .tbl-wrap table pattern; native title tooltip)
+    if (matrix && labels.length){
+      html += '<div class="cp-heat-wrap"><table class="cp-heat"><thead><tr><th class="cp-rowlabel">&nbsp;</th>';
+      labels.forEach(lb => { html += '<th>'+lb+'</th>'; });
+      html += '</tr></thead><tbody>';
+      labels.forEach((rowLb, i) => {
+        html += '<tr><td class="cp-rowlabel">'+rowLb+'</td>';
+        labels.forEach((colLb, j) => {
+          const rVal = matrix[i] ? matrix[i][j] : null;
+          if (i === j){
+            html += '<td class="cp-cell cp-diag" title="'+rowLb+' × '+colLb+'">1.00</td>';
+          } else if (rVal === null || rVal === undefined){
+            html += '<td class="cp-cell" style="color:var(--text-faint)" title="'+rowLb+' × '+colLb+': —">—</td>';
+          } else {
+            const col = corrColor(rVal);
+            const title = rowLb+' × '+colLb+': r='+rVal.toFixed(2)+' (n='+(nObs!=null?nObs:'—')+')';
+            html += '<td class="cp-cell" style="background:'+col.bg+';color:'+col.fg+'" title="'+title+'">'+rVal.toFixed(2)+'</td>';
+          }
+        });
+        html += '</tr>';
+      });
+      html += '</tbody></table></div>';
+    }
+
+    // key_pairs sparklines
+    const kp = corr.key_pairs || [];
+    const longWin = (corr.window && corr.window.long) != null ? corr.window.long : 60;
+    if (kp.length){
+      html += '<div class="cp-spark-grid">';
+      kp.forEach(pair => {
+        const pl = pair.pair || [];
+        const series = pair.series_60d || [];
+        const last = series.length ? series[series.length-1] : null;
+        const latestR = last && typeof last.r === 'number' ? last.r : null;
+        const rCls = latestR==null ? '' : (latestR>=0?'pos':'neg');
+        const rTxt = latestR==null ? '—' : latestR.toFixed(2);
+        html += '<div class="cp-spark">';
+        html += '<div class="cp-spark-hd"><span>'+pl.join(' × ')+' ('+longWin+tr('corr_rolling')+')</span>'+
+                '<span class="cp-spark-r '+rCls+'">r='+rTxt+'</span></div>';
+        html += corrSparkSVG(series, latestR);
+        html += '</div>';
+      });
+      html += '</div>';
+    }
+
+    // footnotes
+    html += '<div class="cp-foot">';
+    html += '<div>'+tr('corr_foot1')+'</div>';
+    html += '<div class="cp-disc">'+tr('corr_foot2')+'</div>';
+    html += '</div>';
+
+    panel.innerHTML = html;
+  }
+  window.__corrSetWindow = function(w){
+    corrWindow = w;
+    renderCorrPanel();
+  };
+
   function refreshMoneyFlow(){
     const D = window.DATA;
     const mf = D && D.money_flow;
-    if (!mf) return;
-    ["us","eu","jp"].forEach(r => renderRegion(r, mf[r]));
+    if (mf) ["us","eu","jp"].forEach(r => renderRegion(r, mf[r]));
+    renderCorrPanel();
   }
   window.__mfRefresh = refreshMoneyFlow;
   window.__mfShow = function(){

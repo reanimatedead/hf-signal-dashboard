@@ -1,9 +1,12 @@
 {
-  "as_of_utc": null,
-  "symbol_count": 0,
-  "total_bars": 0,
-  "coverage": { "first_ts": null, "last_ts": null },
-  "free_gb": null,
-  "store_backend": null,
-  "note": "Macro environment visualization / not investment advice. Run `python3 -m collector.backfill` to populate."
+  "as_of_utc": "2026-06-20T15:16:18+00:00",
+  "symbol_count": 17,
+  "total_bars": 140420,
+  "coverage": {
+    "first_ts": "1927-12-30T00:00:00",
+    "last_ts": "2026-06-20T00:00:00"
+  },
+  "free_gb": 348.54,
+  "store_backend": "jsonl",
+  "note": "Macro environment visualization / not investment advice."
 }

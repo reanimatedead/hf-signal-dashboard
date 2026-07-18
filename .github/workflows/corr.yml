@@ -1,17 +1,24 @@
-name: Daily Signal Update (00:00 JST)
+name: Correlation Panel Update (JST 07:30 / 11:00)
+
+# SPEC_MONEYFLOW.md §8. correlations / money_flow.<region>.sink_metrics を
+# docs/data.json へ read-modify-write マージする専用ワークフロー。
+# 元データ(株価指数・利回り・為替)が日次更新のため、3時間毎などの高頻度更新は
+# 不採用。間隔を変える場合は下の cron 1行を変更するだけでよい。
 
 on:
   schedule:
-    # 00:00 JST = 15:00 UTC (same day). SPEC_MONEYFLOW.md §6.1.
-    - cron: "0 15 * * *"
+    # 30 22 * * 0-4 (UTC) = 07:30 JST 月-金。米国クローズ + FRED反映後。
+    - cron: "30 22 * * 0-4"
+    # 0 2 * * 1-5 (UTC) = 11:00 JST 月-金。財務省JGB利回り公表後。
+    - cron: "0 2 * * 1-5"
   workflow_dispatch:   # Allow manual trigger from GitHub UI
 
 permissions:
   contents: write      # Needed to push data.json back to repo
 
 jobs:
-  update-signals:
-    name: Fetch & Generate Signals
+  update-correlations:
+    name: Fetch & Merge Correlation Panel
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
@@ -35,14 +42,8 @@ jobs:
           pip install --upgrade pip
           pip install -r requirements.txt
 
-      # ── 4. Run signal generation (incl. v4.1 money_flow) ─
-      - name: Generate signals
-        run: python fetch_signals.py
-
-      # ── 4a'. Re-merge correlations (preserve corr block) ──
-      # fetch_signals.py は data.json を全再構築するため correlations を
-      # 再マージする(fetch_signals.py は編集禁止のため後段で注入)。
-      - name: Re-merge correlations (preserve corr block)
+      # ── 4. Fetch + compute + read-modify-write merge into docs/data.json ─
+      - name: Build correlation panel
         run: python3 pipeline/build_corr.py
 
       # ── 4a. Schema gate (fail-fast on contract regression) ─
@@ -57,20 +58,14 @@ jobs:
                  tests/test_bankruptcy_simulator.py \
                  -q
 
-      # ── 4b. Generate (legacy) macro layer (still wired) ──
-      - name: Generate macro layer
-        env:
-          FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
-        run: python pipeline/build_macro.py
-
-      # ── 5. Commit updated data.json + macro.json ───────
+      # ── 5. Commit updated data.json (no-op guard: skip empty commits) ──
       - name: Commit data.json
         run: |
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name  "github-actions[bot]"
-          git add docs/data.json docs/data/macro.json
+          git add docs/data.json
           git diff --cached --quiet && echo "No changes to commit" || \
-            git commit -m "chore: update signals $(date -u '+%Y-%m-%d %H:%M UTC')"
+            git commit -m "chore(corr): $(date -u '+%Y-%m-%d %H:%M UTC')"
 
       # ── 6. Push ────────────────────────────────────────
       - name: Push changes
