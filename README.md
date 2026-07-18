@@ -4,7 +4,7 @@ A public, auto-updating **cross-asset market dashboard** — equities, FX, commo
 volatility, IMM positioning, and crypto — with per-symbol technical charts (Bollinger Bands,
 CCI) and an investment-bank-style macro layer (yield curve, regime context).
 
-**▶ Live dashboard: https://hf-signal-dashboard.pages.dev/**
+**▶ Live dashboard: https://reanimatedead.github.io/hf-signal-dashboard/**
 
 > **30-second pitch:** A Python pipeline pulls daily market data from Yahoo Finance, scores it
 > across 9 market groups, and writes a single `data.json`. A dependency-free static front-end
@@ -341,7 +341,7 @@ or buy/sell recommendations. IMM `long`/`short` refer to CFTC positioning catego
 
 ## Screenshots
 
-Live: **https://hf-signal-dashboard.pages.dev/** — the captures below are of the live site.
+Live: **https://reanimatedead.github.io/hf-signal-dashboard/** — the captures below are of the live site.
 
 ### FX / Commodities detail with Edge Context
 

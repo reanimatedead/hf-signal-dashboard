@@ -1,6 +1,6 @@
 # INTEGRATION_MACRO_FX.md — macro-fx-base 14 派生指標の統合（2026-07-01）
 
-本命ダッシュボード（このリポ / `hf-signal-dashboard.pages.dev`）の「金利・債券・VOL」（`rates_vol`）タブに、
+本命ダッシュボード（このリポ / `reanimatedead.github.io/hf-signal-dashboard`）の「金利・債券・VOL」（`rates_vol`）タブに、
 別リポ **macro-fx-base**（`macro-fx-base.pages.dev`）が算出する 14 派生指標を **1 データソースとして live 参照**で差し込んだ。
 
 ## 差し込んだ 14 指標
