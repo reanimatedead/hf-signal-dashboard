@@ -22,3 +22,6 @@ config.local.*
 # Phase 1.6 — notify: 個別通知ログとローカルストレージは公開しない
 data/local/
 ~/Library/LaunchAgents/com.hf.notify.plist
+
+# セッション用の一時権限設定 (出荷モード等) は誤commitを恒久防止
+.claude/settings.json
