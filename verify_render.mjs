@@ -12,6 +12,41 @@ import { readFile } from "node:fs/promises";
 import { extname, join } from "node:path";
 
 const DIR = new URL("./docs/", import.meta.url).pathname;
+
+// ── corr-network: independent edge/null count from docs/data.json ─────────
+// Mirrors the browser-side logic in docs/index.html's drawCorrNetwork():
+// upper-triangle only (i<j, diagonal excluded), null/undefined/NaN -> "nulls",
+// |r|>=0.3 -> "edges". Computed independently here (not by reading the
+// browser's own output) so the gate can catch a regression in either side.
+function countEdgesNulls(matrix, n) {
+  let edges = 0;
+  let nulls = 0;
+  for (let i = 0; i < n; i++) {
+    for (let j = i + 1; j < n; j++) {
+      const rVal = matrix[i] ? matrix[i][j] : null;
+      if (rVal === null || rVal === undefined || Number.isNaN(rVal)) {
+        nulls++;
+        continue;
+      }
+      if (Math.abs(rVal) >= 0.3) edges++;
+    }
+  }
+  return { edges, nulls };
+}
+
+async function computeCorrExpected() {
+  const raw = await readFile(join(DIR, "data.json"), "utf8");
+  const data = JSON.parse(raw);
+  const corr = data.correlations;
+  if (!corr || !Array.isArray(corr.labels)) {
+    throw new Error("docs/data.json missing correlations.labels — cannot compute expected edge/null counts");
+  }
+  const n = corr.labels.length;
+  return {
+    "60d": countEdgesNulls(corr.matrix_60d, n),
+    "20d": countEdgesNulls(corr.matrix_20d, n),
+  };
+}
 const PORT = parseInt(process.env.PORT || "8788", 10);
 const MIME = {
   ".html": "text/html",
@@ -140,6 +175,40 @@ try {
     return { paneVisible, tableHidden, canvases, counters, badges, disc };
   });
 
+  // ── corr-network: canvas visibility + stats at initial (60d) window ──
+  const corrExpected = await computeCorrExpected();
+  const corrInit = await page.evaluate(() => {
+    const cv = document.getElementById("corr-network");
+    if (!cv) return { present: false };
+    const rect = cv.getBoundingClientRect();
+    return {
+      present: true,
+      w: rect.width,
+      h: rect.height,
+      stats: window.__corrNetworkStats || null,
+    };
+  });
+
+  // Toggle to 20d window via the .cp-wbtn button (not calling internals directly)
+  await page.evaluate(() => {
+    const btns = Array.from(document.querySelectorAll(".cp-wbtn"));
+    const b20 = btns.find((el) => /20d|20日/.test(el.textContent) || el.getAttribute("onclick")?.includes("'20d'"));
+    if (b20) b20.click();
+  });
+  await new Promise((r) => setTimeout(r, 500));
+
+  const corr20 = await page.evaluate(() => {
+    const cv = document.getElementById("corr-network");
+    if (!cv) return { present: false };
+    const rect = cv.getBoundingClientRect();
+    return {
+      present: true,
+      w: rect.width,
+      h: rect.height,
+      stats: window.__corrNetworkStats || null,
+    };
+  });
+
   // Cycle background mode twice and capture transitions
   const bgBefore = await page.evaluate(() => localStorage.getItem("hf_bg_mode") || "clean");
   await page.evaluate(() => document.getElementById("bgbtn")?.click());
@@ -204,7 +273,49 @@ try {
   if (!back.tableVisible) failed.push("table did not restore on return");
   if (back.rows === 0) failed.push("no table rows after returning to nikkei225 (regression)");
 
-  if (errors.length) failed.push("console errors: " + errors.slice(0, 3).join(" | "));
+  // ── gate: corr_network_canvas ──────────────────────────────────────
+  if (!corrInit.present) failed.push("corr_network_canvas: #corr-network canvas missing after moneyflow tab click");
+  else if (!(corrInit.w > 0 && corrInit.h > 0))
+    failed.push(`corr_network_canvas: #corr-network has zero size (w=${corrInit.w}, h=${corrInit.h})`);
+
+  // ── gate: corr_network_edge_parity ───────────────────────────────────
+  // Compares the browser-reported window.__corrNetworkStats against an
+  // independent edge/null count computed directly from docs/data.json
+  // (see computeCorrExpected/countEdgesNulls above), for both the initial
+  // 60d window and after clicking the 20d .cp-wbtn toggle.
+  if (!corrInit.stats) {
+    failed.push("corr_network_edge_parity: window.__corrNetworkStats missing on initial (60d) render");
+  } else {
+    if (corrInit.stats.window !== "60d")
+      failed.push(`corr_network_edge_parity: expected initial window '60d', got '${corrInit.stats.window}'`);
+    const exp60 = corrExpected["60d"];
+    if (corrInit.stats.edges !== exp60.edges)
+      failed.push(`corr_network_edge_parity: 60d edges mismatch — expected ${exp60.edges}, got ${corrInit.stats.edges}`);
+    if (corrInit.stats.nulls !== exp60.nulls)
+      failed.push(`corr_network_edge_parity: 60d nulls mismatch — expected ${exp60.nulls}, got ${corrInit.stats.nulls}`);
+  }
+  if (!corr20.stats) {
+    failed.push("corr_network_edge_parity: window.__corrNetworkStats missing after 20d toggle click");
+  } else {
+    if (corr20.stats.window !== "20d")
+      failed.push(`corr_network_edge_parity: expected window '20d' after toggle, got '${corr20.stats.window}'`);
+    const exp20 = corrExpected["20d"];
+    if (corr20.stats.edges !== exp20.edges)
+      failed.push(`corr_network_edge_parity: 20d edges mismatch — expected ${exp20.edges}, got ${corr20.stats.edges}`);
+    if (corr20.stats.nulls !== exp20.nulls)
+      failed.push(`corr_network_edge_parity: 20d nulls mismatch — expected ${exp20.nulls}, got ${corr20.stats.nulls}`);
+  }
+
+  // ── gate: corr_network_js_errors ─────────────────────────────────────
+  // Reuses the page-wide `errors` collector (console 'error' + pageerror),
+  // which already ran through the corr-network render + 20d toggle above.
+  // The pre-existing isBenignMsg() (top of file) filters out favicon's
+  // "Failed to load resource ... 404" — the one known, unrelated 404 this
+  // static server produces — plus googleapis/gstatic noise. That filter is
+  // untouched here; this gate simply asserts the (already-filtered) errors
+  // collected during the corr-network interactions is empty.
+  if (errors.length) failed.push("corr_network_js_errors: console errors: " + errors.slice(0, 5).join(" | "));
+
   if (badRequests.length) failed.push("bad requests: " + badRequests.slice(0, 3).join(" | "));
 
   out({
@@ -213,6 +324,12 @@ try {
     init,
     moneyFlow: { paneVisible: mf.paneVisible, tableHidden: mf.tableHidden,
                  canvases: mf.canvases, counters: mf.counters, badges: mf.badges },
+    corrNetwork: {
+      canvas60d: { w: corrInit.w, h: corrInit.h },
+      canvas20d: { w: corr20.w, h: corr20.h },
+      expected: corrExpected,
+      actual: { "60d": corrInit.stats, "20d": corr20.stats },
+    },
     bgCycle: { before: bgBefore, after1: bgAfter1, after2: bgAfter2 },
     langPersisted: lng,
     backToNikkei: back,
