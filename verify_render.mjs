@@ -16,11 +16,15 @@ const DIR = new URL("./docs/", import.meta.url).pathname;
 // ── corr-network: independent edge/null count from docs/data.json ─────────
 // Mirrors the browser-side logic in docs/index.html's drawCorrNetwork():
 // upper-triangle only (i<j, diagonal excluded), null/undefined/NaN -> "nulls",
-// |r|>=0.3 -> "edges". Computed independently here (not by reading the
-// browser's own output) so the gate can catch a regression in either side.
+// |r|>=0.25 -> "edges" (a4-UX threshold, v2 §a4-UX). Computed independently
+// here (not by reading the browser's own output) so the gate can catch a
+// regression in either side. Also tallies negative-r edges (|r|>=0.25) so
+// the dashed-edge gate below can assert against a real, non-hardcoded count.
+const CORR_NET_EDGE_THRESHOLD = 0.25;
 function countEdgesNulls(matrix, n) {
   let edges = 0;
   let nulls = 0;
+  let negEdges = 0;
   for (let i = 0; i < n; i++) {
     for (let j = i + 1; j < n; j++) {
       const rVal = matrix[i] ? matrix[i][j] : null;
@@ -28,10 +32,13 @@ function countEdgesNulls(matrix, n) {
         nulls++;
         continue;
       }
-      if (Math.abs(rVal) >= 0.3) edges++;
+      if (Math.abs(rVal) >= CORR_NET_EDGE_THRESHOLD) {
+        edges++;
+        if (rVal < 0) negEdges++;
+      }
     }
   }
-  return { edges, nulls };
+  return { edges, nulls, negEdges };
 }
 
 async function computeCorrExpected() {
@@ -101,6 +108,28 @@ const isBenignMsg = (s) => /favicon|googleapis|gstatic|Failed to load resource/.
 const browser = await puppeteer.launch({ headless: "new", args: ["--no-sandbox"] });
 try {
   const page = await browser.newPage();
+
+  // ── corr_network_dashed_edges instrumentation ──────────────────────────
+  // Wrap CanvasRenderingContext2D.prototype.setLineDash *before* any page
+  // script runs (evaluateOnNewDocument fires on every navigation, ahead of
+  // docs/index.html's own <script>). drawCorrNetwork() calls setLineDash
+  // with a non-empty pattern ([5,4]) immediately before stroke()-ing a
+  // negative-correlation edge, and resets to [] right after (see
+  // docs/index.html ~L2255-2261). So counting non-empty-array calls here,
+  // independent of the page's own bookkeeping, tells us how many dashed
+  // strokes were actually issued to the canvas — a real render-time signal,
+  // not a hardcoded expectation.
+  await page.evaluateOnNewDocument(() => {
+    window.__corrNetDashedCalls = 0;
+    const orig = CanvasRenderingContext2D.prototype.setLineDash;
+    CanvasRenderingContext2D.prototype.setLineDash = function (segments) {
+      if (Array.isArray(segments) && segments.length > 0) {
+        window.__corrNetDashedCalls++;
+      }
+      return orig.apply(this, arguments);
+    };
+  });
+
   page.on("console", (m) => {
     if (m.type() !== "error") return;
     const t = m.text() || "";
@@ -176,7 +205,21 @@ try {
   });
 
   // ── corr-network: canvas visibility + stats at initial (60d) window ──
+  // Note: by this point drawCorrNetwork() has already run at least twice for
+  // the 60d window — once from init()'s money-flow pre-warm (docs/index.html
+  // L907) and once from the moneyflow tab click above (__mfShow ->
+  // refreshMoneyFlow -> renderCorrPanel) — so the global dashedCalls counter
+  // would double-count if read as-is. Reset the counter and click the .cp-wbtn
+  // "60d" button itself (an existing, real redraw trigger — not a call into
+  // internals) to force exactly one fresh 60d draw, then read the counter.
   const corrExpected = await computeCorrExpected();
+  await page.evaluate(() => {
+    window.__corrNetDashedCalls = 0;
+    const btns = Array.from(document.querySelectorAll(".cp-wbtn"));
+    const b60 = btns.find((el) => /60d|60日/.test(el.textContent) || el.getAttribute("onclick")?.includes("'60d'"));
+    if (b60) b60.click();
+  });
+  await new Promise((r) => setTimeout(r, 300));
   const corrInit = await page.evaluate(() => {
     const cv = document.getElementById("corr-network");
     if (!cv) return { present: false };
@@ -186,11 +229,15 @@ try {
       w: rect.width,
       h: rect.height,
       stats: window.__corrNetworkStats || null,
+      // snapshot after a single, freshly-triggered 60d render (see reset
+      // above) so the dashed-edge count reflects exactly one draw pass
+      dashedCalls: window.__corrNetDashedCalls || 0,
     };
   });
 
   // Toggle to 20d window via the .cp-wbtn button (not calling internals directly)
   await page.evaluate(() => {
+    window.__corrNetDashedCalls = 0; // reset counter so 20d gets its own tally
     const btns = Array.from(document.querySelectorAll(".cp-wbtn"));
     const b20 = btns.find((el) => /20d|20日/.test(el.textContent) || el.getAttribute("onclick")?.includes("'20d'"));
     if (b20) b20.click();
@@ -206,6 +253,7 @@ try {
       w: rect.width,
       h: rect.height,
       stats: window.__corrNetworkStats || null,
+      dashedCalls: window.__corrNetDashedCalls || 0,
     };
   });
 
@@ -306,6 +354,36 @@ try {
       failed.push(`corr_network_edge_parity: 20d nulls mismatch — expected ${exp20.nulls}, got ${corr20.stats.nulls}`);
   }
 
+  // ── gate: corr_network_dashed_edges (v2 §a3-validation-harness) ───────
+  // a4-UX #1 dual-encoding requires negative-correlation edges to render
+  // dashed. We can't inspect canvas pixels for "is this line dashed", so
+  // we instrument CanvasRenderingContext2D.prototype.setLineDash via
+  // evaluateOnNewDocument (see top of browser section) and count how many
+  // times drawCorrNetwork() called it with a non-empty pattern — which,
+  // per docs/index.html, happens exactly once per negative edge stroked
+  // (dash set right before stroke(), reset to [] right after — L2255-2261).
+  // Expectation is NOT hardcoded: negEdges60 comes from the same
+  // independent countEdgesNulls() pass over docs/data.json used above.
+  // If there are zero negative pairs at |r|>=0.25 in the current data,
+  // the gate is skipped (not failed) rather than asserting on data that
+  // doesn't exist — matches the "捏造禁止" (no fabricated expectations)
+  // principle applied elsewhere in this harness.
+  const exp60NegEdges = corrExpected["60d"].negEdges;
+  let dashedGateSkipped = false;
+  if (exp60NegEdges === 0) {
+    dashedGateSkipped = true;
+  } else if (!corrInit.present) {
+    failed.push("corr_network_dashed_edges: #corr-network canvas missing, cannot verify dashed strokes");
+  } else if (corrInit.dashedCalls < 1) {
+    failed.push(
+      `corr_network_dashed_edges: expected >=1 dashed stroke (60d has ${exp60NegEdges} negative edge(s) at |r|>=0.25), got 0 setLineDash(non-empty) calls`
+    );
+  } else if (corrInit.dashedCalls !== exp60NegEdges) {
+    failed.push(
+      `corr_network_dashed_edges: dashed stroke count mismatch — expected ${exp60NegEdges} (60d negative edges at |r|>=0.25), got ${corrInit.dashedCalls}`
+    );
+  }
+
   // ── gate: corr_network_js_errors ─────────────────────────────────────
   // Reuses the page-wide `errors` collector (console 'error' + pageerror),
   // which already ran through the corr-network render + 20d toggle above.
@@ -329,6 +407,13 @@ try {
       canvas20d: { w: corr20.w, h: corr20.h },
       expected: corrExpected,
       actual: { "60d": corrInit.stats, "20d": corr20.stats },
+      dashedEdges: {
+        threshold: CORR_NET_EDGE_THRESHOLD,
+        expected60dNegEdges: exp60NegEdges,
+        observedDashedCalls60d: corrInit.dashedCalls,
+        observedDashedCalls20d: corr20.dashedCalls,
+        gate: dashedGateSkipped ? "SKIP (no negative pairs at |r|>=0.25 in current data)" : (failed.some(f => f.startsWith("corr_network_dashed_edges")) ? "FAIL" : "PASS"),
+      },
     },
     bgCycle: { before: bgBefore, after1: bgAfter1, after2: bgAfter2 },
     langPersisted: lng,
