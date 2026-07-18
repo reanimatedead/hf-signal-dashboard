@@ -393,6 +393,12 @@ body.light .mf-cv-wrap{background:radial-gradient(ellipse at 50% 18%,#e8edf3,#f7
          color:var(--text-dim);transition:all .15s}
 .cp-wbtn:hover{border-color:var(--border2);color:var(--text)}
 .cp-wbtn.active{background:rgba(0,255,200,0.1);border-color:var(--green);color:var(--green)}
+.cp-net-wrap{position:relative;background:var(--bg3);border:1px solid var(--border);border-radius:4px;
+             margin-bottom:12px;height:340px}
+.cp-net-wrap canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
+.cp-net-tip{position:absolute;pointer-events:none;background:var(--bg4);border:1px solid var(--border2);
+            border-radius:3px;padding:4px 7px;font-size:10.5px;color:var(--text);white-space:nowrap;
+            z-index:3;display:none;font-variant-numeric:tabular-nums}
 .cp-heat-wrap{overflow-x:auto;margin-bottom:12px}
 table.cp-heat{border-collapse:collapse;font-size:10px}
 table.cp-heat th{position:sticky;top:0;background:var(--bg3);color:var(--text-dim);
@@ -1837,6 +1843,11 @@ loadScenarios();
       corr_foot1: "FX×米金利の相関は金利・債券・VOLタブ参照",
       corr_foot2: "For data visualization purposes only. Not investment advice.",
       corr_rolling: "日ローリング",
+      corr_net_foot: "|r|<0.3 のペアはノイズ域としてネットワーク図から除外",
+      corr_net_empty: "データ不足",
+      corr_net_labels: {N225:"日経225", SPX:"S&P500", US5Y:"米5年", US10Y:"米10年", US30Y:"米30年",
+                         JGB5Y:"日5年", JGB10Y:"日10年", JGB30Y:"日30年", USDJPY:"ドル円",
+                         "US-JP10Yspread":"日米10年差"},
     },
     en: {
       tabs: {nikkei225:"Nikkei 225", dow30:"Dow 30", nasdaq100:"Nasdaq 100",
@@ -1859,6 +1870,9 @@ loadScenarios();
       corr_foot1: "For FX × US-rates correlations, see the Rates/Bonds/Vol tab.",
       corr_foot2: "For data visualization purposes only. Not investment advice.",
       corr_rolling: "d rolling",
+      corr_net_foot: "Pairs with |r|<0.3 are treated as noise and excluded from the network graph.",
+      corr_net_empty: "Insufficient data",
+      corr_net_labels: {},
     },
   };
   let lang = (localStorage.getItem("hf_lang") || "ja");
@@ -2087,6 +2101,219 @@ loadScenarios();
     svg += `</svg>`;
     return svg;
   }
+
+  // ── Correlation network (fixed ring layout, canvas 2d, additive) --
+  // Deterministic angles (degrees, 0°=+x/right, clockwise, canvas coords).
+  // Left arc (140°..220°): N225, JGB5Y, JGB10Y, JGB30Y
+  // Right arc (-40°..40°, i.e. 320°..40°): SPX, US5Y, US10Y, US30Y
+  // Bottom arc (100°..80°, centered at 90°/down): USDJPY, US-JP10Yspread
+  const CORR_NET_ANGLES = {
+    N225: 220, JGB5Y: 193, JGB10Y: 167, JGB30Y: 140,
+    SPX: -40, US5Y: -13, US10Y: 13, US30Y: 40,
+    'USDJPY': 100, 'US-JP10Yspread': 80,
+  };
+  let corrNetHover = null; // {type:'edge', i, j, r} | null
+  let corrNetResizeTimer = null;
+  let corrNetLastGeom = null; // cached for hit-testing on mousemove without full recompute
+
+  function corrNetLabel(lb){
+    const dict = I18N[lang] && I18N[lang].corr_net_labels;
+    if (lang === 'ja' && dict && dict[lb]) return dict[lb];
+    return lb;
+  }
+
+  function corrNetLayout(labels, w, h){
+    // Ellipse centered in canvas; radii leave margin for labels.
+    const cx = w/2, cy = h/2 + 6;
+    const rx = Math.max(60, w/2 - 74);
+    const ry = Math.max(60, h/2 - 46);
+    return labels.map(lb => {
+      const deg = CORR_NET_ANGLES.hasOwnProperty(lb) ? CORR_NET_ANGLES[lb] : 0;
+      const rad = deg * Math.PI / 180;
+      return {
+        label: lb,
+        x: cx + rx * Math.cos(rad),
+        y: cy + ry * Math.sin(rad),
+      };
+    });
+  }
+
+  function corrNetColor(rVal, alpha){
+    return rVal >= 0
+      ? 'rgba(0,232,162,'+alpha.toFixed(2)+')'   // var(--green) ~ #00e8a2
+      : 'rgba(255,69,96,'+alpha.toFixed(2)+')';  // var(--red) ~ #ff4560
+  }
+
+  function drawCorrNetwork(matrix, labels, nObs){
+    const wrap = document.querySelector('.cp-net-wrap');
+    const cv = document.getElementById('corr-network');
+    const tip = document.getElementById('corr-net-tip');
+    if (!cv || !wrap) { window.__corrNetworkStats = {window: corrWindow, edges: 0, nulls: 0}; return; }
+
+    const rectW = wrap.clientWidth || 300;
+    const rectH = wrap.clientHeight || 340;
+    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    cv.width = Math.round(rectW * dpr);
+    cv.height = Math.round(rectH * dpr);
+    const ctx = cv.getContext('2d');
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, rectW, rectH);
+
+    const n = labels.length;
+    const nodes = corrNetLayout(labels, rectW, rectH);
+
+    // build edge list: upper-triangle only, |r|>=0.3, non-null
+    const edges = [];
+    let nulls = 0;
+    for (let i = 0; i < n; i++){
+      for (let j = i+1; j < n; j++){
+        const rVal = matrix[i] ? matrix[i][j] : null;
+        if (rVal === null || rVal === undefined || Number.isNaN(rVal)){
+          nulls++;
+          continue;
+        }
+        if (Math.abs(rVal) >= 0.3){
+          edges.push({ i, j, r: rVal });
+        }
+      }
+    }
+
+    // cache geometry for hit-testing (hover) independent of redraw
+    corrNetLastGeom = { nodes, edges, rectW, rectH };
+
+    const totalPairs = n*(n-1)/2;
+    if (nulls === totalPairs){
+      // every off-diagonal pair is null → "insufficient data" (do not fabricate)
+      // canvas fillStyle does not resolve CSS vars; resolve manually
+      const dimColor = getComputedStyle(document.documentElement).getPropertyValue('--text-dim').trim() || '#8a97a8';
+      ctx.fillStyle = dimColor;
+      ctx.font = '12px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(tr('corr_net_empty'), rectW/2, rectH/2);
+      window.__corrNetworkStats = {window: corrWindow, edges: 0, nulls: nulls};
+      return;
+    }
+
+    // draw edges first (under nodes)
+    edges.forEach(e => {
+      const a = nodes[e.i], b = nodes[e.j];
+      const absR = Math.min(1, Math.abs(e.r));
+      const isHover = corrNetHover && corrNetHover.type === 'edge' &&
+                       corrNetHover.i === e.i && corrNetHover.j === e.j;
+      const width = 1 + absR * 4; // 1px..5px
+      const alpha = isHover ? 0.95 : (0.28 + 0.5 * absR);
+      ctx.beginPath();
+      ctx.moveTo(a.x, a.y);
+      ctx.lineTo(b.x, b.y);
+      ctx.strokeStyle = corrNetColor(e.r, alpha);
+      ctx.lineWidth = isHover ? width + 1.2 : width;
+      ctx.lineCap = 'round';
+      ctx.stroke();
+    });
+
+    // draw nodes
+    const accentColor = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() || '#00ffcc';
+    const bg2Color = getComputedStyle(document.documentElement).getPropertyValue('--bg2').trim() || '#0a0e14';
+    const textColor = getComputedStyle(document.documentElement).getPropertyValue('--text').trim() || '#e8edf3';
+    const border2Color = getComputedStyle(document.documentElement).getPropertyValue('--border2').trim() || '#33404f';
+    nodes.forEach((node, idx) => {
+      const isHoverNode = corrNetHover && corrNetHover.type === 'edge' &&
+                           (corrNetHover.i === idx || corrNetHover.j === idx);
+      ctx.beginPath();
+      ctx.arc(node.x, node.y, isHoverNode ? 5.5 : 4.5, 0, Math.PI*2);
+      ctx.fillStyle = isHoverNode ? accentColor : bg2Color;
+      ctx.fill();
+      ctx.lineWidth = 1.4;
+      ctx.strokeStyle = isHoverNode ? accentColor : border2Color;
+      ctx.stroke();
+
+      // label placement: offset outward from center along the same angle
+      const cx = rectW/2, cy = rectH/2 + 6;
+      const dx = node.x - cx, dy = node.y - cy;
+      const dist = Math.sqrt(dx*dx + dy*dy) || 1;
+      const lx = node.x + (dx/dist) * 13;
+      const ly = node.y + (dy/dist) * 13;
+      ctx.font = (isHoverNode ? '700 ' : '600 ') + '10px "Roboto Condensed",sans-serif';
+      ctx.fillStyle = isHoverNode ? accentColor : textColor;
+      ctx.textAlign = dx > 8 ? 'left' : (dx < -8 ? 'right' : 'center');
+      ctx.textBaseline = dy > 8 ? 'top' : (dy < -8 ? 'bottom' : 'middle');
+      ctx.fillText(corrNetLabel(node.label), lx, ly);
+    });
+
+    window.__corrNetworkStats = {window: corrWindow, edges: edges.length, nulls: nulls};
+
+    // hover wiring (bind once per redraw is fine — canvas element is replaced by innerHTML each render)
+    if (!cv.__corrNetBound){
+      cv.__corrNetBound = true;
+      cv.addEventListener('mousemove', function(ev){
+        corrNetHandleHover(ev, cv, tip);
+      });
+      cv.addEventListener('mouseleave', function(){
+        corrNetHover = null;
+        if (tip) tip.style.display = 'none';
+        corrNetRedrawCurrent();
+      });
+    }
+  }
+
+  function corrNetRedrawCurrent(){
+    const D = window.DATA;
+    const corr = D && D.correlations;
+    if (!corr) return;
+    const matrix = corrWindow === '60d' ? corr.matrix_60d : corr.matrix_20d;
+    const labels = corr.labels || [];
+    if (matrix && labels.length) drawCorrNetwork(matrix, labels, corr.n_obs);
+  }
+
+  function corrNetHandleHover(ev, cv, tip){
+    if (!corrNetLastGeom) return;
+    const rect = cv.getBoundingClientRect();
+    const mx = ev.clientX - rect.left;
+    const my = ev.clientY - rect.top;
+    const { nodes, edges } = corrNetLastGeom;
+    const HIT = 6;
+    let best = null, bestDist = HIT;
+    edges.forEach(e => {
+      const a = nodes[e.i], b = nodes[e.j];
+      const d = ptSegDist(mx, my, a.x, a.y, b.x, b.y);
+      if (d < bestDist){ bestDist = d; best = e; }
+    });
+    const prev = corrNetHover;
+    if (best){
+      corrNetHover = { type:'edge', i: best.i, j: best.j, r: best.r };
+      if (tip){
+        const la = corrNetLabel(nodes[best.i].label);
+        const lb = corrNetLabel(nodes[best.j].label);
+        tip.textContent = la+' × '+lb+': r='+best.r.toFixed(2);
+        tip.style.left = (mx + 10) + 'px';
+        tip.style.top = (my + 10) + 'px';
+        tip.style.display = 'block';
+      }
+    } else {
+      corrNetHover = null;
+      if (tip) tip.style.display = 'none';
+    }
+    const changed = !prev || !best || prev.i !== best.i || prev.j !== best.j;
+    if (changed) corrNetRedrawCurrent();
+  }
+
+  function ptSegDist(px, py, x1, y1, x2, y2){
+    const dx = x2-x1, dy = y2-y1;
+    const lenSq = dx*dx + dy*dy;
+    let t = lenSq === 0 ? 0 : ((px-x1)*dx + (py-y1)*dy) / lenSq;
+    t = Math.max(0, Math.min(1, t));
+    const cx = x1 + t*dx, cy = y1 + t*dy;
+    return Math.sqrt((px-cx)*(px-cx) + (py-cy)*(py-cy));
+  }
+
+  window.addEventListener('resize', function(){
+    if (corrNetResizeTimer) clearTimeout(corrNetResizeTimer);
+    corrNetResizeTimer = setTimeout(function(){
+      corrNetRedrawCurrent();
+    }, 150);
+  });
+
   function renderCorrPanel(){
     const panel = document.getElementById('corr-panel');
     if (!panel) return;
@@ -2132,6 +2359,11 @@ loadScenarios();
     html += '<button type="button" class="cp-wbtn'+(corrWindow==='60d'?' active':'')+'" onclick="window.__corrSetWindow(\'60d\')">'+tr('corr_w60')+'</button>';
     html += '<button type="button" class="cp-wbtn'+(corrWindow==='20d'?' active':'')+'" onclick="window.__corrSetWindow(\'20d\')">'+tr('corr_w20')+'</button>';
     html += '</div>';
+
+    // correlation network (fixed ring layout, canvas 2d)
+    if (matrix && labels.length){
+      html += '<div class="cp-net-wrap"><canvas id="corr-network"></canvas><div class="cp-net-tip" id="corr-net-tip"></div></div>';
+    }
 
     // heatmap (DOM table — consistent with existing .tbl-wrap table pattern; native title tooltip)
     if (matrix && labels.length){
@@ -2180,11 +2412,18 @@ loadScenarios();
 
     // footnotes
     html += '<div class="cp-foot">';
+    html += '<div>'+tr('corr_net_foot')+'</div>';
     html += '<div>'+tr('corr_foot1')+'</div>';
     html += '<div class="cp-disc">'+tr('corr_foot2')+'</div>';
     html += '</div>';
 
     panel.innerHTML = html;
+
+    if (matrix && labels.length){
+      drawCorrNetwork(matrix, labels, nObs);
+    } else {
+      window.__corrNetworkStats = {window: corrWindow, edges: 0, nulls: 0};
+    }
   }
   window.__corrSetWindow = function(w){
     corrWindow = w;
