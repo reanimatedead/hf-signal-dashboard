@@ -48,7 +48,7 @@ import numpy as np
 import pandas as pd
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from corr_sources import fetch_all, YF_LABELS  # noqa: E402
+from corr_sources import fetch_all, YF_LABELS, fetch_ecb_eu10y  # noqa: E402
 
 ROOT = Path(__file__).resolve().parent.parent
 DATA_JSON = ROOT / "docs" / "data.json"
@@ -58,14 +58,14 @@ WINDOW_SHORT = 20
 KEY_PAIR_LOOKBACK = 250  # 直近250営業日分のローリング60日相関系列
 
 MATRIX_LABELS = [
-    "N225", "SPX", "US5Y", "US10Y", "US30Y",
-    "JGB5Y", "JGB10Y", "JGB30Y", "USDJPY", "US-JP10Yspread",
+    "N225", "SPX", "SX5E", "US5Y", "US10Y", "US30Y",
+    "JGB5Y", "JGB10Y", "JGB30Y", "EU10Y", "USDJPY", "US-JP10Yspread",
 ]
 
 # 対数リターンで変化系列化する系列（株価指数・為替）
-LOG_RETURN_LABELS = {"N225", "SPX", "USDJPY"}
+LOG_RETURN_LABELS = {"N225", "SPX", "SX5E", "USDJPY"}
 # bp差分で変化系列化する系列（利回り、% 単位）
-BP_CHANGE_LABELS = {"US5Y", "US10Y", "US30Y", "JGB5Y", "JGB10Y", "JGB30Y"}
+BP_CHANGE_LABELS = {"US5Y", "US10Y", "US30Y", "JGB5Y", "JGB10Y", "JGB30Y", "EU10Y"}
 
 KEY_PAIRS = [
     ("N225", "USDJPY"),
@@ -89,9 +89,9 @@ SINK_SPEC = {
 SINK_METRICS_NOTE = "Weekly % change of representative series. Particle arrival % is a visual effect, not measured flow."
 
 
-# yfinance 由来の内部ラベル (未確定バー除外の対象。FRED/MOF は公表ラグがあり
-# 当日データが存在しないため対象外)
-YF_SOURCED_LABELS = set(YF_LABELS.values())
+# yfinance 由来の内部ラベル (未確定バー除外の対象。FRED/MOF/ECB は公表ラグがあり
+# 当日データが存在しないため対象外)。SX5E は STOXX50E(yfinance) の別名なので含める。
+YF_SOURCED_LABELS = set(YF_LABELS.values()) | {"SX5E"}
 
 
 def drop_unconfirmed_bars(raw: Dict[str, Optional[Dict[str, float]]]) -> Dict[str, Optional[Dict[str, float]]]:
@@ -413,6 +413,11 @@ def main() -> int:
 
     print("== fetch_all() 実行中 (FRED は curl フォールバックで最大3分程度) ==")
     raw = fetch_all()
+
+    # v6.3: 12x12 拡張。SX5E は既存 STOXX50E(yfinance) の別名、EU10Y は ECB(日次)。
+    if raw.get("STOXX50E"):
+        raw["SX5E"] = raw["STOXX50E"]
+    raw["EU10Y"] = fetch_ecb_eu10y()
 
     # data-hygiene: 未確定バー(今日UTC/JST)を除外してから計算する
     # (correlations / sink_metrics 両方の入力に適用。as_of も除外後の系列で決まる)

@@ -988,3 +988,42 @@ charts 合計は約 5.9 MB で、Cloudflare Pages の上限に対し十分な余
 `build_macro.py` の出力。フロント（index.html）は読んでいないが外部消費者の可能性を排除できないため
 **追跡下に残す**。ただしどのワークフローも commit しなくなったため **git 上の tracked コピーは凍結**する。
 **配信物は deploy.yml の full ジョブが毎回 `build_macro.py` で再生成しており最新**（tracked コピーの凍結はサイトに影響しない）。
+
+## 12. v6.3 — Task 2: マクロ層(macro_v2) / ガンマ層(gamma) / EU利回り / 相関12×12
+
+### 命名の区別（重要）— `docs/macro_v2.json` ≠ `docs/data/macro.json`
+
+| ファイル | 生成 | 内容 | フロント参照 |
+|---|---|---|---|
+| `docs/data/macro.json`（**レガシー**） | `pipeline/build_macro.py` | 旧 14 tile。**tracked コピーは凍結**（§11） | index.html は読まない |
+| `docs/macro_v2.json`（**v2・新規**） | `pipeline/build_macro_v2.py` | FRED 16系列の分解/信用/資金/環境/景気 + 全系列の percentile 文脈 + 恒等式 + net_liquidity 是正 | Task 3 で描画予定 |
+
+両者は**別物**。将来 build_macro.py（レガシー）を廃止し macro_v2 に一本化予定だが、外部消費者未確認のため今は併存（§11 参照）。gitignore 済み（生成物・非追跡）。
+
+### `docs/macro_v2.json` スキーマ
+
+- `series.{FRED_ID}` = `{label, category, value, as_of, data_status, context}`。category ∈ {rates_decomp, credit, funding, conditions, recession}。
+- `context` = `{value, pct_rank, z, d20_change, d20_z, n_obs}`（自系列 5年 lookback 内での位置。**全系列に付与**）。
+- `identities.fisher` = `{ok, gap, nominal, real, breakeven}`（名目 = 実質 + 期待インフレ、tol 0.05）。
+- `identities.expectations` = `{value, nominal, term_premium, note}`（value = 名目 − ターム・プレミアム）。
+- `net_liquidity` = WRESBAL（準備預金・**第一指標**）を primary、簡易式 WALCL−TGA−RRP を reference（参考値）。単位は兆ドル。WALCL/WTREGEN/WRESBAL は百万ドル→/1e6、RRPONTSYD は十億ドル→/1e3。
+- FRED は LibreSSL の TLS 相性で requests/urllib がハングするため **curl（デフォルト UA）を primary** に取得（CI ubuntu でも curl 利用可）。
+
+### EU 利回り（`markets.rates` に region "EU" 3行追加）
+
+`fetch_signals.py` が ECB Data Portal（`YC B.U2.EUR.4F.G_N_A.SV_C_YM.SR_{2,10,30}Y`, 日次・キーレス）から EU2Y/EU10Y/EU30Y を取得。既存 US/JP と同一スキーマ、`data_status:"auto_ecb"` / `source_ticker:None` / `region:"EU"`。`build_link` は ECB Data Portal を指す（kind:source）。**ECB ダウン時は EU 行のみ `data_status:"error"` に degrade し US/JP は巻き込まない。**
+`meta.yield_curve.eu_10y_2y_spread` を追加。**US の逆イールド判定は流用せず**、ECB 政策・ユーロ圏構成国混在を前提に別評価（JP と同方針）。
+
+### ガンマ層 `docs/gamma.json`（米国限定・集計値のみ）
+
+`pipeline/build_gamma.py` が CBOE 公開 SPX チェーン（`delayed_quotes/options/_SPX.json`）から生成。ローカルは `~/taka-data/cboe-chains/SPX-*.json.gz`（snapshot_cboe.sh が launchd で保存・**再実装しない**）を優先、無ければ（CI 等）ライブ API。
+- `gex_oi`（建玉ベース GEX, $/1%変動）/ `zero_gamma`（フリップ水準）/ `gamma_walls`（上位10・CBOE gamma×OI）。
+- `gex_volume_0dte`（当日満期・出来高ベース）は **gex_oi と分離**（合算しない）。`n_0dte_contracts` を併記：公開 delayed feed は標準（月物）満期中心で、SPXW の 0DTE/週物が含まれないことがあり、その場合 0DTE は 0 になる（捏造せず件数で明示）。
+- `assumption:"naive_dealer_convention"` + note（コール買い/プット売りの慣習的仮定、CBOE は売買主体非公開、外れると符号反転）を**必ず出力**。
+- `coverage:{us:"full", eu:"unavailable", jp:"unavailable"}`（JPX/Eurex はギリシャ文字非公開）。
+- `vol_structure`: VIX3M/VIX 比（コンタンゴ/バックワーデーション）、SKEW、MOVE/VIX 比（MOVE/VIX は data.json から）。
+- **生チェーンは非公開・集計値のみ・400KB 未満**。
+
+### 相関パネル 12×12（`pipeline/build_corr.py`）
+
+`MATRIX_LABELS` に **SX5E**（既存 STOXX50E=yfinance の別名）と **EU10Y**（ECB 日次）を追加し 10×10 → **12×12**。SX5E は log-return、EU10Y は bp-change。SX5E は未確定バー除外(hygiene)対象。`matrix_60d` / `matrix_20d` 再計算・既存トップレベルキー保全を確認済み。

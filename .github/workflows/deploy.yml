@@ -77,6 +77,17 @@ jobs:
           FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
         run: python3 pipeline/build_macro.py
 
+      # v2 macro layer (docs/macro_v2.json) — FRED 16-series decomposition/credit/
+      # funding + percentile context. Distinct from the legacy docs/data/macro.json.
+      - name: Generate macro_v2 layer
+        run: python3 pipeline/build_macro_v2.py
+
+      # Dealer gamma layer (docs/gamma.json) — CBOE public SPX chain; live API in
+      # CI (no ~/taka-data archive). Reads docs/data.json for MOVE/VIX, so it runs
+      # after fetch_signals.
+      - name: Generate gamma layer
+        run: python3 pipeline/build_gamma.py
+
       # Fail-closed gates: any failure below stops the job BEFORE upload, so the
       # previous good Pages deploy stays live.
       - name: Health gate

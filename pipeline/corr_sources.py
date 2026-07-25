@@ -183,6 +183,36 @@ def fetch_fred_series(series_id: str) -> Optional[Dict[str, float]]:
 
 
 # ---------------------------------------------------------------------------
+# ECB euro-area AAA 10Y spot yield (日次・キーレス)。相関パネルの EU10Y ラベル用。
+# ---------------------------------------------------------------------------
+ECB_YC_10Y = ("https://data-api.ecb.europa.eu/service/data/YC/"
+              "B.U2.EUR.4F.G_N_A.SV_C_YM.SR_10Y?lastNObservations=520&format=csvdata")
+
+
+def fetch_ecb_eu10y() -> Optional[Dict[str, float]]:
+    """ECB Data Portal から euro-area AAA 10Y スポット利回り(日次)を取得し
+    {date_iso: yield} を返す。失敗時 None (捏造しない)。"""
+    import csv as _csv
+    import io as _io
+    try:
+        resp = requests.get(ECB_YC_10Y, timeout=REQUEST_TIMEOUT, headers=_UA)
+        resp.raise_for_status()
+        out: Dict[str, float] = {}
+        for x in _csv.DictReader(_io.StringIO(resp.text)):
+            v = x.get("OBS_VALUE")
+            if v in (None, "", "."):
+                continue
+            try:
+                out[x["TIME_PERIOD"]] = float(v)
+            except (ValueError, KeyError):
+                continue
+        return dict(sorted(out.items())) if len(out) >= 2 else None
+    except Exception as exc:
+        _warn(f"ECB EU10Y fetch failed ({type(exc).__name__}: {exc})")
+        return None
+
+
+# ---------------------------------------------------------------------------
 # 和暦 -> 西暦 ISO 変換 (公開・独立関数)
 # ---------------------------------------------------------------------------
 

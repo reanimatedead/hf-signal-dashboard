@@ -821,6 +821,9 @@ RATE_TICKERS = [
     ("JP2Y", "Japan 2Y JGB Yield", "JP", "2Y", "short_end", []),
     ("JP10Y", "Japan 10Y JGB Yield", "JP", "10Y", "long_end", []),
     ("JP30Y", "Japan 30Y JGB Yield", "JP", "30Y", "long_end", []),
+    ("EU2Y", "Euro-area 2Y AAA Yield", "EU", "2Y", "short_end", []),
+    ("EU10Y", "Euro-area 10Y AAA Yield", "EU", "10Y", "long_end", []),
+    ("EU30Y", "Euro-area 30Y AAA Yield", "EU", "30Y", "long_end", []),
 ]
 
 
@@ -1014,6 +1017,45 @@ def fetch_jp_rate_yield_live():
     return {}
 
 
+# ─── ECB euro-area AAA spot curve (daily, keyless) ───────
+# FRED's German 10Y (IRLTLT01DEM156N) is monthly → too coarse; the ECB Data
+# Portal serves a daily AAA spot curve. EU rates feed markets.rates as region
+# "EU" with the same schema as US/JP. An ECB outage must NOT break US/JP — the
+# caller degrades EU rows to data_status "error" and continues.
+ECB_YC_BASE = "https://data-api.ecb.europa.eu/service/data/YC"
+ECB_YC_KEYS = {"EU2Y": "SR_2Y", "EU10Y": "SR_10Y", "EU30Y": "SR_30Y"}
+
+
+def fetch_ecb_yields(n=520):
+    """Fetch EU2Y/EU10Y/EU30Y daily AAA spot yields from the ECB Data Portal.
+    Returns {sym: {"value": float, "series": [{"date","value"}]}} for whatever
+    tenors succeed, or {} if all fail. Never raises."""
+    import io
+    import requests
+    out = {}
+    for sym, key in ECB_YC_KEYS.items():
+        try:
+            url = (f"{ECB_YC_BASE}/B.U2.EUR.4F.G_N_A.SV_C_YM.{key}"
+                   f"?lastNObservations={n}&format=csvdata")
+            r = requests.get(url, timeout=30,
+                             headers={"User-Agent": "hf-signal-dashboard (ECB YC, keyless)"})
+            r.raise_for_status()
+            ser = []
+            for x in csv.DictReader(io.StringIO(r.text)):
+                v = x.get("OBS_VALUE")
+                if v in (None, "", "."):
+                    continue
+                try:
+                    ser.append({"date": x["TIME_PERIOD"], "value": float(v)})
+                except (ValueError, KeyError):
+                    continue
+            if len(ser) >= 2:
+                out[sym] = {"value": round(ser[-1]["value"], 4), "series": ser}
+        except Exception as exc:
+            print(f"  [ECB] {sym} fetch failed ({type(exc).__name__}: {exc})")
+    return out
+
+
 def build_rates_market():
     """Rates rows. US2Y/US10Y get live yield + charts.1d (BB288/CCI) from yfinance.
     Japan JP2Y/JP10Y are auto-ingested from the official MoF JGB historical CSV
@@ -1026,6 +1068,9 @@ def build_rates_market():
     jp_csv = load_jp_rates_from_csv()
     if jp_auto:
         print(f"  [JP] auto_mof ({len(jp_auto)} tenor)")
+    eu_auto = fetch_ecb_yields()          # ECB outage → {} → EU rows become "error"
+    if eu_auto:
+        print(f"  [EU] auto_ecb ({len(eu_auto)} tenor)")
     rows = []
     for sym, name, region, tenor, role, tickers in RATE_TICKERS:
         df, src_t = fetch_rate_history(tickers) if tickers else (None, None)
@@ -1036,6 +1081,7 @@ def build_rates_market():
                 jp_rec, jp_src = jp_auto[sym], "auto_mof"
             elif jp_csv.get(sym):
                 jp_rec, jp_src = jp_csv[sym], "manual_csv"
+        eu_rec = eu_auto.get(sym) if region == "EU" else None
         if live:
             close = df["Close"].squeeze()
             y = round(float(close.iloc[-1]), 3)
@@ -1060,6 +1106,26 @@ def build_rates_market():
                     "Macro context only, not investment advice." if jp_src == "auto_mof"
                     else "Japan yield data loaded from a user-verified manual CSV. "
                          "Market context only, not investment advice.")
+        elif region == "EU":
+            if eu_rec is not None:
+                ser = eu_rec["series"]
+                y = eu_rec["value"]
+                chg = round(ser[-1]["value"] - ser[-2]["value"], 3) if len(ser) >= 2 else None
+                eu_src = f"ECB Data Portal (YC B.U2.EUR.4F.G_N_A.SV_C_YM.{ECB_YC_KEYS[sym]})"
+                eu_chart = build_jp_rate_chart_1d(ser, now, source=eu_src)
+                charts = {"4h": build_empty_chart("4h"), "1d": eu_chart, "1w": build_empty_chart("1w")}
+                data_status, source, ticker_out, risk = "auto_ecb", eu_src, None, "medium"
+                note = ("Euro-area AAA spot yields auto-ingested from the ECB Data Portal (daily). "
+                        "Macro context only, not investment advice.")
+            else:
+                # ECB down: degrade EU only, do NOT break US/JP.
+                y, chg = None, None
+                charts = {"4h": build_empty_chart("4h"), "1d": build_empty_chart("1d"),
+                          "1w": build_empty_chart("1w")}
+                charts["1d"]["note"] = "ECB Data Portal fetch failed; EU yield unavailable."
+                data_status, source, ticker_out, risk = "error", None, None, "unknown"
+                note = ("ECB yield fetch failed; EU row degraded to data_status='error'. "
+                        "US/JP are unaffected. Macro context only.")
         else:
             y, chg = None, None
             charts = {"4h": build_empty_chart("4h"), "1d": build_empty_chart("1d"),
@@ -1103,8 +1169,20 @@ def build_yield_curve_state(rates_rows):
         if s < 0.25:   return s, "flat_or_policy_watch", "medium"
         return s, "normal_or_watch", "low_or_medium"
 
+    def eu_curve(ten, two):
+        # US recession-inversion logic is NOT applied to the euro-area curve: the
+        # ECB AAA curve mixes sovereign issuers and reflects ECB policy, not a
+        # single-country recession signal.
+        if not isinstance(ten, (int, float)) or not isinstance(two, (int, float)):
+            return None, "unknown", "unknown"
+        s = round(ten - two, 3)
+        if s < 0:      return s, "inverted_policy_watch", "medium_or_high"
+        if s < 0.25:   return s, "flat_or_policy_watch", "medium"
+        return s, "normal_or_watch", "low_or_medium"
+
     us_s, us_state, us_risk = us_curve(y.get("US10Y"), y.get("US2Y"))
     jp_s, jp_state, jp_risk = jp_curve(y.get("JP10Y"), y.get("JP2Y"))
+    eu_s, eu_state, eu_risk = eu_curve(y.get("EU10Y"), y.get("EU2Y"))
     usjp = (round(y["US10Y"] - y["JP10Y"], 3)
             if isinstance(y.get("US10Y"), (int, float)) and isinstance(y.get("JP10Y"), (int, float))
             else None)
@@ -1113,6 +1191,8 @@ def build_yield_curve_state(rates_rows):
                              "comment": "US curve. Inversion is a recession/policy-stress context, not a trade signal."},
         "jp_10y_2y_spread": {"value": jp_s, "state": jp_state, "risk": jp_risk,
                              "comment": "Japan curve assessed separately (BOJ policy / JGB). US inversion logic is not applied."},
+        "eu_10y_2y_spread": {"value": eu_s, "state": eu_state, "risk": eu_risk,
+                             "comment": "Euro-area AAA curve assessed separately (ECB policy, mixed-sovereign composition). US inversion logic is not applied."},
         "us_jp_10y_spread": {"value": usjp, "state": "unknown" if usjp is None else "computed",
                              "relation": "USDJPY yield-spread context",
                              "comment": "Context only, not investment advice."},
