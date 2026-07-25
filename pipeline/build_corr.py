@@ -309,6 +309,10 @@ def build_correlations(raw: Dict[str, Optional[Dict[str, float]]]) -> dict:
         "lag_days": lag_days,
         "sources": SOURCES,
         "method": METHOD_NOTE,
+        "align": "inner_join",
+        "align_note": ("変化系列を全ラベル共通営業日で inner join（dropna, 前方補完なし）。"
+                       "日米欧の祝日・TARGET 休業日が一致しないため n_obs は各系列より小さくなる。"
+                       "休場日のズレを ffill でごまかさない。"),
         "note": CORR_NOTE,
     }
 

@@ -1018,7 +1018,12 @@ charts 合計は約 5.9 MB で、Cloudflare Pages の上限に対し十分な余
 
 `pipeline/build_gamma.py` が CBOE 公開 SPX チェーン（`delayed_quotes/options/_SPX.json`）から生成。ローカルは `~/taka-data/cboe-chains/SPX-*.json.gz`（snapshot_cboe.sh が launchd で保存・**再実装しない**）を優先、無ければ（CI 等）ライブ API。
 - `gex_oi`（建玉ベース GEX, $/1%変動）/ `zero_gamma`（フリップ水準）/ `gamma_walls`（上位10・CBOE gamma×OI）。
-- `gex_volume_0dte`（当日満期・出来高ベース）は **gex_oi と分離**（合算しない）。`n_0dte_contracts` を併記：公開 delayed feed は標準（月物）満期中心で、SPXW の 0DTE/週物が含まれないことがあり、その場合 0DTE は 0 になる（捏造せず件数で明示）。
+- `gex_volume_0dte`（当日満期・出来高ベース）は **gex_oi と分離**（合算しない）。**0DTE 捕捉不能の明示（重要）**:
+  - この CBOE `_SPX` は**遅延フィード＝前営業日引け時点のスナップショット**であり、当日満期(0DTE)は既に消えているため**このフィードでは 0DTE を捕捉できない**。
+  - よって **`gex_volume_0dte` は 0DTE の実態を表さない**。`n_0dte_contracts`(=0) と `gex_volume_0dte_status:"unavailable"` / `gex_volume_0dte_reason` で明示する。
+  - **建玉ベースの `gex_oi` は 0DTE の影響を過小評価している。**
+  - 0DTE を捉えるには**リアルタイムフィードが必要で、無料では入手できない。**
+  - 誤読防止のため `gex_volume_0dte` は **0 ではなく `null`**（+status/reason）として出力する。
 - `assumption:"naive_dealer_convention"` + note（コール買い/プット売りの慣習的仮定、CBOE は売買主体非公開、外れると符号反転）を**必ず出力**。
 - `coverage:{us:"full", eu:"unavailable", jp:"unavailable"}`（JPX/Eurex はギリシャ文字非公開）。
 - `vol_structure`: VIX3M/VIX 比（コンタンゴ/バックワーデーション）、SKEW、MOVE/VIX 比（MOVE/VIX は data.json から）。

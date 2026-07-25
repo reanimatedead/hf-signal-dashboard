@@ -194,9 +194,16 @@ def main():
     walls = gamma_walls(recs, spot) if (spot and recs) else []
     gex0, n0 = gex_volume_0dte(recs, spot, snap_date) if (spot and recs) else (None, 0)
     # How many contracts in the feed actually expire on the snapshot date. The
-    # public delayed _SPX feed carries standard (monthly) expiries; sub-monthly
-    # SPXW dailies/weeklies are often absent, so 0DTE can legitimately be 0.
+    # public _SPX feed is a DELAYED snapshot taken at the prior session's close,
+    # so same-day (0DTE) contracts have already expired and are absent — this
+    # source structurally cannot capture 0DTE. When 0, we report gex_volume_0dte
+    # as null + status "unavailable" (not 0) to avoid the "no 0DTE exists" misread.
     n_0dte_contracts = sum(1 for r in recs if r[7] == snap_date)
+    _0dte_captured = n_0dte_contracts > 0
+    _0dte_reason = ("この CBOE 遅延フィードは前営業日引け時点のスナップショットのため当日満期(0DTE)は"
+                    "既に消えており捕捉できない。gex_volume_0dte は 0DTE の実態を表さない。"
+                    "建玉ベースの gex_oi も 0DTE の影響を過小評価している。0DTE を捉えるには"
+                    "リアルタイムフィードが必要だが無料では入手できない。")
 
     # volatility structure
     vix = _csv_latest_close("VIX_History.csv")
@@ -221,9 +228,14 @@ def main():
                          else "above_flip_dampening" if (spot and zg and spot >= zg)
                          else "unknown"),
         "gamma_walls": [{"strike": k, "gex": round(v), "gex_bn": round(v / 1e9, 2)} for k, v in walls],
-        # 0DTE volume-based GEX, kept SEPARATE (not summed with gex_oi).
-        "gex_volume_0dte": round(gex0) if gex0 is not None else None,
-        "gex_volume_0dte_bn": round(gex0 / 1e9, 2) if gex0 is not None else None,
+        # 0DTE volume-based GEX, kept SEPARATE (not summed with gex_oi). This
+        # DELAYED feed cannot capture 0DTE (prior-close snapshot), so when no 0DTE
+        # contracts are present we emit null + status "unavailable" + reason rather
+        # than a misleading 0.
+        "gex_volume_0dte": (round(gex0) if (_0dte_captured and gex0 is not None) else None),
+        "gex_volume_0dte_bn": (round(gex0 / 1e9, 2) if (_0dte_captured and gex0 is not None) else None),
+        "gex_volume_0dte_status": ("live" if _0dte_captured else "unavailable"),
+        "gex_volume_0dte_reason": (None if _0dte_captured else _0dte_reason),
         "n_0dte_volume": n0,
         "n_0dte_contracts": n_0dte_contracts,
         "vol_structure": {
@@ -239,8 +251,10 @@ def main():
                  "CBOEは売買主体を公開していない。仮定が外れると符号が反転する。"),
         "reading": ("現値がフリップ(zero_gamma)より下＝負ガンマ＝増幅ゾーン（下落で売り上昇で買い）。"
                     "上＝正ガンマ＝値が貼り付く。"),
-        "zero_dte_note": ("建玉(OI)ベースGEXは寄り引けで消える0DTEを過小評価する。日中の増幅は"
-                          "出来高側(gex_volume_0dte)に出る。gex_oiと合算しない。"),
+        "zero_dte_note": ("建玉(OI)ベースGEX(gex_oi)は寄り引けで消える0DTEを過小評価する。"
+                          "本フィードは遅延(前営業日引け)スナップショットのため0DTEを捕捉できず、"
+                          "gex_volume_0dteはunavailable。0DTEを捉えるにはリアルタイムフィードが"
+                          "必要だが無料では入手できない。gex_oiと合算しない。"),
         "coverage": {"us": "full", "eu": "unavailable", "jp": "unavailable"},
         "coverage_note": "この層は米国のみ。JPX/Eurex はギリシャ文字を公開していない。",
         "disclaimer": "For data visualization purposes only. Not investment advice.",
