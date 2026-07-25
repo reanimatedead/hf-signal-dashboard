@@ -88,6 +88,11 @@ jobs:
       - name: Generate gamma layer
         run: python3 pipeline/build_gamma.py
 
+      # Yield×equity balance layer (docs/relations.json) — US/JP equities from FRED,
+      # EU equity from yfinance (no FRED STOXX50E). Real-yield-based (US).
+      - name: Generate relations layer
+        run: python3 pipeline/build_relations.py
+
       # Fail-closed gates: any failure below stops the job BEFORE upload, so the
       # previous good Pages deploy stays live.
       - name: Health gate

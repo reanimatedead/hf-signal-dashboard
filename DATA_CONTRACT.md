@@ -1045,3 +1045,30 @@ charts 合計は約 5.9 MB で、Cloudflare Pages の上限に対し十分な余
   「古い値を最新と誤認させない」を全層で一貫させる。
 - **古い値を保持して最新と誤認させる方式は採らない**（ガンマ/マクロは日々変わるため、3日前の値を現在値として
   出すのは誤情報。`unavailable` と出す方が正しい）。0DTE の `null + status:"unavailable" + reason`（§上記）も同原則。
+
+## 13. v6.4 — Task 3: 天秤層 relations.json（利回り×株価）
+
+### ソース非対称（`docs/relations.json` と本節に明記）
+
+| 地域 | 株価ソース | 利回りソース | 実質金利 / ターム・プレミアム |
+|---|---|---|---|
+| US | **FRED SP500**（公的） | FRED（DGS10/DFII10/THREEFYTP10/DGS2/DGS30） | あり（DFII10 / THREEFYTP10） |
+| JP | **FRED NIKKEI225**（公的） | MoF JGB | **なし**（無料日次系列なし） |
+| EU | **yfinance ^STOXX50E**（個人利用想定 ToS） | ECB Data Portal | **なし** |
+
+**重要な非対称: FRED に STOXX50E / SX5E は存在しない（2026-07-25 実測確認）。EU 株価は yfinance のみが経路。**
+米国・日本は FRED（公的）、欧州は yfinance（個人利用想定）というソース非対称。実質金利・ターム・プレミアムは**米国のみ**。
+画面では EU/JP を「名目のみ・米国と非対称」と明示する。
+
+### `docs/relations.json` スキーマ（4部品）
+
+- `balance.erp` = `{value:null, data_status:"unavailable", reason}`（指数の日次EPSに無料信頼ソースなし。Shillerミラー2024-09停止）。画面に「未実装」明示・空欄禁止。
+- `balance.regime` = `{r_120d, regime, label, n_obs, history, note}`。株価の日次対数リターン × 利回りの日次変化(bp) の120日ローリング相関（**リターン×変化。水準相関はトレンドで見かけ高く出るため不可**）。分類: r≤−0.20 growth_shock_dominant / r≥+0.20 inflation_policy_shock_dominant / それ以外 transition。`history`（covid/2022/直近1年）は実データ駆動。
+- `balance.beta` = `{nasdaq100, dow30, sp500, lookback_days:250, unit, note}`。10bp上昇に対する日次リターン%（OLS傾き×100×10）。**Dow>SPX は教科書と逆＝断定せず観測対象**と note に明記。
+- `balance.rebalance` = `{eq_ret_pct, bond_ret_pct, gap_pct, pressure, quarter_start, note}`。四半期末リバランス（デュレーション8近似。年金比率・規模は非公開）。
+- `balance.context` = macro_v2 の `contextualize()` を再利用（重複実装しない）。`speed_warning`（d20_z≥2）付き。
+- `regions.{us,eu,jp}` = `{equity, equity_source, real_yield, nominal, term_premium, yields, asymmetry, source, data_status, series}`。`series` は共通営業日 inner join（**ffill なし**、build_corr.py と同方式）。`align:"inner_join"` を JSON に明記。
+
+### 描画（新タブ「利回り×株価」）
+
+上段=株価(左軸)+**実質金利**(右軸)・名目は破線トグル / 中段=120日ローリング相関+レジーム / 下段=感応度ベータ棒 / サイドバー=リバランス圧力・パーセンタイル・d20_z。**全図の直下に説明文5要素（何を示すか/どう読むか/現在の状態/出典と算出/前提と限界）を必須**。degrade 時は「取得に失敗（最新値は表示しません）」明示・空欄禁止。
