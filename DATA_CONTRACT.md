@@ -964,3 +964,27 @@ charts 合計は約 5.9 MB で、Cloudflare Pages の上限に対し十分な余
 株式は **1d 全長のみ**提供。4h/1w は意図的に非提供（`_equity_empty_charts` の note で理由明示）。
 理由: 4h/1w は 1h/1d の追加取得と resample が銘柄ごとに必要で取得コストが数倍になる一方、
 日次〜週次の「環境可視化」用途では 1d で十分。指数・FX・金利・暗号資産は本数が限られるため 4h/1w も提供する。
+
+## 11. v6.2 — 配信モデル（生成物は git 非追跡・Actions が Pages へ直接配信）
+
+2026-07-26 に GitHub Pages のソースを「Deploy from a branch」から **GitHub Actions** に切替えた。
+生成物（`docs/data.json` / `docs/charts/*.json` / `docs/health.json` / 将来の
+`docs/macro_v2.json` / `docs/relations.json` / `docs/gamma.json`）は **`.gitignore` 済みで git に積まない**。
+`.github/workflows/deploy.yml` の **full**（00:00 JST）と **corr_refresh**（07:30 / 11:00 JST）が
+生成 → health_gate → pytest → `upload-pages-artifact` → `deploy-pages` で**直接配信**する。
+
+### 既存ワークフローの整理（A-Ⅱ）
+
+- `collect.yml`: 保持。`git add` から `docs/data.json` / `docs/data/macro.json` を除去し、
+  `data/history/` と `data/collect_log.jsonl`（append-only 履歴＝git ベースの控え）のみコミット。
+- `corr.yml` / `update_signals.yml`: deploy.yml の corr_refresh / full と**役割が完全重複**するため
+  `schedule` を停止し `workflow_dispatch` のみに縮退（DEPRECATED）。手動実行すると
+  `git add docs/data.json` が gitignore により exit 1 で失敗する点に注意。
+- **削除予定: 2026-08-02 以降に `corr.yml` と `update_signals.yml` を削除する**
+  （deploy.yml が1週間安定稼働したことの確認後）。人間の記憶に依存せずここに記録する。
+
+### `docs/data/macro.json`（レガシー）の扱い
+
+`build_macro.py` の出力。フロント（index.html）は読んでいないが外部消費者の可能性を排除できないため
+**追跡下に残す**。ただしどのワークフローも commit しなくなったため **git 上の tracked コピーは凍結**する。
+**配信物は deploy.yml の full ジョブが毎回 `build_macro.py` で再生成しており最新**（tracked コピーの凍結はサイトに影響しない）。

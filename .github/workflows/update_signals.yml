@@ -1,9 +1,10 @@
+# DEPRECATED 2026-07-26: deploy.yml の full / corr_refresh ジョブに統合済み。
+# 手動実行すると git add docs/data.json が gitignore により exit 1 で失敗する。
+# deploy.yml が1週間安定稼働したら削除予定。
 name: Daily Signal Update (00:00 JST)
 
 on:
-  schedule:
-    # 00:00 JST = 15:00 UTC (same day). SPEC_MONEYFLOW.md §6.1.
-    - cron: "0 15 * * *"
+  # schedule は deploy.yml の full に移譲済み（重複のため停止）。手動のみ残す。
   workflow_dispatch:   # Allow manual trigger from GitHub UI
 
 permissions:

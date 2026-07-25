@@ -66,8 +66,9 @@ jobs:
         run: |
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name  "github-actions[bot]"
-          git add docs/data.json docs/data/macro.json \
-                  data/history/ data/collect_log.jsonl
+          for p in data/history data/collect_log.jsonl; do
+            if [ -e "$p" ]; then git add "$p"; fi
+          done
           git diff --cached --quiet && echo "No changes to commit" || \
             git commit -m "chore(autocollect): $(date -u '+%Y-%m-%d %H:%M UTC')"
 

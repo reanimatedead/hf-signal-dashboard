@@ -8,7 +8,7 @@ CCI) and an investment-bank-style macro layer (yield curve, regime context).
 
 > **30-second pitch:** A Python pipeline pulls daily market data from Yahoo Finance, scores it
 > across 9 market groups, and writes a single `data.json`. A dependency-free static front-end
-> (inline-SVG charts, no chart library) renders it, deployed on Cloudflare Pages and refreshed
+> (inline-SVG charts, no chart library) renders it, deployed on GitHub Actions Pages and refreshed
 > automatically every day by GitHub Actions. It demonstrates an end-to-end data pipeline,
 > CI-driven data refresh, a documented data contract between a public UI and a private analysis
 > engine, and careful GRC framing (everything is market *context*, never trade advice).
@@ -282,23 +282,23 @@ Markets/symbols without computed charts (e.g. equities, IMM, Japan rates) show a
 ```
 GitHub Actions (daily 08:00 JST / 23:00 UTC, or manual)
   └── Python + yfinance  →  fetch_signals.py  →  docs/data.json (auto-committed)
-        └── Cloudflare Pages serves docs/ as the public site
+        └── GitHub Actions (deploy.yml) uploads docs/ as the Pages artifact and deploys it
               └── docs/index.html (vanilla JS + inline SVG) reads data.json
 ```
 
 - **Data source:** Yahoo Finance via `yfinance` — **no API key, no paid API**.
 - **Pipeline:** `fetch_signals.py` fetches, scores, computes indicators (RSI/MACD/EMA/Bollinger/CCI),
   and writes one `docs/data.json`.
-- **Hosting:** Cloudflare Pages (free tier).
-- **Scheduler:** GitHub Actions (`.github/workflows/update_signals.yml`) — runs the pipeline daily,
-  commits the refreshed `data.json`, which redeploys Pages. ~2000 free minutes/month is ample.
+- **Hosting:** GitHub Actions Pages (artifact deploy via `.github/workflows/deploy.yml`).
+- **Scheduler:** GitHub Actions (`.github/workflows/deploy.yml`) — `full` runs the pipeline daily and
+  deploys the refreshed `docs/` as the Pages artifact (generated data is not committed to git).
 - **Front-end:** a single static `index.html` (no build step, no framework, no chart library) —
   charts are drawn with hand-rolled inline SVG.
 
 ### Data flow
 
 ```
-fetch_signals.py ──> docs/data.json ──> Cloudflare Pages ──> browser (index.html renders)
+fetch_signals.py ──> docs/data.json ──> GitHub Actions Pages ──> browser (index.html renders)
         ▲                                   ▲
    GitHub Actions (daily)            auto-redeploy on commit
 ```
@@ -414,8 +414,8 @@ In CI (`deploy.yml`) generation always precedes these consumers, so ordering is 
 
 ### Deploy your own
 
-- **GitHub Actions:** Actions tab → "Daily Signal Update" → **Run workflow** (also runs daily on cron).
-- **Cloudflare Pages:** Connect the repo → Build command *(empty)* → Output directory `docs` → Deploy.
+- **GitHub Actions:** Actions tab → "Deploy to Pages (full daily + corr refresh)" → **Run workflow** (`job=full`; also runs daily on cron).
+- **GitHub Pages source:** Settings → Pages → **Source: GitHub Actions** (the `deploy.yml` workflow publishes `docs/` as the Pages artifact).
 
 ---
 
@@ -452,8 +452,8 @@ and edge context are market context only.
 ```
 hf-signal-dashboard/
 ├── .github/workflows/
-│   └── update_signals.yml      # Daily GitHub Actions pipeline
-├── docs/                       # Cloudflare Pages root
+│   └── deploy.yml              # GitHub Actions Pages deploy (full daily + corr refresh)
+├── docs/                       # GitHub Actions Pages artifact root
 │   ├── index.html              # Dashboard UI (vanilla JS + inline SVG)
 │   ├── data.json               # Generated market data (auto-updated daily)
 │   └── sample-signals.json     # Sample data in the integration-contract format

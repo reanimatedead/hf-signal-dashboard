@@ -25,3 +25,12 @@ data/local/
 
 # セッション用の一時権限設定 (出荷モード等) は誤commitを恒久防止
 .claude/settings.json
+
+# A-Ⅱ — 生成物は git に積まず、CI(deploy.yml) が Pages へ直接配信する。
+# docs/data/macro.json (build_macro のレガシー出力) は判断保留につき追跡下に残す。
+docs/data.json
+docs/charts/
+docs/health.json
+docs/macro_v2.json
+docs/relations.json
+docs/gamma.json

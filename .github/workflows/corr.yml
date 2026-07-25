@@ -1,3 +1,6 @@
+# DEPRECATED 2026-07-26: deploy.yml の full / corr_refresh ジョブに統合済み。
+# 手動実行すると git add docs/data.json が gitignore により exit 1 で失敗する。
+# deploy.yml が1週間安定稼働したら削除予定。
 name: Correlation Panel Update (JST 07:30 / 11:00)
 
 # SPEC_MONEYFLOW.md §8. correlations / money_flow.<region>.sink_metrics を
@@ -6,11 +9,7 @@ name: Correlation Panel Update (JST 07:30 / 11:00)
 # 不採用。間隔を変える場合は下の cron 1行を変更するだけでよい。
 
 on:
-  schedule:
-    # 30 22 * * 0-4 (UTC) = 07:30 JST 月-金。米国クローズ + FRED反映後。
-    - cron: "30 22 * * 0-4"
-    # 0 2 * * 1-5 (UTC) = 11:00 JST 月-金。財務省JGB利回り公表後。
-    - cron: "0 2 * * 1-5"
+  # schedule は deploy.yml の corr_refresh に移譲済み（重複のため停止）。手動のみ残す。
   workflow_dispatch:   # Allow manual trigger from GitHub UI
 
 permissions:
