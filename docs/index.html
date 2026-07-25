@@ -163,6 +163,11 @@ tbody tr.detail-row,tbody tr.detail-row:hover{background:var(--bg2)}
 .dt-disc{margin-top:6px;font-size:10px;color:var(--text-faint)}
 .dt-bb{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:4px 18px;margin-top:6px;font-size:11px;color:var(--text)}
 .dt-bb b{color:var(--text-dim);font-weight:400}
+/* BB/CCI caption cells sit inside the table, which sets white-space:nowrap
+   globally; the long "mid·up·low" text then overflows its grid track and paints
+   over the next cell. Cancel the inherited nowrap on the cells only (not the
+   table body) so each caption wraps within its own track. */
+.dt-bb>div{white-space:normal;overflow-wrap:anywhere}
 .dt-chart{margin-top:8px;max-width:560px}
 .dt-svg,.dt-cci-svg{width:100%;display:block;background:var(--bg2);border:1px solid var(--border);border-radius:5px}
 .dt-svg{height:150px}
