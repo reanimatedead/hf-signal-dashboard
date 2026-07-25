@@ -332,6 +332,30 @@ html,body{overflow-x:hidden}
    MONEY FLOW PANE (Agent C, SPEC §5)
 ══════════════════════════════════════════════════ */
 #mf-pane{padding:14px 16px;font-family:-apple-system,"Hiragino Kaku Gothic ProN",system-ui,sans-serif;font-size:13px;color:var(--text)}
+/* ─ Relations (利回り×株価) v6.4 ─ */
+#rel-pane{padding:14px 16px;font-family:-apple-system,"Hiragino Kaku Gothic ProN",system-ui,sans-serif;font-size:13px;color:var(--text);max-width:1000px}
+.rel-sec{border:1px solid var(--border);border-radius:6px;padding:12px 14px;margin:0 0 14px;background:var(--bg2)}
+.rel-h{font-size:14px;font-weight:700;color:var(--accent);margin:0 0 8px}
+.rel-sub{font-size:12px;font-weight:700;color:var(--text-dim);margin:10px 0 4px}
+.rel-cap{font-size:11.5px;line-height:1.55;color:var(--text-dim);background:var(--bg3);border-left:3px solid var(--accent);
+         border-radius:0 4px 4px 0;padding:8px 11px;margin:6px 0 4px;white-space:normal;overflow-wrap:anywhere}
+.rel-cap b{color:var(--text)}
+.rel-cap .k{color:var(--text-faint)}
+.rel-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:6px 16px;font-size:11.5px;margin-top:4px}
+.rel-grid>div{white-space:normal;overflow-wrap:anywhere}
+.rel-svg{width:100%;height:150px;display:block;background:var(--bg3);border:1px solid var(--border);border-radius:5px;margin-top:4px}
+.rel-flex{display:flex;flex-wrap:wrap;gap:14px}
+.rel-flex>.rel-col{flex:1 1 320px;min-width:280px}
+.rel-side{flex:0 0 240px;min-width:220px;font-size:11.5px}
+.rel-side .kv{display:flex;justify-content:space-between;gap:8px;padding:3px 0;border-bottom:1px solid var(--border)}
+.rel-warn{color:var(--red);font-weight:700}
+.rel-bad{color:var(--yellow);border:1px solid var(--border);border-radius:4px;padding:6px 10px;background:var(--bg3);margin:4px 0}
+.rel-badge{display:inline-block;font-size:10px;padding:1px 6px;border-radius:3px;background:var(--bg4);color:var(--text-dim);margin-left:6px}
+.rel-toggle{font-size:11px;color:var(--text-dim);cursor:pointer;user-select:none;border:1px solid var(--border);border-radius:3px;padding:1px 7px;background:var(--bg3)}
+.rel-bar-row{display:flex;align-items:center;gap:8px;margin:3px 0;font-size:11.5px}
+.rel-bar-track{position:relative;flex:1;height:14px;background:var(--bg4);border-radius:2px}
+.rel-bar-fill{position:absolute;top:0;height:14px;border-radius:2px}
+.rel-disc{font-size:10px;color:var(--text-faint);margin-top:6px}
 .mf-disc{font-size:11px;color:var(--yellow);border:1px solid var(--border);border-radius:4px;
          padding:6px 10px;margin-bottom:10px;background:var(--bg2)}
 .mf-grid{display:grid;grid-template-columns:1fr;gap:14px}
@@ -594,6 +618,7 @@ tbody tr.mrow-normal:hover{opacity:1}
     <button class="tab" data-tab="fx"        onclick="sw('fx',this)">FX / 商品</button>
     <button class="tab" data-tab="rates_vol" onclick="sw('rates_vol',this)">金利・債券・VOL</button>
     <button class="tab" data-tab="pos_val"   onclick="sw('pos_val',this)">ポジション/割安度</button>
+    <button class="tab" data-tab="relations" onclick="sw('relations',this)">利回り×株価</button>
     <button class="tab" data-tab="moneyflow" onclick="sw('moneyflow',this)">お金の流れ</button>
   </div>
   <div id="toolbar">
@@ -629,6 +654,9 @@ tbody tr.mrow-normal:hover{opacity:1}
       survival_loop データがロードされていません。data.json を確認してください。
     </div>
   </div>
+
+  <!-- ─── 利回り×株価 / Relations (yield-equity balance, v6.4) ─── -->
+  <div id="rel-pane" style="display:none"></div>
 
   <!-- ─── お金の流れ / Money Flow (3-region, v4.1) ─── -->
   <div id="mf-pane" style="display:none">
@@ -955,11 +983,16 @@ function sw(key,btn){
     return;
   }
   if (window.__survivalHide) window.__survivalHide();
+  if (window.__relHide) window.__relHide();
   if (key === "moneyflow") {
     if (window.__mfShow) window.__mfShow();
     return;
   }
   if (window.__mfHide) window.__mfHide();
+  if (key === "relations") {
+    if (window.__relShow) window.__relShow();
+    return;
+  }
   renderFBtns(); renderTbl();
 }
 
@@ -2629,6 +2662,245 @@ loadScenarios();
       if (e.key === 'l' || e.key === 'L') window.toggleLang();
     });
   });
+})();
+</script>
+<script>
+/* ══ Relations (利回り×株価) + Task-2 layer rendering, v6.4 ══════════════════
+   Renders docs/relations.json (balance), docs/macro_v2.json (decomposition/credit/
+   funding/conditions) and docs/gamma.json (dealer gamma) into #rel-pane with a
+   caption under EVERY figure. Never leaves a figure without an explanation; on
+   error/unavailable shows "取得に失敗（最新値は表示しません）" (no silent blanks). */
+(function(){
+  "use strict";
+  const REL={}, MAC={}, GAM={};        // caches
+  let showNominal=false, loaded=false;
+  const $=id=>document.getElementById(id);
+  const esc=s=>String(s==null?"":s).replace(/[&<>]/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[m]));
+  const nz=v=>(typeof v==="number"&&isFinite(v));
+  const f=(v,d=2)=>nz(v)?v.toFixed(d):"—";
+  const pct=(v,d=2)=>nz(v)?(v>=0?"+":"")+v.toFixed(d)+"%":"—";
+  const BAD='<div class="rel-bad">取得に失敗しています。表示中の値はありません（最新値は表示しません）。</div>';
+
+  async function grab(url){
+    try{ const r=await fetch(url+"?t="+Date.now(),{cache:"no-cache"});
+      if(!r.ok) throw new Error(r.status); return {ok:true,data:await r.json()}; }
+    catch(e){ console.warn("rel fetch failed",url,e); return {ok:false,data:null}; }
+  }
+
+  // ── inline SVG helpers (no external lib) ──
+  function poly(vals, W,H, pad, mn, mx, css, dash){
+    const n=vals.length; if(n<2||mx===mn) return "";
+    const X=i=>pad+ i/(n-1)*(W-2*pad);
+    const Y=v=> H-pad-(v-mn)/(mx-mn)*(H-2*pad);
+    const pts=vals.map((v,i)=> nz(v)?`${X(i).toFixed(1)},${Y(v).toFixed(1)}`:null).filter(Boolean).join(" ");
+    if(!pts) return "";
+    return `<polyline points="${pts}" style="fill:none;${css}"${dash?` stroke-dasharray="${dash}"`:""}/>`;
+  }
+  function minmax(a){ const v=a.filter(nz); return v.length?[Math.min(...v),Math.max(...v)]:[0,1]; }
+
+  // dual-axis: equity (left, accent solid) + real/nominal (right)
+  function dualChart(series, hasReal){
+    if(!series||series.length<2) return "";
+    const W=460,H=150;
+    const eq=series.map(p=>p.equity), nom=series.map(p=>p.nominal), real=series.map(p=>p.real_yield);
+    const [emn,emx]=minmax(eq);
+    const ylist=hasReal?real.concat(showNominal?nom:[]):nom;
+    const [ymn,ymx]=minmax(ylist.length?ylist:nom);
+    let s=`<svg class="rel-svg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="price and yield">`;
+    s+=poly(eq,W,H,6,emn,emx,"stroke:var(--accent);stroke-width:1.6");
+    if(hasReal) s+=poly(real,W,H,6,ymn,ymx,"stroke:var(--yellow);stroke-width:1.4");
+    else        s+=poly(nom,W,H,6,ymn,ymx,"stroke:var(--yellow);stroke-width:1.4");
+    if(hasReal&&showNominal) s+=poly(nom,W,H,6,ymn,ymx,"stroke:var(--yellow);stroke-width:1;opacity:.6","3 2");
+    return s+"</svg>";
+  }
+  // regime gauge: r in [-1,1] with history markers + zones
+  function regimeGauge(r,hist){
+    const W=460,H=64,pad=8, X=v=>pad+(v+1)/2*(W-2*pad);
+    let s=`<svg class="rel-svg" style="height:64px" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="stock-bond correlation regime">`;
+    // zones: <=-0.2 green(機能) / >=0.2 red(壊れる) / mid gray
+    s+=`<rect x="${pad}" y="24" width="${X(-0.2)-pad}" height="12" style="fill:var(--green);opacity:.25"/>`;
+    s+=`<rect x="${X(-0.2)}" y="24" width="${X(0.2)-X(-0.2)}" height="12" style="fill:var(--text-faint);opacity:.2"/>`;
+    s+=`<rect x="${X(0.2)}" y="24" width="${W-pad-X(0.2)}" height="12" style="fill:var(--red);opacity:.25"/>`;
+    s+=`<line x1="${X(0)}" y1="20" x2="${X(0)}" y2="40" style="stroke:var(--border2);stroke-width:1"/>`;
+    const hm=[["covid",hist&&hist.covid_2020_03_2021_06,"var(--text-faint)"],
+              ["2022",hist&&hist.inflation_2022,"var(--text-faint)"],
+              ["1y",hist&&hist.last_1y,"var(--text-dim)"]];
+    hm.forEach(([lb,v])=>{ if(nz(v)){ s+=`<circle cx="${X(v).toFixed(1)}" cy="30" r="2.5" style="fill:var(--text-dim)"/>`+
+        `<text x="${X(v).toFixed(1)}" y="18" style="fill:var(--text-faint);font-size:8px" text-anchor="middle">${lb}</text>`; }});
+    if(nz(r)) s+=`<circle cx="${X(r).toFixed(1)}" cy="30" r="4" style="fill:var(--accent)"/>`+
+        `<text x="${X(r).toFixed(1)}" y="52" style="fill:var(--accent);font-size:9px;font-weight:700" text-anchor="middle">${r.toFixed(2)}</text>`;
+    s+=`<text x="${pad}" y="52" style="fill:var(--green);font-size:8px">−1 天秤機能</text>`;
+    s+=`<text x="${W-pad}" y="52" style="fill:var(--red);font-size:8px" text-anchor="end">+1 天秤崩壊</text>`;
+    return s+"</svg>";
+  }
+  function betaBars(b){
+    const rows=[["Nasdaq100",b&&b.nasdaq100],["Dow30",b&&b.dow30],["S&P500",b&&b.sp500]];
+    const mx=Math.max(0.001,...rows.map(r=>Math.abs(nz(r[1])?r[1]:0)));
+    return rows.map(([lb,v])=>{ const w=nz(v)?Math.abs(v)/mx*100:0;
+      return `<div class="rel-bar-row"><span style="width:80px">${lb}</span>`+
+        `<span class="rel-bar-track"><span class="rel-bar-fill" style="width:${w.toFixed(0)}%;left:0;background:${v<0?"var(--red)":"var(--green)"}"></span></span>`+
+        `<span style="width:64px;text-align:right">${nz(v)?f(v,3)+"%":"—"}</span></div>`;
+    }).join("");
+  }
+  const cap=html=>`<div class="rel-cap">${html}</div>`;
+
+  // ── section renderers ──
+  function renderBalance(){
+    const R=REL.data;
+    if(!R) return `<div class="rel-sec"><div class="rel-h">天秤（利回り×株価）</div>${BAD}</div>`;
+    const b=R.balance, rg=b.regime, be=b.beta, rb=b.rebalance, cx=(b.context||{}).us_10y_nominal||{}, cxr=(b.context||{}).us_10y_real||{};
+    const reg=R.regions||{};
+    // upper: 3-region charts
+    let charts="";
+    [["us","米国",true],["eu","欧州",false],["jp","日本",false]].forEach(([k,nm,hasReal])=>{
+      const rr=reg[k]||{}; const bad=rr.data_status!=="live"||!(rr.series&&rr.series.length);
+      const last=(rr.series&&rr.series.length)?rr.series[rr.series.length-1]:null;
+      charts+=`<div class="rel-col"><div class="rel-sub">${nm} <span class="rel-badge">${esc(rr.source||"")}</span></div>`;
+      if(bad){ charts+=BAD; }
+      else{
+        charts+=dualChart(rr.series, hasReal);
+        charts+=cap(
+          `<b>この図</b>: ${nm}の株価（青の実線）と${hasReal?"実質金利（黄の実線・名目は破線トグル）":"名目金利（黄の実線）"}を重ねたもの。`+
+          `<br><b>読み方</b>: 金利が上がると債券が有利になり株から資金が抜けやすい（下向き圧力）。`+
+          `<br><b>現在</b>: 株価 ${f(last&&last.equity,0)}、${hasReal?`実質金利 ${f(last&&last.real_yield,2)}%（名目 ${f(last&&last.nominal,2)}%）`:`名目金利 ${f(last&&last.nominal,2)}%`}。`+
+          `<br><b>出典・算出</b>: <span class="k">株価 ${esc(rr.equity_source||"")}、利回り ${esc(rr.source||"")}。共通営業日で突き合わせ（inner join・前方補完なし）。</span>`+
+          `<br><b>前提・限界</b>: <span class="k">${hasReal?"米国は実質金利あり。":"欧州/日本は実質金利の無料日次系列がないため名目のみ＝米国と非対称。"}</span>`);
+      }
+      charts+=`</div>`;
+    });
+    const nomTgl=`<span class="rel-toggle" onclick="window.__relToggleNom&&window.__relToggleNom()">名目を${showNominal?"隠す":"重ねる"}（破線）</span>`;
+    // middle: regime
+    const regBad=!nz(rg&&rg.r_120d);
+    const mid=`<div class="rel-sub">相関レジーム（天秤が機能しているか）</div>`+
+      (regBad?BAD:regimeGauge(rg.r_120d,rg.history)+cap(
+        `<b>この図</b>: 「株と債券が逆に動いているか」を示します。`+
+        `<br><b>読み方</b>: マイナスなら金利上昇時に株が下がる（天秤が機能）、プラスなら株と債券が同時に落ちる（天秤が壊れる）。`+
+        `<br><b>現在</b>: r = <b>${f(rg.r_120d,2)}</b>（${esc(rg.label||"")}）。<span class="k">履歴 covid ${f(rg.history&&rg.history.covid_2020_03_2021_06,2)} / 2022 ${f(rg.history&&rg.history.inflation_2022,2)} / 直近1年 ${f(rg.history&&rg.history.last_1y,2)}。</span>`+
+        `<br><b>出典・算出</b>: <span class="k">株価の日次対数リターン × 利回りの日次変化(bp)、120日ローリング。水準ではなく変化率で取る（水準はトレンドで見かけの相関が高く出るため）。n=${rg.n_obs}。</span>`+
+        `<br><b>前提・限界</b>: <span class="k">60/40 の前提はこの符号に依存する。US(SP500×DGS10)で算出。</span>`));
+    // lower: beta
+    const mxdz=nz(cx.d20_z)?cx.d20_z:0;
+    const low=`<div class="rel-sub">感応度ベータ（腕の長さ）</div>`+
+      (be&&(nz(be.nasdaq100)||nz(be.sp500))? betaBars(be)+cap(
+        `<b>この図</b>: 金利が10bp上がったとき各指数が何%動くかを示します。`+
+        `<br><b>読み方</b>: 数値（絶対値）が大きいほど金利に敏感です。`+
+        `<br><b>現在</b>: Nasdaq100 ${f(be.nasdaq100,3)}% / Dow30 ${f(be.dow30,3)}% / S&P500 ${f(be.sp500,3)}%。Nasdaq が最も敏感なのは利益が遠い将来にあるため。`+
+        `<br><b>出典・算出</b>: <span class="k">各指数の日次対数リターン × DGS10 の日次変化(bp)、直近${be.lookback_days}日の OLS 傾き。FRED。</span>`+
+        `<br><b>前提・限界</b>: <span class="k">Dow が S&P500 より敏感なのは教科書と逆。断定せず観測対象として置いています。</span>`)
+      :BAD);
+    // sidebar
+    const side=`<div class="rel-side"><div class="rel-sub">サイドバー</div>`+
+      `<div class="kv"><span>四半期末リバランス</span><span>${rb&&rb.data_status==="live"?esc(rb.pressure):"—"}</span></div>`+
+      `<div class="kv"><span>株式 / 債券リターン</span><span>${rb?pct(rb.eq_ret_pct)+" / "+pct(rb.bond_ret_pct):"—"}</span></div>`+
+      `<div class="kv"><span>乖離 gap</span><span>${rb?pct(rb.gap_pct):"—"}</span></div>`+
+      `<div class="kv"><span>米10年 水準</span><span>${f(cx.value,2)}%</span></div>`+
+      `<div class="kv"><span>パーセンタイル(5年)</span><span>${nz(cx.pct_rank)?cx.pct_rank+"%tile":"—"}</span></div>`+
+      `<div class="kv"><span>20日変化 z (速度)</span><span class="${mxdz>=2?"rel-warn":""}">${f(cx.d20_z,2)}${mxdz>=2?" ⚠速い":""}</span></div>`+
+      `<div class="rel-disc">天秤を壊すのは水準ではなく速度。d20_z が +2 を超えたら警告。リバランスはデュレーション8での近似（年金比率・規模は非公開）。</div></div>`;
+    // ERP unavailable
+    const erp=b.erp||{};
+    const erpBox=`<div class="rel-sub">ERP（株式リスクプレミアム）<span class="rel-badge">未実装</span></div>`+
+      `<div class="rel-bad">未実装: ${esc(erp.reason||"指数の日次EPSに無料の信頼ソースがない。")}<br>部品2・3・4（相関/ベータ/リバランス）だけで天秤の動作状態は判定できます。空欄にはしていません。</div>`;
+
+    return `<div class="rel-sec"><div class="rel-h">天秤（利回り×株価）— 3地域 ${nomTgl}</div>`+
+      `<div class="rel-flex">${charts}</div>${mid}`+
+      `<div class="rel-flex"><div class="rel-col">${low}</div>${side}</div>${erpBox}`+
+      `<div class="rel-disc">For data visualization purposes only. Not investment advice.</div></div>`;
+  }
+
+  function ctxLine(id,S){ const s=(S&&S[id])||{}; const c=s.context||{};
+    if(s.data_status!=="live") return `<div><b>${id}</b> <span class="k">取得失敗（最新値なし）</span></div>`;
+    const warn=nz(c.d20_z)&&Math.abs(c.d20_z)>=2;
+    return `<div><b>${id}</b> ${f(s.value,4)} <span class="k">[${esc(s.label||"")}]</span> `+
+      `<span class="k">%tile ${nz(c.pct_rank)?c.pct_rank:"—"} · z ${f(c.z,2)} · d20z <span class="${warn?"rel-warn":""}">${f(c.d20_z,2)}${warn?"⚠":""}</span></span></div>`;
+  }
+  function renderMacro(){
+    const M=MAC.data;
+    if(!M) return `<div class="rel-sec"><div class="rel-h">金利の分解・信用・資金・環境（macro_v2）</div>${BAD}</div>`;
+    const S=M.series||{}, id=M.identities||{}, fi=id.fisher||{}, ex=id.expectations||{}, nl=M.net_liquidity||{};
+    const byCat=c=>Object.keys(S).filter(k=>S[k].category===c);
+    const grid=cats=>`<div class="rel-grid">${cats.map(k=>ctxLine(k,S)).join("")}</div>`;
+    // decomposition caption (example 5)
+    const decompCap=cap(
+      `<b>この図</b>: 名目金利 = 実質金利 + 期待インフレ という恒等式の内訳です。`+
+      `<br><b>読み方</b>: 同じ金利でも、実質が上がったのか期待インフレが上がったのかで株への影響が逆になります。`+
+      `<br><b>現在</b>: 名目 ${f(fi.nominal,2)}% = 実質 ${f(fi.real,2)}% + 期待インフレ ${f(fi.breakeven,2)}%（検算誤差 ${f(fi.gap,2)}）。さらに ${f(ex.nominal,2)}% のうち ${f(ex.term_premium,2)}% はターム・プレミアム（リスク料）、残り <b>${f(ex.value,2)}%</b> が将来の政策金利の予想です。`+
+      `<br><b>出典・算出</b>: <span class="k">FRED DGS10 / DFII10 / T10YIE / THREEFYTP10。名目−ターム・プレミアム=予想。</span>`+
+      `<br><b>前提・限界</b>: <span class="k">米国のみ。EU/JP は実質金利・ターム・プレミアムの無料日次系列がありません。</span>`);
+    const nlCap=cap(
+      `<b>この図</b>: 市場に出回るお金（ネット流動性）の大きさです。`+
+      `<br><b>読み方</b>: 大きいほど株などリスク資産に追い風になりやすい。`+
+      `<br><b>現在</b>: 第一指標 準備預金(WRESBAL) <b>${f(nl.primary&&nl.primary.value_tn,2)}兆ドル</b>。参考の簡易式(WALCL−TGA−RRP) ${f(nl.reference&&nl.reference.value_tn,2)}兆ドル。`+
+      `<br><b>出典・算出</b>: <span class="k">FRED。RRP はほぼ枯渇（${f(nl.reference&&nl.reference.components_tn&&nl.reference.components_tn.RRP,4)}兆ドル）で情報量が乏しいため WRESBAL を主指標に格上げ。</span>`+
+      `<br><b>前提・限界</b>: <span class="k">簡易式は SNS 由来の参考値。主はあくまで WRESBAL。</span>`);
+    return `<div class="rel-sec"><div class="rel-h">金利の分解・信用・資金・環境（macro_v2）</div>`+
+      `<div class="rel-sub">分解（名目 = 実質 + 期待インフレ / ターム・プレミアム）</div>${grid(byCat("rates_decomp"))}${decompCap}`+
+      `<div class="rel-sub">信用スプレッド（HY / IG OAS）</div>${grid(byCat("credit"))}`+
+      cap(`<b>この図</b>: 社債の上乗せ金利（信用不安の温度計）。<br><b>読み方</b>: 上がるほど信用不安。<br><b>現在</b>: HY ${f((S.BAMLH0A0HYM2||{}).value,2)} / IG ${f((S.BAMLC0A0CM||{}).value,2)}。<br><b>出典・算出</b>: <span class="k">FRED BAMLH0A0HYM2 / BAMLC0A0CM。</span><br><b>前提・限界</b>: <span class="k">米国のみ。</span>`)+
+      `<div class="rel-sub">資金繰り（SOFR / IORB / SOFR99 / 準備預金）</div>${grid(byCat("funding"))}${nlCap}`+
+      `<div class="rel-sub">金融環境・景気（NFCI / ANFCI / StL Stress / ドル指数 / 10Y-3M / Sahm）</div>${grid(byCat("conditions").concat(byCat("recession")))}`+
+      cap(`<b>この図</b>: 金融環境の緩和/引き締めと景気後退の温度計。<br><b>読み方</b>: NFCI/ANFCI は負＝緩和、10Y-3M が負＝逆イールド（後退シグナル）、Sahm は 0.5 で発火。<br><b>現在</b>: NFCI ${f((S.NFCI||{}).value,3)} / 10Y-3M ${f((S.T10Y3M||{}).value,2)} / Sahm ${f((S.SAHMREALTIME||{}).value,2)}。<br><b>出典・算出</b>: <span class="k">FRED。各系列に5年パーセンタイル文脈(%tile / z / d20z)を付与。</span><br><b>前提・限界</b>: <span class="k">米国のみ。weekly/monthly 系列は d20 が20週/月換算。</span>`)+
+      `<div class="rel-disc">出典: FRED（keyless）。For data visualization purposes only. Not investment advice.</div></div>`;
+  }
+
+  function renderGamma(){
+    const G=GAM.data;
+    if(!G) return `<div class="rel-sec"><div class="rel-h">ディーラー・ガンマ（米国のみ）</div>${BAD}</div>`;
+    if(G.data_status==="error") return `<div class="rel-sec"><div class="rel-h">ディーラー・ガンマ（米国のみ）</div>${BAD}<div class="rel-disc">${esc(G.note||"")}</div></div>`;
+    const walls=(G.gamma_walls||[]).slice(0,10);
+    const mxw=Math.max(0.001,...walls.map(w=>Math.abs(w.gex_bn||0)));
+    const wallRows=walls.map(w=>{ const wd=Math.abs(w.gex_bn||0)/mxw*100;
+      return `<div class="rel-bar-row"><span style="width:60px">${w.strike}</span>`+
+        `<span class="rel-bar-track"><span class="rel-bar-fill" style="width:${wd.toFixed(0)}%;left:0;background:${(w.gex_bn||0)<0?"var(--red)":"var(--green)"}"></span></span>`+
+        `<span style="width:70px;text-align:right">${f(w.gex_bn,2)}bn</span></div>`;}).join("");
+    const vs=G.vol_structure||{};
+    const zeroDte = G.gex_volume_0dte_status==="unavailable"
+      ? `<div class="rel-bad">0DTE（当日満期・出来高ベース）: <b>取得不能（unavailable）</b>。${esc(G.gex_volume_0dte_reason||"")}</div>`
+      : `<div class="rel-grid"><div><b>0DTE(出来高)</b> ${f(G.gex_volume_0dte_bn,2)}bn</div></div>`;
+    return `<div class="rel-sec"><div class="rel-h">ディーラー・ガンマ（米国のみ）</div>`+
+      `<div class="rel-grid"><div><b>総 GEX</b> ${f(G.gex_oi_bn,2)}bn ドル/1%</div><div><b>ゼロガンマ</b> ${f(G.zero_gamma,1)}</div>`+
+      `<div><b>現値</b> ${f(G.spot,2)}</div><div><b>フリップ判定</b> ${esc(G.flip_vs_spot||"")}</div></div>`+
+      cap(
+        `<b>この図</b>: オプションのディーラーが価格変動にどう反応するか（下の壁は行使価格別のガンマ）。`+
+        `<br><b>読み方</b>: 総 GEX がマイナスなら下落時に売り上昇時に買うため値動きが増幅、プラスなら打ち消し。`+
+        `<br><b>現在</b>: ${f(G.gex_oi_bn,2)}bnドル/1%、ゼロガンマ ${f(G.zero_gamma,1)}、現値 ${f(G.spot,2)} はその${G.flip_vs_spot==="below_flip_amplifying"?"下＝増幅ゾーン":"上＝抑制ゾーン"}。`+
+        `<br><b>出典・算出</b>: <span class="k">CBOE 公開オプションチェーン（SPX、建玉あり ${G.n_contracts_oi} 契約）。${esc((G.snapshot&&G.snapshot.source)||"")}。</span>`+
+        `<br><b>前提・限界</b>: <span class="k">${esc(G.note||"")} coverage: 米国のみ（EU/JP は JPX/Eurex がギリシャ文字非公開で unavailable）。</span>`)+
+      `<div class="rel-sub">ガンマ壁（行使価格別・上位10）</div>${wallRows||BAD}`+
+      cap(`<b>この図</b>: どの株価で値動きが止まりやすい/増幅しやすいかの「壁」。<br><b>読み方</b>: 正（緑）は貼り付き、負（赤）は増幅。<br><b>現在</b>: 最大の壁 ${walls[0]?walls[0].strike:"—"}（${walls[0]?f(walls[0].gex_bn,2)+"bn":"—"}）。<br><b>出典・算出</b>: <span class="k">CBOE gamma × 建玉、25ポイント刻み集計。</span><br><b>前提・限界</b>: <span class="k">売買主体の慣習的仮定に依存（下記）。</span>`)+
+      `<div class="rel-sub">0DTE（当日満期）</div>${zeroDte}`+
+      cap(`<b>この図</b>: 当日満期(0DTE)の日中増幅。<br><b>読み方</b>: 建玉ベースの総 GEX は 0DTE を過小評価します。<br><b>現在</b>: このフィードでは <b>取得不能</b>（前営業日引けスナップのため0DTEが消えている、契約数 ${G.n_0dte_contracts}）。<br><b>出典・算出</b>: <span class="k">CBOE 遅延フィード。0DTE を捉えるにはリアルタイムフィードが必要だが無料では入手できない。</span><br><b>前提・限界</b>: <span class="k">gex_oi と合算しない。0 ではなく unavailable と表示。</span>`)+
+      `<div class="rel-sub">ボラ構造</div><div class="rel-grid">`+
+      `<div><b>VIX3M/VIX</b> ${f(vs.vix3m_vix_ratio,3)} <span class="k">[${esc(vs.term_state||"")}]</span></div>`+
+      `<div><b>SKEW</b> ${f(vs.skew,1)}</div><div><b>MOVE/VIX</b> ${f(vs.move_vix_ratio,3)}</div></div>`+
+      cap(`<b>この図</b>: 恐怖の期間構造とテール・金利ボラ比。<br><b>読み方</b>: VIX3M/VIX>1=平常(コンタンゴ)、<1=ストレス(バックワーデーション)。MOVE/VIX が高いと金利ボラ主導。<br><b>現在</b>: 比 ${f(vs.vix3m_vix_ratio,3)}（${esc(vs.term_state||"")}）、SKEW ${f(vs.skew,1)}、MOVE/VIX ${f(vs.move_vix_ratio,3)}。<br><b>出典・算出</b>: <span class="k">CBOE VIX/VIX3M/SKEW CSV、MOVE は data.json。</span><br><b>前提・限界</b>: <span class="k">米国のみ。</span>`)+
+      `<div class="rel-bad">前提（必読）: assumption = <b>${esc(G.assumption||"")}</b>。${esc(G.note||"")}</div>`+
+      `<div class="rel-disc">coverage: US=${esc(G.coverage.us)} / EU=${esc(G.coverage.eu)} / JP=${esc(G.coverage.jp)}。この層は米国のみ。For data visualization purposes only. Not investment advice.</div></div>`;
+  }
+
+  function render(){
+    const el=$("rel-pane"); if(!el) return;
+    el.innerHTML=`<div class="mf-disc">⚠ 相場「環境」の可視化 / not investment advice</div>`+
+      renderBalance()+renderMacro()+renderGamma();
+  }
+  async function load(force){
+    if(loaded&&!force) return;
+    const [a,b,c]=await Promise.all([grab("relations.json"),grab("macro_v2.json"),grab("gamma.json")]);
+    REL.data=a.ok?a.data:null; MAC.data=b.ok?b.data:null; GAM.data=c.ok?c.data:null;
+    loaded=true; render();
+  }
+  window.__relToggleNom=function(){ showNominal=!showNominal; render(); };
+  window.__relShow=function(){
+    $("rel-pane").style.display="block";
+    const tw=document.querySelector(".tbl-wrap"); if(tw) tw.style.display="none";
+    const tb=$("toolbar"); if(tb) tb.style.display="none";
+    load(false);
+  };
+  window.__relHide=function(){
+    const p=$("rel-pane"); if(p) p.style.display="none";
+    const tw=document.querySelector(".tbl-wrap"); if(tw) tw.style.display="";
+    const tb=$("toolbar"); if(tb) tb.style.display="";
+  };
 })();
 </script>
 </body>

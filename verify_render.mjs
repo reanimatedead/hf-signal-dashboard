@@ -286,8 +286,8 @@ try {
   });
 
   const failed = [];
-  if (init.tabCount !== 9) failed.push(`expected 9 tabs, got ${init.tabCount}`);
-  const want = ["survival","nikkei225","dow30","nasdaq100","sp500","fx","rates_vol","pos_val","moneyflow"];
+  if (init.tabCount !== 10) failed.push(`expected 10 tabs, got ${init.tabCount}`);
+  const want = ["survival","nikkei225","dow30","nasdaq100","sp500","fx","rates_vol","pos_val","relations","moneyflow"];
   if (init.tabIds.join(",") !== want.join(","))
     failed.push(`tab order mismatch: ${init.tabIds.join(",")}`);
   if (!init.bgPresent) failed.push("#bg-fx canvas missing");

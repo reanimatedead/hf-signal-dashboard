@@ -21,14 +21,14 @@ def test_index_exists():
     assert INDEX.exists(), "docs/index.html must exist"
 
 
-def test_exactly_nine_main_tabs():
+def test_exactly_ten_main_tabs():
     html = _read()
     tabs = re.findall(r'<button[^>]*class="tab(?:\s+active)?"[^>]*data-tab="([^"]+)"', html)
-    assert len(tabs) == 9, f"expected 9 main tabs (incl. survival), found {len(tabs)}: {tabs}"
+    assert len(tabs) == 10, f"expected 10 main tabs (incl. survival, relations), found {len(tabs)}: {tabs}"
     expected = {
         "survival",
         "nikkei225", "dow30", "nasdaq100", "sp500",
-        "fx", "rates_vol", "pos_val", "moneyflow",
+        "fx", "rates_vol", "pos_val", "relations", "moneyflow",
     }
     assert set(tabs) == expected, f"unexpected tab set: {set(tabs) ^ expected}"
 
