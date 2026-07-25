@@ -905,3 +905,54 @@ financial advice, price targets, trade execution, or buy/sell recommendations.
 
 - お金の流れタブ、金利・債券・VOL タブ、ポジション/割安度タブの上部に同一の disclaimer を出す。
 - 文言は既存 `For data visualization purposes only. Not investment advice.` を踏襲。
+
+## 10. v6.0 — payload split（charts を data.json から分離・遅延ロード）
+
+各行に完全な OHLC + 指標ブロック（≈16 KB/行）を埋め込むと、株式全被覆で
+`data.json` が 5 MB を超え、4h/1w も足すと約 18 MB でブラウザ読込が破綻する。
+そこで **charts を `data.json` から切り出し**、行には `chart_status` フラグのみを残し、
+重いチャートは `docs/charts/{tab}.json` に置いてタブ展開時に遅延取得する。
+
+### レイアウト
+
+| ファイル | 内容 |
+|---|---|
+| `docs/data.json` | 一覧表・指標サマリ・money_flow・survival_loop・correlations（**charts を除去**） |
+| `docs/charts/{tab}.json` | `{symbol: {"4h":…,"1d":…,"1w":…}}`。tab = nikkei225 / dow30 / nasdaq100 / sp500 / fx / rates / crypto / volatility / valuation |
+
+各行の `charts` は削除され、代わりに `chart_status: "ready" | "pending" | "unavailable"` を持つ。
+
+- `ready` … 該当タブの charts ファイルに実データがある（≥1 時間足 `available:true`）
+- `pending` … 図示可能だが容量方針により未生成（株式の大半）
+- `unavailable` … データ元にチャート系列が存在しない（imm=CFTC建玉、valuation の一部）
+
+フロントは `loadCharts(tab)`（`docs/index.html`）で `charts/{tab}.json` を **on-demand fetch + キャッシュ**。
+空欄は出さず、`pending` / `unavailable` は理由文（`CHART_MSG`）を表示する。
+
+### 容量予算
+
+| 対象 | 予算 |
+|---|---|
+| `docs/data.json` | **< 400 KB** |
+| `docs/charts/*.json` 合計 | **< 5 MB** |
+| `docs/macro.json` | < 300 KB |
+| `docs/relations.json` | < 200 KB |
+| `docs/gamma.json` | < 400 KB（生チェーン非公開・集計値のみ） |
+
+### 被覆率ポリシー（P0–P3）
+
+| 優先 | 対象 | 時間足 |
+|---|---|---|
+| P0 | 指数 5 本（`^N225` `^DJI` `^NDX` `^GSPC` `^STOXX50E`） | 1d + 1w |
+| P1 | FX 18・rates 9・crypto 4 | 4h + 1d + 1w |
+| P2 | `composite_score` 上位 30 銘柄／各株式タブ | 1d（≤120 本） |
+| P3 | 残り全株式 | 1d（OHLC を 120→60 本に間引き） |
+
+間引き（P3）は予算ガードで、指標は各バー配列ではなく最新値スカラのため ohlc を短縮しても整列は壊れない。
+実装は `fetch_signals.split_chart_payload()`。手動再分割は `tools/split_payload.py`（ネット再取得なし・冪等）。
+
+### 株式の 4h / 1w を提供しない理由
+
+株式 368 行に 4h/1d/1w を全付与すると **合計約 18 MB** となりブラウザ読込・Cloudflare Pages 配信が破綻する。
+株式は **1d のみ**提供し、4h/1w は意図的に非提供とする（`chart_status` と `CHART_MSG` で理由を明示）。
+指数・FX・金利・暗号資産は本数が限られるため 4h/1w を提供する。

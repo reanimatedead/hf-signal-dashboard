@@ -2161,9 +2161,8 @@ _LINK_SRC = {
     "EU2Y":  ("https://data.ecb.europa.eu/data/datasets/YC", "ECB Data Portal"),
     "EU10Y": ("https://data.ecb.europa.eu/data/datasets/YC", "ECB Data Portal"),
     "EU30Y": ("https://data.ecb.europa.eu/data/datasets/YC", "ECB Data Portal"),
-    "VIX":   ("https://finance.yahoo.com/quote/%5EVIX/", "Yahoo Finance (^VIX)"),
-    "MOVE":  ("https://finance.yahoo.com/quote/%5EMOVE/", "Yahoo Finance (^MOVE)"),
-    "US_BUFFETT_INDICATOR": ("https://fred.stlouisfed.org/graph/?g=qLC", "FRED"),
+    "US_BUFFETT_INDICATOR": ("https://fred.stlouisfed.org/series/NCBEILQ027S",
+                             "FRED (NCBEILQ027S)"),
     "JP_BUFFETT_INDICATOR": ("", ""),
 }
 
@@ -2205,6 +2204,12 @@ def build_link(rec, market):
     if sym.endswith("_IMM"):
         return {"url": "https://www.cftc.gov/dea/futures/financial_lf.htm",
                 "label": "CFTC COT", "kind": "source"}
+    # VIX / MOVE は Yahoo の正規クォートページなので quote 扱いにする
+    QUOTE_ALIAS = {"VIX": "^VIX", "MOVE": "^MOVE"}
+    if sym in QUOTE_ALIAS:
+        t = QUOTE_ALIAS[sym]
+        return {"url": f"https://finance.yahoo.com/quote/{q(t)}/",
+                "label": f"Yahoo Finance ({t})", "kind": "quote"}
     if sym in _LINK_SRC and _LINK_SRC[sym][0]:
         return {"url": _LINK_SRC[sym][0], "label": _LINK_SRC[sym][1], "kind": "source"}
     return {"url": "", "label": "", "kind": "none"}
@@ -2218,6 +2223,88 @@ def attach_links(markets):
                 rec["link"] = build_link(rec, market)
             except Exception:
                 rec["link"] = {"url": "", "label": "", "kind": "none"}
+
+
+# ── v6.0 payload split: charts leave data.json for per-tab lazy-loaded files ──
+# Each charted row embeds a full OHLC + indicator block (~16 KB). Embedding a
+# chart on every equity row balloons data.json past 5 MB and breaks the browser
+# load. We split: data.json keeps only a `chart_status` flag per row, and the
+# heavy chart blocks move to docs/charts/{tab}.json, fetched on demand when a
+# tab is opened (see loadCharts in docs/index.html).
+#
+# Coverage policy (see DATA_CONTRACT.md §payload):
+#   P0  indices ^N225/^DJI/^NDX/^GSPC/^STOXX50E : 1d + 1w
+#   P1  fx / rates / crypto                      : 4h + 1d + 1w
+#   P2  composite_score top-30 per equity tab    : 1d full (≤120 bars)
+#   P3  remaining equities                        : 1d, decimated 120→60 bars
+# Equity 4h/1w are intentionally NOT provided (full coverage ≈ 18 MB).
+_CHART_TABS  = ("nikkei225", "dow30", "nasdaq100", "sp500",
+                "fx", "rates", "crypto", "volatility", "valuation")
+_EQUITY_TABS = ("nikkei225", "dow30", "nasdaq100", "sp500")
+_P2_TOP_N     = 30
+_P3_KEEP_BARS = 60
+
+
+def _decimate_1d(charts):
+    """P3 budget guard: thin a 1d OHLC block to the most recent 60 bars.
+    Indicators are latest-value scalars (not per-bar arrays), so thinning the
+    ohlc list does not misalign them."""
+    b = charts.get("1d")
+    if isinstance(b, dict) and isinstance(b.get("ohlc"), list) \
+            and len(b["ohlc"]) > _P3_KEEP_BARS:
+        b["ohlc"] = b["ohlc"][-_P3_KEEP_BARS:]
+    return charts
+
+
+def _is_ready(charts):
+    """ready = the block carries at least one timeframe with real data."""
+    return isinstance(charts, dict) and any(
+        isinstance(b, dict) and b.get("available") for b in charts.values())
+
+
+def split_chart_payload(payload, out_dir=OUTPUT_DIR):
+    """Strip each row's `charts` into docs/charts/{tab}.json and replace it with
+    `chart_status` in {ready, pending, unavailable}. Mutates `payload` (charts
+    removed) and returns {tab: bytes_written}. Idempotent: rows already stripped
+    (no `charts` key) keep their existing status."""
+    chart_dir = Path(out_dir) / "charts"
+    chart_dir.mkdir(parents=True, exist_ok=True)
+    written = {}
+    for tab, rows in payload.get("markets", {}).items():
+        bucket = {}
+        top = set()
+        if tab in _EQUITY_TABS:
+            order = sorted(range(len(rows)),
+                           key=lambda i: (rows[i].get("composite_score") is not None,
+                                          rows[i].get("composite_score") or 0.0),
+                           reverse=True)
+            top = set(order[:_P2_TOP_N])
+        for i, rec in enumerate(rows):
+            charts = rec.pop("charts", None)
+            if charts is None:
+                # already split, or never charted → keep/assign a status
+                rec.setdefault("chart_status",
+                               "pending" if tab in _EQUITY_TABS else "unavailable")
+                continue
+            if _is_ready(charts):
+                if tab in _EQUITY_TABS and i not in top:
+                    charts = _decimate_1d(charts)              # P3
+                bucket[rec["symbol"]] = charts
+                rec["chart_status"] = "ready"
+            elif tab in _EQUITY_TABS:
+                rec["chart_status"] = "pending"               # chartable, not generated
+            else:
+                rec["chart_status"] = "unavailable"           # source has no chart series
+        # Only (over)write a tab's chart file when we actually have charts to
+        # store. An empty bucket means the payload was already split (re-run) or
+        # the tab has no charted rows — in both cases leaving any existing file
+        # untouched keeps split_chart_payload idempotent (no wiping on re-run).
+        if tab in _CHART_TABS and bucket:
+            p = chart_dir / f"{tab}.json"
+            with open(p, "w", encoding="utf-8") as f:
+                json.dump(bucket, f, ensure_ascii=False, separators=(",", ":"))
+            written[tab] = p.stat().st_size
+    return written
 
 
 def main():
@@ -2332,11 +2419,17 @@ def main():
     # JSON.parse rejects them — a single NaN (e.g. a ticker that returned no price)
     # would break the entire dashboard load. Sanitize non-finite floats to null.
     payload = _json_safe(payload)
+
+    # v6.0 — split charts out to docs/charts/{tab}.json, keep only chart_status.
+    chart_bytes = split_chart_payload(payload, OUTPUT_DIR)
+
     with open(OUTPUT_FILE, "w", encoding="utf-8") as f:
         json.dump(payload, f, ensure_ascii=False, separators=(",", ":"))
 
     kb = OUTPUT_FILE.stat().st_size / 1024
+    charts_kb = sum(chart_bytes.values()) / 1024
     print(f"\n✅ data.json → {OUTPUT_FILE} ({kb:.1f} KB, {time.time()-t0:.0f}s)")
+    print(f"✅ charts/   → {len(chart_bytes)} tabs, {charts_kb:.1f} KB total")
 
 if __name__ == "__main__":
     main()

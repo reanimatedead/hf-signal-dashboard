@@ -1260,8 +1260,31 @@ function renderBody(rows){
   if (rc) rc.textContent = dataRowCount + " symbols";
 }
 
+// ══ v6.0 lazy chart loading ════════════════════════
+// Charts no longer ship inside data.json; each row carries only chart_status.
+// The heavy OHLC/indicator blocks live in charts/{tab}.json and are fetched on
+// demand (and cached) the first time a row on that tab is expanded.
+const CHART_CACHE = {};
+async function loadCharts(tabKey){
+  if(CHART_CACHE[tabKey]) return CHART_CACHE[tabKey];
+  try{
+    const res = await fetch(`charts/${tabKey}.json`, {cache:"no-cache"});
+    if(!res.ok) throw new Error(res.status);
+    CHART_CACHE[tabKey] = await res.json();
+  }catch(e){
+    CHART_CACHE[tabKey] = {};
+    console.warn("chart load failed", tabKey, e);
+  }
+  return CHART_CACHE[tabKey];
+}
+// Never leave a chart area silently blank — say WHY it is empty.
+const CHART_MSG = {
+  pending:     "この銘柄のチャートは容量方針により未生成です（指数・FX・金利は生成済み）",
+  unavailable: "データ元にこの時間足の系列がありません"
+};
+
 // ══ Symbol detail panel ════════════════════════════
-function toggleDetail(ev,sym){
+async function toggleDetail(ev,sym){
   if(ev&&ev.target&&ev.target.closest&&ev.target.closest(".star, a")) return;
   const row=document.querySelector(`tr[data-sym="${CSS.escape(sym)}"]`);
   if(!row) return;
@@ -1270,6 +1293,12 @@ function toggleDetail(ev,sym){
   document.querySelectorAll("tr.detail-row").forEach(e=>e.remove());
   if(open) return;
   const r=ROWMAP[sym]||{};
+  // Hydrate this row's chart block from charts/{tab}.json before rendering.
+  // Only "ready" rows have a stored block; pending/unavailable render a reason.
+  if(r.chart_status === "ready" && !r.charts){
+    const store = await loadCharts(tab);
+    if(store && store[sym]) r.charts = store[sym];
+  }
   const tr=document.createElement("tr");
   tr.className="detail-row";
   const td=document.createElement("td");
@@ -1341,7 +1370,9 @@ function tfChartHTML(r, tf, f){
   const label = {"4h":"4時間足 4h","1d":"日足 1d","1w":"週足 1w"}[tf]||tf;
   const c = r.charts && r.charts[tf];
   if(c && c.available) return chart1dHTML(c, f, label);
-  const note = (c && c.note) ? c.note : "Chart data is not available for this timeframe.";
+  // v6.0: explain the empty state instead of a silent blank.
+  const note = (c && c.note) ? c.note
+             : (CHART_MSG[r.chart_status] || "Chart data is not available for this timeframe.");
   return `<div class="dt-note">${label} — ${esc(note)}</div>`;
 }
 // Swap the chart area to the selected timeframe (re-renders from ROWMAP).
