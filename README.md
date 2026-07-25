@@ -381,10 +381,36 @@ The Valuation tab adds long-term equity market valuation context through the Buf
 python -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
-python fetch_signals.py            # generates docs/data.json (10–20 min; Yahoo rate limits)
+python fetch_signals.py            # generates docs/data.json + docs/charts/ (Yahoo rate limits)
+python pipeline/build_corr.py      # merges correlations back into docs/data.json
 cd docs && python -m http.server 8080
 # open http://localhost:8080
 ```
+
+### Generated data (not in git)
+
+`docs/data.json`, `docs/charts/*.json`, `docs/macro.json`, and `docs/health.json` are
+**build artifacts, generated — not committed** (deployed straight from CI to Pages; see
+`.github/workflows/deploy.yml`). A fresh clone therefore has no `docs/data.json`. To
+regenerate the full local payload:
+
+```bash
+python3 fetch_signals.py           # → docs/data.json (table + chart_status) + docs/charts/*.json
+python3 pipeline/build_corr.py     # → re-inject correlations (fetch_signals does not produce them)
+python3 pipeline/build_macro.py    # → docs/data/macro.json (reuses docs/data.json; optional)
+```
+
+Until you run those, the following behave as noted (all recover once data.json exists):
+
+| Tool | Without `docs/data.json` |
+|---|---|
+| `pytest tests/ -q` | 28 schema tests **skip** with "run fetch_signals.py" (no failures) |
+| `node verify_render.mjs` | **fails** — the render harness requires `data.json` (incl. `correlations`) |
+| `python3 verify.py` | **fails** — Gate-1 regression check reads `data.json` |
+| `python3 pipeline/build_macro.py` | **fails** — reuses JP rates / IMM / VIX from `data.json` |
+| `python3 notify/receiver.py` | degrades gracefully (`reason: no_data_json`) |
+
+In CI (`deploy.yml`) generation always precedes these consumers, so ordering is never an issue.
 
 ### Deploy your own
 
