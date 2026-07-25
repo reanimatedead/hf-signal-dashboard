@@ -906,12 +906,11 @@ financial advice, price targets, trade execution, or buy/sell recommendations.
 - お金の流れタブ、金利・債券・VOL タブ、ポジション/割安度タブの上部に同一の disclaimer を出す。
 - 文言は既存 `For data visualization purposes only. Not investment advice.` を踏襲。
 
-## 10. v6.0 — payload split（charts を data.json から分離・遅延ロード）
+## 10. v6.0 / v6.1 — payload split + 全株式チャート被覆
 
-各行に完全な OHLC + 指標ブロック（≈16 KB/行）を埋め込むと、株式全被覆で
-`data.json` が 5 MB を超え、4h/1w も足すと約 18 MB でブラウザ読込が破綻する。
-そこで **charts を `data.json` から切り出し**、行には `chart_status` フラグのみを残し、
-重いチャートは `docs/charts/{tab}.json` に置いてタブ展開時に遅延取得する。
+各行に完全な OHLC + 指標ブロック（≈16 KB/行）を埋め込むと `data.json` の table payload が
+肥大しパースが重くなる。そこで **charts を `data.json` から切り出し**、行には `chart_status`
+フラグのみを残し、重いチャートは `docs/charts/{tab}.json` に置いてタブ展開時に遅延取得する。
 
 ### レイアウト
 
@@ -923,36 +922,45 @@ financial advice, price targets, trade execution, or buy/sell recommendations.
 各行の `charts` は削除され、代わりに `chart_status: "ready" | "pending" | "unavailable"` を持つ。
 
 - `ready` … 該当タブの charts ファイルに実データがある（≥1 時間足 `available:true`）
-- `pending` … 図示可能だが容量方針により未生成（株式の大半）
-- `unavailable` … データ元にチャート系列が存在しない（imm=CFTC建玉、valuation の一部）
+- `unavailable` … 取得を試みたがデータが無い（yfinance 欠損・テーブル取得エラー等）。理由は行の `chart_error` に格納。imm=CFTC建玉のようにそもそもチャート系列を持たない群も含む
+- `pending` … 予約値（現行の全被覆方針では株式は全て試行するため通常出現しない）
 
 フロントは `loadCharts(tab)`（`docs/index.html`）で `charts/{tab}.json` を **on-demand fetch + キャッシュ**。
 空欄は出さず、`pending` / `unavailable` は理由文（`CHART_MSG`）を表示する。
 
-### 容量予算
+### 容量予算 — v6.1 で撤廃
 
-| 対象 | 予算 |
+**旧 v6.0 の容量予算（`data.json < 400 KB` / `charts 合計 < 5 MB`）は撤廃した。**
+理由: (1) 予算ガードを残すと全株式被覆で必ず失敗する。(2) 368 銘柄フル（1d 全長・≈16 KB/件）でも
+charts 合計は約 5.9 MB で、Cloudflare Pages の上限に対し十分な余裕がある。(3) split 時の間引き（旧 P3）は
+「取得済み 2y データを捨てる」処理でしかなく、指標計算との実行順を誤ると BB288 を壊すため、処理自体を削除した。
+
+**新しい容量制約は Cloudflare Pages 側の上限のみ:**
+
+| 制約 | 上限 |
 |---|---|
-| `docs/data.json` | **< 400 KB** |
-| `docs/charts/*.json` 合計 | **< 5 MB** |
-| `docs/macro.json` | < 300 KB |
-| `docs/relations.json` | < 200 KB |
-| `docs/gamma.json` | < 400 KB（生チェーン非公開・集計値のみ） |
+| 1 ファイル | **25 MiB** |
+| サイト全体 | **1 GB** |
+| ファイル数 | **20,000** |
 
-### 被覆率ポリシー（P0–P3）
+ローカルアーカイブ（`~/taka-data/`）に容量上限は設けない。`df` の空き容量監視のみ（別ドライブ複製なし＝受容したリスク、後述の節参照）。
+
+### 被覆率ポリシー（P0–P2、P3 は廃止）
 
 | 優先 | 対象 | 時間足 |
 |---|---|---|
-| P0 | 指数 5 本（`^N225` `^DJI` `^NDX` `^GSPC` `^STOXX50E`） | 1d + 1w |
+| P0 | 指数 5 本（`^N225` `^DJI` `^NDX` `^GSPC`、`^STOXX50E` は Agent 2 で追加） | 1d + 1w |
 | P1 | FX 18・rates 9・crypto 4 | 4h + 1d + 1w |
-| P2 | `composite_score` 上位 30 銘柄／各株式タブ | 1d（≤120 本） |
-| P3 | 残り全株式 | 1d（OHLC を 120→60 本に間引き） |
+| P2 | **全株式構成銘柄（4 タブ全行）** | **1d 全長（間引きなし）** |
 
-間引き（P3）は予算ガードで、指標は各バー配列ではなく最新値スカラのため ohlc を短縮しても整列は壊れない。
-実装は `fetch_signals.split_chart_payload()`。手動再分割は `tools/split_payload.py`（ネット再取得なし・冪等）。
+**P3（残り株式の 120→60 本間引き）は廃止。** OHLC の間引きは一切行わない。
+指標（BB48/288・CCI48/288）は **フルの 2y OHLC** で計算し、`ohlc` リストは既存の `OHLC_MAX_BARS=120` 本まで。
+株式チャートの取得は `fetch_signals.attach_equity_charts()` が **50 銘柄バッチ + バッチ間 2 秒待機**（yfinance 429 対策）で実行。
+バッチ全滅時はそのバッチのみ単体取得にフォールバック。1 銘柄の失敗で全体を落とさず、失敗銘柄は
+`chart_status="unavailable"` + `chart_error` 理由を持つ。手動再分割は `tools/split_payload.py`（ネット再取得なし・冪等）。
 
 ### 株式の 4h / 1w を提供しない理由
 
-株式 368 行に 4h/1d/1w を全付与すると **合計約 18 MB** となりブラウザ読込・Cloudflare Pages 配信が破綻する。
-株式は **1d のみ**提供し、4h/1w は意図的に非提供とする（`chart_status` と `CHART_MSG` で理由を明示）。
-指数・FX・金利・暗号資産は本数が限られるため 4h/1w を提供する。
+株式は **1d 全長のみ**提供。4h/1w は意図的に非提供（`_equity_empty_charts` の note で理由明示）。
+理由: 4h/1w は 1h/1d の追加取得と resample が銘柄ごとに必要で取得コストが数倍になる一方、
+日次〜週次の「環境可視化」用途では 1d で十分。指数・FX・金利・暗号資産は本数が限られるため 4h/1w も提供する。

@@ -1733,11 +1733,10 @@ EQUITY_INDEX = [
     ("^NDX", "Nasdaq 100 Index", "nasdaq100"),
     ("^GSPC", "S&P 500 Index", "sp500"),
 ]
-# Existing constituents that get charts.1d (must match data.json symbols).
-EQUITY_ALLOWLIST = {
-    "AAPL", "MSFT", "NVDA", "AMZN", "GOOGL", "META", "TSLA", "JPM", "UNH",
-    "7203.T", "9984.T", "8035.T",
-}
+# v6.1: the old hardcoded 12-symbol EQUITY_ALLOWLIST is removed. Chart coverage
+# is now policy-driven (P0-P3, DATA_CONTRACT §10): every constituent gets a 1d
+# chart, so the front-end no longer shows "pending" for arbitrary equities. The
+# P3 60-bar thinning is applied later in split_chart_payload (after indicators).
 
 
 def _equity_empty_charts():
@@ -1758,46 +1757,125 @@ def build_equity_chart_1d(df, source_ticker, now, dp):
     return chart
 
 
-def attach_equity_charts(equity_markets):
-    """Add charts.1d to allowlisted constituents and insert scored+charted index
-    proxy rows. yfinance only; per-symbol try/except so the run never fails."""
-    print("\n[Equity charts] index proxies + selected constituents (1d only)…")
-    now = datetime.now(JST).isoformat()
-    # selected existing constituents
-    for grp in ("nikkei225", "dow30", "nasdaq100", "sp500"):
-        for r in equity_markets.get(grp, []):
-            if r.get("symbol") not in EQUITY_ALLOWLIST or r.get("error"):
-                continue
-            try:
-                df = fetch_batch([r["symbol"]], period="2y").get(r["symbol"])
-                if df is None or len(df) < 60:
-                    continue
-                price = r.get("price") or float(df["Close"].squeeze().iloc[-1])
-                dp = 2 if (price or 0) >= 100 else 3 if (price or 0) >= 1 else 5
-                chart = build_equity_chart_1d(df, r["symbol"], now, dp)
-                if chart:
-                    r["charts"] = {"4h": _equity_empty_charts()["4h"], "1d": chart,
-                                   "1w": _equity_empty_charts()["1w"]}
-            except Exception:
-                continue
-    # index-level proxy rows (scored via process_ticker + charted), pinned on top
-    for idx_t, name, grp in EQUITY_INDEX:
+def _batched_2y_ohlc(symbols, batch_size=BATCH_SIZE, pause=2.0):
+    """Fetch 2y daily OHLC for many symbols in batches of `batch_size`, pausing
+    `pause`s between batches to stay under Yahoo's rate limit (HTTP 429 seen
+    before). If a whole batch comes back empty (a grouped-download hiccup rather
+    than genuinely-dead tickers), fall back to per-symbol fetch for that batch so
+    one bad ticker never sinks the other 49. Returns {symbol: DataFrame|None}."""
+    out = {}
+    uniq = list(dict.fromkeys(s for s in symbols if s))      # de-dup, keep order
+    chunks = [uniq[i:i + batch_size] for i in range(0, len(uniq), batch_size)]
+    for idx, chunk in enumerate(chunks):
+        if idx > 0:
+            time.sleep(pause)                                # 429 avoidance
         try:
-            df = fetch_batch([idx_t], period="2y").get(idx_t)
+            res = fetch_batch(chunk, period="2y")
+        except Exception as exc:
+            print(f"  [batch {idx+1}/{len(chunks)}] grouped fetch failed "
+                  f"({type(exc).__name__}); per-symbol fallback")
+            res = {}
+        got = [s for s in chunk if res.get(s) is not None]
+        if not got and chunk:                                # whole batch empty
+            print(f"  [batch {idx+1}/{len(chunks)}] empty → per-symbol fallback")
+            for s in chunk:
+                try:
+                    res[s] = fetch_batch([s], period="2y").get(s)
+                except Exception:
+                    res[s] = None
+        for s in chunk:
+            out[s] = res.get(s)
+    return out
+
+
+def attach_equity_charts(equity_markets):
+    """v6.1 full-coverage equity charting (DATA_CONTRACT §10, policy P0/P2).
+
+    P0: index proxy rows (^N225/^DJI/^NDX/^GSPC) are scored + charted with 1d and
+        1w (1w resampled from the same 2y daily frame — no extra fetch) and pinned
+        on top of each tab.
+    P2: EVERY constituent across all 4 equity tabs gets a full-length 1d chart.
+        No hardcoded allowlist, no OHLC thinning.
+
+    Fetching is batched (50 symbols / request, 2 s between requests) to respect
+    Yahoo's rate limit. Failures are isolated per A'-2: a symbol with no data gets
+    chart_status='unavailable' + a chart_error reason; the rest still render."""
+    now = datetime.now(JST).isoformat()
+
+    # ── P0: index proxy rows (1d + 1w) ──────────────────────────────────────
+    print("\n[Equity charts] P0 index proxies (1d + 1w), batched 2y…")
+    idx_frames = _batched_2y_ohlc([t for t, _, _ in EQUITY_INDEX])
+    for idx_t, name, grp in EQUITY_INDEX:
+        df = idx_frames.get(idx_t)
+        try:
             if df is None or len(df) < 60:
+                print(f"  {idx_t:9s} index skipped (no 2y data)")
                 continue
             row = process_ticker(df, idx_t, name)
             if row.get("error"):
+                print(f"  {idx_t:9s} index skipped ({row.get('error')})")
                 continue
             price = row.get("price") or 0
             dp = 2 if (price or 0) >= 100 else 3
-            chart = build_equity_chart_1d(df, idx_t, now, dp)
+            c1d = build_equity_chart_1d(df, idx_t, now, dp)
             ec = _equity_empty_charts()
-            row["charts"] = {"4h": ec["4h"], "1d": chart or ec["1d"], "1w": ec["1w"]}
+            row["charts"] = {"4h": ec["4h"], "1d": c1d or ec["1d"], "1w": ec["1w"]}
+            # P0 weekly: resample the 2y daily frame (0 extra fetch).
+            dfw = resample_ohlc(df, "1W")
+            if dfw is not None and len(dfw) >= 10:
+                cw = build_1d_chart_from_ohlc(dfw, dp, now)
+                if cw.get("available") is True:
+                    cw["source"] = "yfinance"
+                    cw["source_ticker"] = idx_t
+                    cw["note"] = "Weekly (1d→1W resample). Market context only."
+                    row["charts"]["1w"] = cw
             equity_markets.setdefault(grp, []).insert(0, row)
-            print(f"  {idx_t:7s} index row added to {grp} (chart={bool(chart)})")
+            print(f"  {idx_t:9s} → {grp} (1d={bool(c1d)} "
+                  f"1w={row['charts']['1w'].get('available') is True})")
         except Exception as exc:
-            print(f"  {idx_t}: index chart skipped ({str(exc)[:50]})")
+            print(f"  {idx_t}: index chart skipped ({str(exc)[:60]})")
+
+    # ── P2: every constituent gets a full-length 1d chart ───────────────────
+    targets = []            # [(row, dp)] to chart, in fetch order
+    for grp in ("nikkei225", "dow30", "nasdaq100", "sp500"):
+        for r in equity_markets.get(grp, []):
+            sym = r.get("symbol", "")
+            if sym.startswith("^"):
+                continue                                     # index proxy: done above
+            if r.get("error"):                               # table row already failed
+                r["chart_status"] = "unavailable"
+                r["chart_error"] = "table fetch error; chart skipped"
+                continue
+            targets.append(r)
+    print(f"[Equity charts] P2 constituents: charting {len(targets)} rows, batched 2y…")
+    frames = _batched_2y_ohlc([r["symbol"] for r in targets])
+    ok = fail = 0
+    for r in targets:
+        sym = r["symbol"]
+        df = frames.get(sym)
+        try:
+            if df is None or len(df) < 60:
+                r["chart_status"] = "unavailable"
+                r["chart_error"] = "no 2y daily data from yfinance"
+                fail += 1
+                continue
+            price = r.get("price") or float(df["Close"].squeeze().iloc[-1])
+            dp = 2 if (price or 0) >= 100 else 3 if (price or 0) >= 1 else 5
+            chart = build_equity_chart_1d(df, sym, now, dp)
+            if not chart:
+                r["chart_status"] = "unavailable"
+                r["chart_error"] = "indicator/OHLC build returned unavailable"
+                fail += 1
+                continue
+            ec = _equity_empty_charts()
+            r["charts"] = {"4h": ec["4h"], "1d": chart, "1w": ec["1w"]}
+            ok += 1
+        except Exception as exc:
+            r["chart_status"] = "unavailable"
+            r["chart_error"] = f"{type(exc).__name__}: {str(exc)[:80]}"
+            fail += 1
+    print(f"[Equity charts] constituents: {ok} charted / {fail} unavailable "
+          f"/ {len(targets)} total")
 
 # ─── SUMMARY ─────────────────────────────────────────────
 
@@ -2226,34 +2304,22 @@ def attach_links(markets):
 
 
 # ── v6.0 payload split: charts leave data.json for per-tab lazy-loaded files ──
-# Each charted row embeds a full OHLC + indicator block (~16 KB). Embedding a
-# chart on every equity row balloons data.json past 5 MB and breaks the browser
-# load. We split: data.json keeps only a `chart_status` flag per row, and the
-# heavy chart blocks move to docs/charts/{tab}.json, fetched on demand when a
-# tab is opened (see loadCharts in docs/index.html).
+# Each charted row embeds a full OHLC + indicator block (~16 KB). We split so the
+# table payload (data.json) stays small and fast to parse: data.json keeps only a
+# `chart_status` flag per row, and the heavy chart blocks move to
+# docs/charts/{tab}.json, fetched on demand when a tab is opened (see loadCharts
+# in docs/index.html). There is NO capacity guard here — capacity is constrained
+# only by Cloudflare Pages limits (25 MiB/file, 1 GB/site, 20k files); see
+# DATA_CONTRACT.md §10.
 #
-# Coverage policy (see DATA_CONTRACT.md §payload):
+# Coverage policy (see DATA_CONTRACT.md §10):
 #   P0  indices ^N225/^DJI/^NDX/^GSPC/^STOXX50E : 1d + 1w
 #   P1  fx / rates / crypto                      : 4h + 1d + 1w
-#   P2  composite_score top-30 per equity tab    : 1d full (≤120 bars)
-#   P3  remaining equities                        : 1d, decimated 120→60 bars
-# Equity 4h/1w are intentionally NOT provided (full coverage ≈ 18 MB).
+#   P2  every equity constituent (all 4 tabs)    : 1d full length (no thinning)
+# Equity 4h/1w are intentionally NOT provided (only the 1d full-length chart).
 _CHART_TABS  = ("nikkei225", "dow30", "nasdaq100", "sp500",
                 "fx", "rates", "crypto", "volatility", "valuation")
 _EQUITY_TABS = ("nikkei225", "dow30", "nasdaq100", "sp500")
-_P2_TOP_N     = 30
-_P3_KEEP_BARS = 60
-
-
-def _decimate_1d(charts):
-    """P3 budget guard: thin a 1d OHLC block to the most recent 60 bars.
-    Indicators are latest-value scalars (not per-bar arrays), so thinning the
-    ohlc list does not misalign them."""
-    b = charts.get("1d")
-    if isinstance(b, dict) and isinstance(b.get("ohlc"), list) \
-            and len(b["ohlc"]) > _P3_KEEP_BARS:
-        b["ohlc"] = b["ohlc"][-_P3_KEEP_BARS:]
-    return charts
 
 
 def _is_ready(charts):
@@ -2266,33 +2332,28 @@ def split_chart_payload(payload, out_dir=OUTPUT_DIR):
     """Strip each row's `charts` into docs/charts/{tab}.json and replace it with
     `chart_status` in {ready, pending, unavailable}. Mutates `payload` (charts
     removed) and returns {tab: bytes_written}. Idempotent: rows already stripped
-    (no `charts` key) keep their existing status."""
+    (no `charts` key) keep their existing status. No OHLC thinning — the 1d chart
+    is stored full length (P2)."""
     chart_dir = Path(out_dir) / "charts"
     chart_dir.mkdir(parents=True, exist_ok=True)
     written = {}
     for tab, rows in payload.get("markets", {}).items():
         bucket = {}
-        top = set()
-        if tab in _EQUITY_TABS:
-            order = sorted(range(len(rows)),
-                           key=lambda i: (rows[i].get("composite_score") is not None,
-                                          rows[i].get("composite_score") or 0.0),
-                           reverse=True)
-            top = set(order[:_P2_TOP_N])
-        for i, rec in enumerate(rows):
+        for rec in rows:
             charts = rec.pop("charts", None)
             if charts is None:
-                # already split, or never charted → keep/assign a status
+                # No chart block. Under full-coverage P2 an equity that reaches
+                # this branch was attempted and failed (attach_equity_charts sets
+                # chart_status='unavailable' + a reason); setdefault preserves it.
+                # Non-equity rows with no chart series are simply 'unavailable'.
                 rec.setdefault("chart_status",
                                "pending" if tab in _EQUITY_TABS else "unavailable")
                 continue
             if _is_ready(charts):
-                if tab in _EQUITY_TABS and i not in top:
-                    charts = _decimate_1d(charts)              # P3
                 bucket[rec["symbol"]] = charts
                 rec["chart_status"] = "ready"
             elif tab in _EQUITY_TABS:
-                rec["chart_status"] = "pending"               # chartable, not generated
+                rec["chart_status"] = "unavailable"           # attempted, no data
             else:
                 rec["chart_status"] = "unavailable"           # source has no chart series
         # Only (over)write a tab's chart file when we actually have charts to
