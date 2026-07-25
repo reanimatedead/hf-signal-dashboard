@@ -1032,3 +1032,16 @@ charts 合計は約 5.9 MB で、Cloudflare Pages の上限に対し十分な余
 ### 相関パネル 12×12（`pipeline/build_corr.py`）
 
 `MATRIX_LABELS` に **SX5E**（既存 STOXX50E=yfinance の別名）と **EU10Y**（ECB 日次）を追加し 10×10 → **12×12**。SX5E は log-return、EU10Y は bp-change。SX5E は未確定バー除外(hygiene)対象。`matrix_60d` / `matrix_20d` 再計算・既存トップレベルキー保全を確認済み。
+
+### degrade 方針（gamma / macro_v2 層）— 保持方式は採らない
+
+`gamma` 層（`pipeline/build_gamma.py`）と `macro_v2` 層（`pipeline/build_macro_v2.py`）は
+**degrade 方式**を採る。データ源（CBOE / FRED）が障害の場合:
+
+- 各生成スクリプトは **exit 0 のまま `data_status:"error"` / `"unavailable"` を出力**し、**サイト全体は落とさない**
+  （コア payload = `docs/data.json` は `tools/health_gate.py` が FAIL でガードしており、この分離は意図的）。
+- **画面表示時は必ず「取得に失敗（最新値は表示しません）」を明示すること。空欄にしてはならない。**
+  これは `index.html` の `MACRO_FX_STATE`（loading / error / ok の3状態）と同じ原則で、
+  「古い値を最新と誤認させない」を全層で一貫させる。
+- **古い値を保持して最新と誤認させる方式は採らない**（ガンマ/マクロは日々変わるため、3日前の値を現在値として
+  出すのは誤情報。`unavailable` と出す方が正しい）。0DTE の `null + status:"unavailable" + reason`（§上記）も同原則。
