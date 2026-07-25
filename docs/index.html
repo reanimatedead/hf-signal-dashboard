@@ -1029,7 +1029,7 @@ function getCombinedRows(){
       const mn = ratesMeaning(r.symbol), delta = r.change;
       return {
         __orig: "rates",
-        symbol: r.symbol, name: r.name,
+        symbol: r.symbol, name: r.name, link: r.link,
         type_label: r.tenor || "—",
         value: r.yield, delta,
         meaning: mn.text, tone: mn.tone,
@@ -1041,7 +1041,7 @@ function getCombinedRows(){
       const mn = volMeaning(r.symbol, r.price), delta = r.change_pct;
       return {
         __orig: "volatility",
-        symbol: r.symbol, name: r.name,
+        symbol: r.symbol, name: r.name, link: r.link,
         type_label: "Vol",
         value: r.price, delta,
         meaning: mn.text, tone: mn.tone,
@@ -1066,7 +1066,7 @@ function getCombinedRows(){
   } else if (tab === "pos_val") {
     const imm = (DATA.markets?.imm||[]).map(r => ({
       __orig: "imm",
-      symbol: r.symbol, name: r.name,
+      symbol: r.symbol, name: r.name, link: r.link,
       type_label: "IMM " + (r.currency||""),
       value: r.net_position, delta: r.weekly_change,
       context: r.positioning_state,
@@ -1075,7 +1075,7 @@ function getCombinedRows(){
     }));
     const crypto = (DATA.markets?.crypto||[]).map(r => ({
       __orig: "crypto",
-      symbol: r.symbol, name: r.name,
+      symbol: r.symbol, name: r.name, link: r.link,
       type_label: "Crypto",
       value: r.price, delta: r.change_pct,
       context: r.risk || "—",
@@ -1084,7 +1084,7 @@ function getCombinedRows(){
     }));
     const val = (DATA.markets?.valuation||[]).map(r => ({
       __orig: "valuation",
-      symbol: r.symbol, name: r.name,
+      symbol: r.symbol, name: r.name, link: r.link,
       type_label: r.metric || "—",
       value: r.value, delta: null,
       context: r.valuation_context,
