@@ -1,0 +1,148 @@
+name: Deploy to Pages (full daily + corr refresh)
+
+# A-Ⅰ: builds the site and deploys it via the GitHub Pages *Actions* source
+# (actions/deploy-pages). Data is generated in-job and uploaded as the Pages
+# artifact — it is NOT committed to git (that switch is A-Ⅱ). If generation, the
+# health gate, or the contract tests fail, the artifact is never uploaded and the
+# job fails, so deploy-pages keeps the previous good deploy live. This is the
+# "never overwrite with broken data" mechanism.
+#
+# Two jobs share one Pages deployment (concurrency group "pages", no cancel):
+#   full         — 00:00 JST daily: full regeneration + macro + deploy
+#   corr_refresh — 07:30 / 11:00 JST Mon-Fri: pull the live site as base,
+#                  recompute correlations only, redeploy the full payload
+# On manual dispatch, pick which job via the `job` input (default: full).
+
+on:
+  workflow_dispatch:
+    inputs:
+      job:
+        description: "Which job to run on manual dispatch"
+        type: choice
+        options: [full, corr_refresh]
+        default: full
+  schedule:
+    - cron: "0 15 * * *"      # full         — 00:00 JST daily
+    - cron: "30 22 * * 0-4"   # corr_refresh — 07:30 JST Mon-Fri
+    - cron: "0 2 * * 1-5"     # corr_refresh — 11:00 JST Mon-Fri
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# One live Pages deployment at a time; never cancel an in-flight deploy.
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+jobs:
+  # ── FULL: 00:00 JST daily (or manual `job=full`) ──────────────────────────
+  full:
+    if: >-
+      (github.event_name == 'workflow_dispatch' && inputs.job == 'full') ||
+      (github.event_name == 'schedule' && github.event.schedule == '0 15 * * *')
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest
+
+      # Generate → correlations → macro. build_macro is full-only (index.html does
+      # not read docs/data/macro.json, but external consumers may; 3s / 13 FRED
+      # calls buys removing that unknown risk). corr_refresh does NOT run it.
+      - name: Generate signals
+        run: python3 fetch_signals.py
+
+      - name: Re-merge correlations
+        run: python3 pipeline/build_corr.py
+
+      - name: Generate macro layer (legacy docs/data/macro.json)
+        env:
+          FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
+        run: python3 pipeline/build_macro.py
+
+      # Fail-closed gates: any failure below stops the job BEFORE upload, so the
+      # previous good Pages deploy stays live.
+      - name: Health gate
+        run: python3 tools/health_gate.py
+
+      - name: Contract tests
+        run: python3 -m pytest tests/ -q
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v5
+        with:
+          path: docs
+
+      - name: Deploy to Pages
+        id: deploy
+        uses: actions/deploy-pages@v5
+
+  # ── CORR_REFRESH: 07:30 / 11:00 JST Mon-Fri (or manual `job=corr_refresh`) ─
+  corr_refresh:
+    if: >-
+      (github.event_name == 'workflow_dispatch' && inputs.job == 'corr_refresh') ||
+      (github.event_name == 'schedule' && github.event.schedule == '30 22 * * 0-4') ||
+      (github.event_name == 'schedule' && github.event.schedule == '0 2 * * 1-5')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    env:
+      PAGES_BASE: "https://reanimatedead.github.io/hf-signal-dashboard"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest
+
+      # Pull docs/data.json + required charts/*.json from the live site (chart
+      # tabs derived from data.json), then guard the base (fail closed): stale
+      # (>48h), missing keys, missing chart_status, or equity ready < 90% → exit 1.
+      - name: Pull live site as deploy base + guard
+        run: python3 tools/pull_live_base.py
+
+      - name: Re-merge correlations
+        run: python3 pipeline/build_corr.py
+
+      - name: Health gate
+        run: python3 tools/health_gate.py
+
+      - name: Contract tests
+        run: python3 -m pytest tests/ -q
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v5
+        with:
+          path: docs
+
+      - name: Deploy to Pages
+        id: deploy
+        uses: actions/deploy-pages@v5
