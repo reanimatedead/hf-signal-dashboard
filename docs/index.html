@@ -191,6 +191,9 @@ tbody tr.detail-row,tbody tr.detail-row:hover{background:var(--bg2)}
 .sym-t{font-weight:700;font-size:var(--sym-size);letter-spacing:0.04em;color:var(--sym-color)}
 .sym-arrow{font-size:9px;color:var(--text-faint);transition:color .15s}
 .sym-a:hover .sym-arrow{color:var(--accent)}
+.sym-a.nolink{cursor:default}
+.sym-a.nolink .sym-t{color:var(--text-dim)}
+.sym-src{font-size:8px;font-weight:700;letter-spacing:.03em;color:var(--bg,#0b0e14);background:var(--yellow);border-radius:3px;padding:0 3px;margin-left:2px;text-transform:uppercase}
 
 /* ── Company name ── */
 .cname{font-family:var(--cond);font-weight:400;font-size:12px;color:var(--text-dim);
@@ -1504,10 +1507,17 @@ function cciChartSVG(c){
 }
 
 // ══ Company links ══════════════════════════════════
-function lnk(sym){
-  if(tab==="nikkei225") return`https://finance.yahoo.co.jp/quote/${sym.replace(".T","")}.T`;
-  if(tab==="fx") return`https://finance.yahoo.com/quote/${encodeURIComponent(sym)}/`;
-  return`https://finance.yahoo.com/quote/${sym}/`;
+// v5.0: link is resolved per-row in the pipeline (build_link) and shipped as
+// r.link = {url,label,kind}. We never guess from the active tab anymore.
+// kind: "quote" → Yahoo, "source" → primary source (MoF/ECB/CFTC/FRED), "none".
+// Back-compat: an old data.json without r.link renders plain text (no broken link).
+function symLink(r){
+  const L=r.link||{kind:"none",url:"",label:""};
+  if(!L.url)
+    return`<span class="sym-a nolink" title="外部リンクなし"><span class="sym-t">${r.symbol}</span></span>`;
+  const badge=L.kind==="source"?`<span class="sym-src" title="一次出典: ${esc(L.label||"")}">src</span>`:"";
+  return`<a class="sym-a" href="${L.url}" target="_blank" rel="noopener" title="${esc(L.label||"")}">`
+       +`<span class="sym-t">${r.symbol}</span>${badge}<span class="sym-arrow">↗</span></a>`;
 }
 
 // ══ Star / Watchlist ═══════════════════════════════
@@ -1545,9 +1555,7 @@ function cell(c,r){
       const on=WL.has(r.symbol);
       h=`<div class="sym-cell">
         <span class="star ${on?"on":""}" onclick="toggleStar('${r.symbol}',this)">${on?"★":"☆"}</span>
-        <a class="sym-a" href="${lnk(r.symbol)}" target="_blank" rel="noopener">
-          <span class="sym-t">${r.symbol}</span><span class="sym-arrow">↗</span>
-        </a>
+        ${symLink(r)}
       </div>`;
       break;
     }

@@ -2148,6 +2148,78 @@ def _build_money_flow():
     }
 
 
+# ── Per-row external links (v5.0) ─────────────────────────────────────────
+# The front-end used to guess a Yahoo URL from the *active tab* and the internal
+# symbol, which 404'd every non-Yahoo row (JGB / EU / CFTC / FRED / indices).
+# We resolve the link ONCE here, from the row's own attributes, and hand the
+# front-end a ready {"url","label","kind"} object. kind: "quote" (tradable /
+# indexable on Yahoo), "source" (primary source page), "none" (no external link).
+_LINK_SRC = {
+    "JP2Y":  ("https://www.mof.go.jp/jgbs/reference/interest_rate/", "財務省 国債金利"),
+    "JP10Y": ("https://www.mof.go.jp/jgbs/reference/interest_rate/", "財務省 国債金利"),
+    "JP30Y": ("https://www.mof.go.jp/jgbs/reference/interest_rate/", "財務省 国債金利"),
+    "EU2Y":  ("https://data.ecb.europa.eu/data/datasets/YC", "ECB Data Portal"),
+    "EU10Y": ("https://data.ecb.europa.eu/data/datasets/YC", "ECB Data Portal"),
+    "EU30Y": ("https://data.ecb.europa.eu/data/datasets/YC", "ECB Data Portal"),
+    "VIX":   ("https://finance.yahoo.com/quote/%5EVIX/", "Yahoo Finance (^VIX)"),
+    "MOVE":  ("https://finance.yahoo.com/quote/%5EMOVE/", "Yahoo Finance (^MOVE)"),
+    "US_BUFFETT_INDICATOR": ("https://fred.stlouisfed.org/graph/?g=qLC", "FRED"),
+    "JP_BUFFETT_INDICATOR": ("", ""),
+}
+
+
+def build_link(rec, market):
+    """Return {"url":str, "label":str, "kind":"quote"|"source"|"none"} for a row.
+
+    Decides from the row's own market/symbol/source_ticker — never from the
+    currently active UI tab. Rows Yahoo cannot serve get routed to their primary
+    source (MoF / ECB / CFTC / FRED); rows with no external page get kind:"none"
+    so the front-end renders plain text rather than a broken link.
+    """
+    q = lambda s: urllib.parse.quote(s, safe="")
+    sym = rec.get("symbol", "")
+    st  = rec.get("source_ticker")
+
+    # 1) Yahoo-quotable indices / equities
+    if market in ("dow30", "nasdaq100", "sp500"):
+        t = st or sym
+        return {"url": f"https://finance.yahoo.com/quote/{q(t)}/",
+                "label": "Yahoo Finance", "kind": "quote"}
+    if market == "nikkei225":
+        if sym.startswith("^"):            # index: no .T suffix, use yahoo.com
+            return {"url": f"https://finance.yahoo.com/quote/{q(sym)}/",
+                    "label": "Yahoo Finance", "kind": "quote"}
+        code = sym.replace(".T", "")
+        return {"url": f"https://finance.yahoo.co.jp/quote/{code}.T",
+                "label": "Yahoo!ファイナンス", "kind": "quote"}
+    if market in ("fx", "crypto"):
+        return {"url": f"https://finance.yahoo.com/quote/{q(sym)}/",
+                "label": "Yahoo Finance", "kind": "quote"}
+
+    # 2) US rates carry a real Yahoo source_ticker (^TNX / ^TYX / 2YY=F)
+    if market == "rates" and st:
+        return {"url": f"https://finance.yahoo.com/quote/{q(st)}/",
+                "label": f"Yahoo Finance ({st})", "kind": "quote"}
+
+    # 3) Not on Yahoo → route to primary source
+    if sym.endswith("_IMM"):
+        return {"url": "https://www.cftc.gov/dea/futures/financial_lf.htm",
+                "label": "CFTC COT", "kind": "source"}
+    if sym in _LINK_SRC and _LINK_SRC[sym][0]:
+        return {"url": _LINK_SRC[sym][0], "label": _LINK_SRC[sym][1], "kind": "source"}
+    return {"url": "", "label": "", "kind": "none"}
+
+
+def attach_links(markets):
+    """Attach rec['link'] to every row across all markets. Never raises."""
+    for market, rows in markets.items():
+        for rec in rows:
+            try:
+                rec["link"] = build_link(rec, market)
+            except Exception:
+                rec["link"] = {"url": "", "label": "", "kind": "none"}
+
+
 def main():
     t0      = time.time()
     now_jst = datetime.now(JST)
@@ -2227,6 +2299,9 @@ def main():
         },
         "money_flow": money_flow,
     }
+
+    # v5.0 — per-row external links (resolved from each row, not the active tab).
+    attach_links(payload["markets"])
 
     # v4.2 — survival_loop (生存ループ / Phase 1).
     # Pure analytic; reads payload (markets + money_flow + meta) only.
