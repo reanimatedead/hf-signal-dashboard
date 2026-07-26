@@ -34,3 +34,8 @@ docs/health.json
 docs/macro_v2.json
 docs/relations.json
 docs/gamma.json
+# Task 5-4: link 死活の診断出力（CI 再生成・警告のみ）
+docs/link_check.json
+
+# Task 5-3: decisions.jsonl は「生成物ではなく記録」。追跡下に置く（無視しない）。
+!docs/decisions.jsonl

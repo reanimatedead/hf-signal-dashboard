@@ -16,9 +16,16 @@ Checks (A-Ⅰ-2):
     - fred_daily lag> 4d
     - equity 4-tab ready rate < 90%
     - data.json missing any of markets / summary / money_flow / survival_loop
+    - relations の 3 地域いずれかが series 200 件未満   (Task 5-2)
+    - correlations.align が inner_join でない            (Task 5-2)
+    - macro_v2 の fisher.ok が False                     (Task 5-2)
   WARN (exit 0, logged):
     - boj_assets lag > 45d
     - imm lag        > 12d
+    - gamma が data_status error / unavailable           (Task 5-2)
+    - macro_v2 の error 系列が 3 件以上                    (Task 5-2)
+    - relations の d20_z が |値| > 2（速度警告）          (Task 5-2)
+    - decisions.jsonl の review_date が到来               (Task 5-3)
 
 Freshness reference — honest-limitation note: the current data.json schema stores
 NO per-observation date on the US-rate / JGB / FRED-daily rows (they are live /
@@ -34,7 +41,17 @@ import sys
 from datetime import datetime, timezone
 
 DATA = sys.argv[1] if len(sys.argv) > 1 else "docs/data.json"
-OUT = os.path.join(os.path.dirname(DATA) or ".", "health.json")
+DOCS_DIR = os.path.dirname(DATA) or "."
+OUT = os.path.join(DOCS_DIR, "health.json")
+
+
+def _load_sibling(name):
+    """docs/<name> を読む。欠落/破損は None（呼び出し側で unknown/warn 扱い）。"""
+    try:
+        with open(os.path.join(DOCS_DIR, name), encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return None
 
 FAIL_LAG = {"us_rates": 3, "jgb": 5, "fred_daily": 4}
 WARN_LAG = {"boj_assets": 45, "imm": 12}
@@ -133,6 +150,107 @@ def evaluate(d):
         add("imm", "WARN", "warn", f"lag {imm_lag}d > {WARN_LAG['imm']}d")
     else:
         add("imm", "WARN", "pass", f"lag {imm_lag}d <= {WARN_LAG['imm']}d")
+
+    # ── Task 5-2: v2 検証層の拡張チェック ──────────────────────────────
+    # relations.json / macro_v2.json / gamma.json は data.json の兄弟生成物。
+    rel = _load_sibling("relations.json")
+    mac = _load_sibling("macro_v2.json")
+    gam = _load_sibling("gamma.json")
+
+    # FAIL: relations の 3 地域いずれかが series 200 件未満
+    if rel is None:
+        add("relations_series", "FAIL", "unknown", "relations.json 読み込み不可")
+    else:
+        regions = rel.get("regions") or {}
+        short = {r: len((regions.get(r) or {}).get("series") or [])
+                 for r in ("us", "eu", "jp")
+                 if len((regions.get(r) or {}).get("series") or []) < 200}
+        if short:
+            add("relations_series", "FAIL", "fail",
+                f"series < 200 の地域: {short}")
+        else:
+            add("relations_series", "FAIL", "pass",
+                "us/eu/jp series >= 200")
+
+    # FAIL: correlations.align が inner_join でない
+    corr_align = (d.get("correlations") or {}).get("align")
+    if corr_align is None:
+        add("corr_align", "FAIL", "unknown", "correlations.align 欠落")
+    elif corr_align != "inner_join":
+        add("corr_align", "FAIL", "fail",
+            f"correlations.align='{corr_align}' (inner_join でない)")
+    else:
+        add("corr_align", "FAIL", "pass", "correlations.align=inner_join")
+
+    # FAIL: macro_v2 の fisher.ok が False
+    if mac is None:
+        add("macro_fisher", "FAIL", "unknown", "macro_v2.json 読み込み不可")
+    else:
+        fisher = (mac.get("identities") or {}).get("fisher") or {}
+        if fisher.get("ok") is not True:
+            add("macro_fisher", "FAIL", "fail",
+                f"fisher.ok={fisher.get('ok')} gap={fisher.get('gap')}")
+        else:
+            add("macro_fisher", "FAIL", "pass",
+                f"fisher.ok gap={fisher.get('gap')}")
+
+    # WARN: gamma が data_status: error または unavailable
+    if gam is None:
+        add("gamma_status", "WARN", "unknown", "gamma.json 読み込み不可")
+    else:
+        gs = gam.get("data_status")
+        if gs in ("error", "unavailable"):
+            add("gamma_status", "WARN", "warn", f"gamma.data_status={gs}")
+        else:
+            add("gamma_status", "WARN", "pass", f"gamma.data_status={gs}")
+
+    # WARN: macro_v2 の系列のうち error のものが 3 件以上
+    if mac is not None:
+        series = mac.get("series") or {}
+        errs = [k for k, v in series.items() if v.get("data_status") == "error"]
+        if len(errs) >= 3:
+            add("macro_series_errors", "WARN", "warn",
+                f"error 系列 {len(errs)} 件: {errs}")
+        else:
+            add("macro_series_errors", "WARN", "pass",
+                f"error 系列 {len(errs)} 件 (< 3)")
+
+    # WARN: relations の d20_z が絶対値 2 を超える（速度警告）
+    if rel is not None:
+        ctx = (rel.get("balance") or {}).get("context") or {}
+        hot = {}
+        for k, v in ctx.items():
+            dz = (v or {}).get("d20_z")
+            if isinstance(dz, (int, float)) and abs(dz) > 2:
+                hot[k] = dz
+        if hot:
+            add("relations_speed", "WARN", "warn",
+                f"|d20_z| > 2 の系列: {hot}")
+        else:
+            add("relations_speed", "WARN", "pass", "|d20_z| <= 2")
+
+    # WARN: decisions.jsonl の review_date が到来（見直し期限）— Task 5-3
+    dec_path = os.path.join(DOCS_DIR, "decisions.jsonl")
+    if os.path.exists(dec_path):
+        due = []
+        try:
+            with open(dec_path, encoding="utf-8") as f:
+                for line in f:
+                    line = line.strip()
+                    if not line:
+                        continue
+                    rec = json.loads(line)
+                    rv = _parse_date(rec.get("review_date"))
+                    if rv is not None and rv <= _today():
+                        due.append(rec.get("review_date"))
+        except Exception as e:
+            add("decisions_review", "WARN", "unknown", f"decisions.jsonl 解析失敗: {e}")
+        else:
+            if due:
+                add("decisions_review", "WARN", "warn",
+                    f"review_date 到来 {len(due)} 件: {due} → 判断を見直せ")
+            else:
+                add("decisions_review", "WARN", "pass", "見直し期限なし")
 
     # fails/warns may repeat names via add(); de-dup while keeping only real fails.
     real_fails = [c["name"] for c in checks if c["status"] == "fail"]

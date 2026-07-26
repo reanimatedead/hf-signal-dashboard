@@ -1072,3 +1072,124 @@ charts 合計は約 5.9 MB で、Cloudflare Pages の上限に対し十分な余
 ### 描画（新タブ「利回り×株価」）
 
 上段=株価(左軸)+**実質金利**(右軸)・名目は破線トグル / 中段=120日ローリング相関+レジーム / 下段=感応度ベータ棒 / サイドバー=リバランス圧力・パーセンタイル・d20_z。**全図の直下に説明文5要素（何を示すか/どう読むか/現在の状態/出典と算出/前提と限界）を必須**。degrade 時は「取得に失敗（最新値は表示しません）」明示・空欄禁止。
+
+## 14. v6.5 — Task 5: 検証層 / スキーマ最終整理
+
+Task 5 は「動いているつもり」を機械的に潰す検証層。人間の記憶に依存する検査は作らない。
+検査は `tests/test_contract_v2.py`（契約テスト）・`tools/health_gate.py`（拡張）・
+`tools/check_links.py`（死活）で機械化する。以下に全スキーマと運用方針を集約する。
+
+### `link` スキーマ（全 markets 行に必須）
+
+各 `markets.<cat>[]` 行は `link` オブジェクトを持つ。**全行に `link` と `link.kind` が必須**。
+
+```
+link = {
+  "url":   str,   // 外部参照 URL（空文字可: kind:"none" のとき）
+  "label": str,   // 表示名（例 "Yahoo Finance" / "CFTC COT" / "FRED (…)"）
+  "kind":  "quote" | "source" | "none"
+}
+```
+
+- `kind:"quote"` … 銘柄ページ（Yahoo Finance の quote 等）。**VIX / MOVE は `quote`**。
+- `kind:"source"` … 一次データ提供元（MoF JGB / ECB Data Portal / CFTC COT / FRED 系列 等）。
+- `kind:"none"` … 対応 URL なし（例 `JP_BUFFETT_INDICATOR`: `url:""` `label:""` `kind:"none"`）。
+- **非ティッカー識別子（`*_IMM` / `*BUFFETT*` / `JP2Y/JP10Y/JP30Y` / `EU2Y/EU10Y/EU30Y`）は
+  `finance.yahoo.com/quote/` を指してはならない**（Yahoo に無い銘柄コードで 404 / 誤誘導になる）。
+  これらは `kind:"source"`（一次出典）で出す。
+- **結合タブ（`rates_vol` / `pos_val`）の行は元行の `link` を保持する**。`getCombinedRows` の
+  `.map()` で `link: r.link` を落とすと詳細リンクが死ぬ（過去に実バグ化）。`test_contract_v2.py`
+  が (a) 結合元 5 ソース全行の link 保持と (b) `getCombinedRows` の写像の両面で回帰ガードする。
+
+### `chart_status`（株式 4 タブ）
+
+`markets.{nikkei225,dow30,nasdaq100,sp500}[].chart_status ∈ {ready, pending, unavailable}`。
+
+- **株式 4 タブの ready 率 >= 95%**（health_gate は FAIL 閾値 90%、契約テストは 95% で監視）。
+- **`ready` の行は `charts/{tab}.json[symbol]` に実体があり `1d.available=true` かつ `1d.ohlc` が非空**。
+  フラグだけ見て中身を見ないのが過去の見落とし原因。契約テストが実体と OHLC を実測する。
+- **Bollinger Bands は `upper > basis > lower` が成立**（`1d.indicators.bollinger_bands[period][std_N]`）。
+
+### `docs/health.json`（health_gate 出力）
+
+`tools/health_gate.py` が `docs/data.json` とその兄弟（`relations.json` / `macro_v2.json` /
+`gamma.json` / `decisions.jsonl`）を読み、FAIL / WARN を判定して出力。**FAIL が 1 つでもあれば exit 1**
+（deploy.yml が upload 前にガード＝壊れた payload で本番を上書きしない）。
+
+```
+health.json = {status:"PASS"|"WARN"|"FAIL", generated_from, as_of_utc,
+               fails:[name], warns:[name], checks:[{name,level,status,detail}], notes:[]}
+```
+
+- **FAIL**: 構造欠落 / equity ready < 90% / us_rates・jgb・fred_daily lag 超過 /
+  **relations の 3 地域いずれか series < 200**（Task 5-2）/ **correlations.align ≠ inner_join**（5-2）/
+  **macro_v2 の fisher.ok が False**（5-2）。
+- **WARN**: boj_assets lag>45d / imm lag>12d / **gamma data_status が error・unavailable**（5-2）/
+  **macro_v2 の error 系列が 3 件以上**（5-2）/ **relations の |d20_z| > 2（速度警告）**（5-2）/
+  **decisions.jsonl の review_date 到来**（5-3、見直し期限）。
+
+### `docs/decisions.jsonl`（判断ログ・append-only・**git 追跡下**）
+
+生成物ではなく**記録**。`.gitignore` しない（`!docs/decisions.jsonl`）。1 行 1 レコード。
+
+```
+{"date":"YYYY-MM-DD", "observation":str, "reading":str,
+ "falsifier":str, "review_date":"YYYY-MM-DD"}
+```
+
+- **`falsifier` が本体**。「何が起きたらこの読みは外れか」を必ず書く。これが無いと都合の良い
+  記憶だけが残る確認バイアス装置になる。
+- `review_date` 到来時に `health_gate` が WARN を出す（見直しを機械的に促す）。
+- 画面からの追記 UI は作らない（JSON 直編集で足りる）。
+
+### `docs/link_check.json`（死活診断・**警告のみ**・CI 再生成）
+
+`tools/check_links.py` が全 markets 行の `link.url` に HEAD を投げて到達性を記録。
+
+```
+link_check.json = {as_of_utc, checked, ok, warn, policy,
+                   results:[{category,symbol,url,status_code,note,level}]}
+```
+
+- **Yahoo (`finance.yahoo.com`) には各リクエスト前に 2 秒以上待機**（実測で HTTP 429 を踏むため）。
+- **CI では警告のみ。レート制限(429)・ネットワークエラーで job を fail させない**（スクリプトは常に exit 0）。
+- 生成物のため `.gitignore` 済み。
+
+### 容量方針
+
+**上限は設けない（v6.1 で容量予算を撤廃）**。監視は `df`（ローカルストア）のみ。制約は
+**GitHub Pages 側**（成果物サイズ・帯域）だけを見る。生チェーン等の非公開・集計値のみ出力の原則は維持。
+
+### 出典一覧と再利用条件の区別
+
+| 出典 | 系列 | 種別 / 再利用条件 |
+|---|---|---|
+| **ECB** Data Portal | EU 利回り（YC 2Y/10Y/30Y） | 公的統計。出典表示で再配布可。 |
+| **FRED**（St. Louis Fed） | 米金利分解 16 系列 / SP500 / NIKKEI225 / DFII10 / THREEFYTP10 等 | 公的。keyless 取得。原系列は各提供元条件に従う。 |
+| **MoF**（日本財務省） | JGB 2Y/10Y/30Y | 公的統計。出典表示で利用可。 |
+| **CFTC** COT | IMM ポジション | 公的（週次）。出典表示で利用可。 |
+| **CBOE** | SPX オプションチェーン（gamma）/ VIX・VIX3M・SKEW | **遅延フィード**。集計値のみ公開、生チェーンは非公開。 |
+| **yfinance**（Yahoo 非公式） | EU 株価 ^STOXX50E 等 | **Yahoo の ToS 上「個人利用」想定**。公的統計ではない。EU 株価は FRED に無く yfinance のみが経路（非対称）。 |
+
+**公的統計（ECB/FRED/MoF/CFTC）と、慣習的仮定を含む集計（CBOE gamma）・個人利用想定の非公式取得
+（yfinance）は性質が異なる**。前者は出典表示で再利用しやすく、後者は再配布に制約・限界がある点を
+区別して扱う。
+
+### 非提供・非対称の理由（Task 5-5 要求の集約・各節への索引）
+
+- **株式の 4h / 1w を提供しない理由** … §10「株式の 4h / 1w を提供しない理由」（取得コスト数倍・1d で用途十分）。
+- **ERP が unavailable である理由** … §13「`balance.erp`」（指数の日次 EPS に無料の信頼ソースが無い。Shiller ミラーは 2024-09 停止）。空欄禁止・`reason` 必須。
+- **ガンマ層が米国限定である理由** … §12「ガンマ層」（`coverage:{us:"full", eu:"unavailable", jp:"unavailable"}`。JPX/Eurex はギリシャ文字非公開）。
+- **0DTE が捕捉できない理由** … §12「0DTE 捕捉不能の明示」（CBOE `_SPX` は前営業日引けスナップ＝当日満期は既に消えている。無料リアルタイムフィードなし。`null + status:"unavailable" + reason`）。
+- **EU/JP に実質金利とターム・プレミアムが無い理由** … §13 表（無料日次系列が無い。米国のみ DFII10 / THREEFYTP10）。`relations.{eu,jp}.real_yield = term_premium = null`。
+- **EU 株価が yfinance のみである非対称** … §13「ソース非対称」（FRED に STOXX50E/SX5E は存在しない＝実測確認。EU 株価は yfinance のみが経路）。
+- **GEX の慣習的仮定と符号反転リスク** … §12（`assumption:"naive_dealer_convention"` + note。CBOE は売買主体非公開、仮定が外れると符号反転）。
+- **degrade 方針** … §12「degrade 方針」（データ源障害でも exit 0・`data_status:"error"/"unavailable"` を出し、サイト全体は落とさない。古い値を最新と誤認させる保持方式は採らない）。
+- **corr.yml / update_signals.yml の削除予定** … §11（**2026-08-02 以降に削除**。deploy.yml が 1 週間安定稼働の確認後。人間の記憶に依存せずここに記録）。
+- **yfinance が Yahoo 利用規約上「個人利用」想定である旨** … 上表「yfinance」および §13 表。公的統計ではない。
+
+### 無償・投資顧問でない旨（免責）
+
+**本サイトは無償で提供され、投資顧問契約に基づく助言を行わない。** 市場環境の可視化と
+クロスアセットの文脈提示のみを目的とし、投資助言・価格目標・売買推奨・売買執行は提供しない
+（§Scope and disclaimer と同旨）。
