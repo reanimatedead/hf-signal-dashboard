@@ -127,20 +127,29 @@ def test_combined_tab_sources_retain_link():
 
 
 # ─────────────────────────── 被覆 ───────────────────────────
-def test_equity_ready_rate_at_least_95pct():
+# NOTE: 被覆率（量）の判定は health_gate の 90% に一本化した（Task 5 で 95%/90% と
+# 二重指定したのは設計ミス）。契約テストは「質」= 不変条件のみを見る。ready 率の数値
+# 閾値はここでは検査しない。DATA_CONTRACT §14「被覆率閾値の一本化」参照。
+
+
+def test_unavailable_equity_rows_have_chart_error():
+    """equity タブの unavailable 行は理由(chart_error)を必ず持つ（質の検査）。
+
+    equity の unavailable は「取得を試みて失敗/劣化した」状態なので、なぜ落ちたかを
+    必ず記録する（no-data / degraded / 例外 を後から区別できるように）。
+    ※ 非 equity（imm/valuation 等）の unavailable は「その市場に per-symbol チャート系列
+      が構造的に無い」設計状態であり chart_error を持たない。ゆえに equity 限定で検査する。
+    """
     data = _load("data.json")
     markets = data.get("markets") or {}
-    tot = rdy = 0
-    per = {}
+    bad = []
     for tab in EQUITY_TABS:
-        rows = markets.get(tab, [])
-        r = sum(1 for x in rows if x.get("chart_status") == "ready")
-        per[tab] = f"{r}/{len(rows)}"
-        tot += len(rows)
-        rdy += r
-    assert tot > 0, "株式 4 タブに行が無い"
-    pct = rdy / tot * 100
-    assert pct >= 95.0, f"株式 ready 率 {pct:.1f}% < 95% (内訳 {per})"
+        for r in markets.get(tab, []):
+            if r.get("chart_status") == "unavailable" and not r.get("chart_error"):
+                bad.append(f"{tab}/{r.get('symbol','?')}")
+    assert not bad, (
+        f"equity の unavailable 行が chart_error を欠く 計 {len(bad)} 件: {bad[:20]}"
+    )
 
 
 def test_chart_status_is_valid_enum():

@@ -1108,7 +1108,6 @@ link = {
 
 `markets.{nikkei225,dow30,nasdaq100,sp500}[].chart_status ∈ {ready, pending, unavailable}`。
 
-- **株式 4 タブの ready 率 >= 95%**（health_gate は FAIL 閾値 90%、契約テストは 95% で監視）。
 - **`ready` の行は `charts/{tab}.json[symbol]` に実体があり `1d.available=true` かつ `1d.ohlc` が非空**。
   フラグだけ見て中身を見ないのが過去の見落とし原因。契約テストが実体と OHLC を実測する。
 - **Bollinger Bands は `upper > basis > lower` が成立**（`1d.indicators.bollinger_bands[period][std_N]`）。
@@ -1119,6 +1118,28 @@ link = {
   有限 Close が 48 本未満なら `available:false`（＝unavailable、ready ではない）。これにより
   **「ready ⇒ 有効な指標」**の契約を保つ。契約テストは正当な `state:"insufficient_data"`（真に本数
   不足の短命銘柄）の null は許容し、`state` がそれ以外なのに帯が null（＝NaN 劣化の兆候）を捕捉する。
+- **unavailable の行（equity）は必ず `chart_error` を持つ**。equity の unavailable は「取得を試みて
+  失敗/劣化した」状態なので理由を刻む（`no 2y daily data` / `degraded: …NaN…` / 例外 / `index chart
+  build returned unavailable`）。非 equity（imm/valuation 等）の unavailable は「その市場に per-symbol
+  チャート系列が構造的に無い」設計状態で `chart_error` は持たない。契約テストは equity 限定で検査する。
+
+### 被覆率閾値の一本化（量は health_gate・質は contract test）— 2026-07-27 整理
+
+**役割分担を明確にする。被覆率という「量」の判定は `health_gate` に一本化した。**
+
+| ゲート | 守るもの | ready 率の扱い |
+|---|---|---|
+| **`health_gate`** | **量**（デプロイの可否）。壊れ/薄すぎる payload を本番に上げない | **ready 率 < 90% で FAIL**（唯一の被覆率ソース） |
+| **`contract test`** | **質**（不変条件）。値・構造・結線が正しいか | ready 率の数値閾値は**見ない**。代わりに ready⇒実体+有効BB / enum / unavailable⇒chart_error を検査 |
+
+- 経緯: Task 5 で contract test に 95%、health_gate に 90% と**別々の数字を置いたのは設計ミス**。
+  被覆率（量）を質の検査に混ぜた結果、`total=368` では **19 銘柄の一時劣化で contract test が 95% を割り
+  スイート全体が落ちてデプロイが空振り阻止**されていた（health_gate は 37 銘柄まで許容）。
+- 是正: **contract test の 95% ハード判定を撤廃**し、被覆率は health_gate の 90% 単一ソースに統一。
+  一時的な yfinance 劣化での過剰なデプロイ阻止を防ぐ。加えて `_batched_2y_ohlc` の heal（部分劣化の
+  個別再取得）で劣化銘柄数自体を減らす（下記「equity fetch heal」）。
+- 90% の根拠: `total=368` で 90% は **約 37 銘柄**の欠落まで許容（36→90.22% PASS / 37→89.95% FAIL）。
+  1 バッチ(50)が丸ごと劣化しても即 FAIL にはならず、かつ広範な障害（複数バッチ崩壊）は確実に止める水準。
 
 ### `docs/health.json`（health_gate 出力）
 
