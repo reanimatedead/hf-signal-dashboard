@@ -278,13 +278,24 @@ def build_1d_chart_from_ohlc(df_d, dp, updated_at):
     context only, not trading signals. Falls back to available:false on error.
     """
     try:
-        close = df_d["Close"].squeeze()
-        high = df_d["High"].squeeze()
-        low = df_d["Low"].squeeze()
+        close_raw = pd.to_numeric(df_d["Close"].squeeze(), errors="coerce")
+        # NaN-degraded-frame guard: yfinance intermittently returns a frame with the
+        # correct ROW count but NaN Close values. `len(close) < 48` (row count) then
+        # passes, yet rolling stats come out NaN → _json_safe nulls them → a chart is
+        # marked "ready" with empty BB bands (state stays "neutral", not
+        # "insufficient_data"). Guard on VALUE validity, not row count: the latest bar
+        # must be a real number and there must be >= 48 finite closes. Otherwise this
+        # is unavailable (not ready) — the contract "ready ⇒ valid indicators" holds.
+        if len(close_raw) == 0 or not np.isfinite(float(close_raw.iloc[-1])):
+            return build_empty_chart("1d")
+        finite = df_d[np.isfinite(close_raw.to_numpy())]
+        close = finite["Close"].squeeze()
+        high = finite["High"].squeeze()
+        low = finite["Low"].squeeze()
         if len(close) < 48:
             return build_empty_chart("1d")
         ohlc = []
-        for ts, r in df_d.tail(OHLC_MAX_BARS).iterrows():
+        for ts, r in finite.tail(OHLC_MAX_BARS).iterrows():
             try:
                 t = ts.strftime("%Y-%m-%dT00:00:00+09:00") if hasattr(ts, "strftime") else str(ts)
                 ohlc.append({"time": t, "open": round(float(r["Open"]), dp), "high": round(float(r["High"]), dp),

@@ -183,8 +183,20 @@ def test_ready_rows_have_real_ohlc_in_chart_file():
 
 
 def test_bollinger_bands_upper_gt_basis_gt_lower():
-    """BB の upper > basis > lower が成立しているか（中身の妥当性）。"""
-    bad = []
+    """BB の中身の妥当性を検査する（フラグでなく実体）。
+
+    正当な None と不正な None を区別する:
+      - state == "insufficient_data" → 帯が None なのは**正当**（真に本数不足の短命銘柄）。
+        順序検査はスキップする。build は 288 本未満で必ずこの state を出す。
+      - それ以外（"neutral"/"..._touch"）で帯が None → **不正**。
+        これは NaN 劣化フレーム（行はあるが Close が NaN）が _json_safe で null 化され、
+        ready のまま空帯で配信された兆候。今回 CI を止めた事象そのもの。捕捉し続ける。
+      - 帯が数値なら upper > basis > lower が成立すること。
+
+    影響範囲を必ず全件数で報告する（過去に bad[:10] 打ち切りで総数が分からず判断を誤った）。
+    """
+    violations = []           # 不正な None or 順序不正（総数を報告）
+    legit_insufficient = 0    # 正当な insufficient_data（参考カウント）
     for tab in EQUITY_TABS:
         chart = _load(f"charts/{tab}.json")
         for sym, c in chart.items():
@@ -195,12 +207,45 @@ def test_bollinger_bands_upper_gt_basis_gt_lower():
                 for sd, sv in pv.items():
                     if not isinstance(sv, dict):
                         continue
+                    state = sv.get("state")
                     u, b, l = sv.get("upper"), sv.get("basis"), sv.get("lower")
                     if None in (u, b, l):
-                        bad.append(f"{tab}/{sym} {period}/{sd}: 帯が欠損 {(u,b,l)}")
+                        if state == "insufficient_data":
+                            legit_insufficient += 1          # 正当（本数不足）
+                        else:
+                            violations.append(
+                                f"{tab}/{sym} {period}/{sd}: state={state!r} なのに帯が None "
+                                f"{(u, b, l)}（NaN 劣化の疑い）")
                     elif not (u > b > l):
-                        bad.append(f"{tab}/{sym} {period}/{sd}: upper>basis>lower 不成立 {(u,b,l)}")
-    assert not bad, f"BB 帯の順序不正: {bad[:10]}"
+                        violations.append(
+                            f"{tab}/{sym} {period}/{sd}: upper>basis>lower 不成立 {(u, b, l)}")
+    assert not violations, (
+        f"BB 帯の不正 計 {len(violations)} 件"
+        f"（正当な insufficient_data は別途 {legit_insufficient} 件・許容）: "
+        f"先頭20件={violations[:20]}"
+    )
+
+
+def test_ready_symbols_have_valid_bb48():
+    """ready(＝chart 実体を持つ)銘柄は最低でも BB48 が有効であること。
+
+    ready は 48 本以上の有効 Close を意味する（build ガード）。したがって 48 期間 BB は
+    必ず計算できるはず。48 が insufficient_data / None なら ready の付与が誤り
+    （＝ready↔有効BB の結線が壊れている）。288 は本数不足なら insufficient_data 可。
+    """
+    bad = []
+    for tab in EQUITY_TABS:
+        chart = _load(f"charts/{tab}.json")
+        for sym, c in chart.items():
+            if (c.get("1d") or {}).get("available") is not True:
+                continue
+            b48 = (((c.get("1d") or {}).get("indicators") or {})
+                   .get("bollinger_bands") or {}).get("48") or {}
+            for sd in ("std_2", "std_3"):
+                sv = b48.get(sd) or {}
+                if sv.get("basis") is None:
+                    bad.append(f"{tab}/{sym} 48/{sd}: state={sv.get('state')!r} basis=None")
+    assert not bad, f"ready なのに BB48 が無効な銘柄 計 {len(bad)} 件: {bad[:20]}"
 
 
 # ─────────────────────────── 地域 ───────────────────────────

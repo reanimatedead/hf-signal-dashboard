@@ -1112,6 +1112,13 @@ link = {
 - **`ready` の行は `charts/{tab}.json[symbol]` に実体があり `1d.available=true` かつ `1d.ohlc` が非空**。
   フラグだけ見て中身を見ないのが過去の見落とし原因。契約テストが実体と OHLC を実測する。
 - **Bollinger Bands は `upper > basis > lower` が成立**（`1d.indicators.bollinger_bands[period][std_N]`）。
+- **NaN 劣化フレーム・ガード（2026-07-27 事故対応）**: yfinance は稀に「行数は正常だが Close が
+  NaN」の劣化フレームを一時的に返す。行数だけを見る `len(close) < 48` ガードはこれを通してしまい、
+  `rolling` 統計が NaN → `_json_safe` が null 化 → **ready のまま空帯(BB=null)**で配信されていた。
+  対策として `build_1d_chart_from_ohlc` は**値の妥当性**で判定する: 最新バーが有限値でなく、または
+  有限 Close が 48 本未満なら `available:false`（＝unavailable、ready ではない）。これにより
+  **「ready ⇒ 有効な指標」**の契約を保つ。契約テストは正当な `state:"insufficient_data"`（真に本数
+  不足の短命銘柄）の null は許容し、`state` がそれ以外なのに帯が null（＝NaN 劣化の兆候）を捕捉する。
 
 ### `docs/health.json`（health_gate 出力）
 
