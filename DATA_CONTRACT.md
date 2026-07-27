@@ -1018,12 +1018,15 @@ charts 合計は約 5.9 MB で、Cloudflare Pages の上限に対し十分な余
 
 `pipeline/build_gamma.py` が CBOE 公開 SPX チェーン（`delayed_quotes/options/_SPX.json`）から生成。ローカルは `~/taka-data/cboe-chains/SPX-*.json.gz`（snapshot_cboe.sh が launchd で保存・**再実装しない**）を優先、無ければ（CI 等）ライブ API。
 - `gex_oi`（建玉ベース GEX, $/1%変動）/ `zero_gamma`（フリップ水準）/ `gamma_walls`（上位10・CBOE gamma×OI）。
-- `gex_volume_0dte`（当日満期・出来高ベース）は **gex_oi と分離**（合算しない）。**0DTE 捕捉不能の明示（重要）**:
-  - この CBOE `_SPX` は**遅延フィード＝前営業日引け時点のスナップショット**であり、当日満期(0DTE)は既に消えているため**このフィードでは 0DTE を捕捉できない**。
-  - よって **`gex_volume_0dte` は 0DTE の実態を表さない**。`n_0dte_contracts`(=0) と `gex_volume_0dte_status:"unavailable"` / `gex_volume_0dte_reason` で明示する。
-  - **建玉ベースの `gex_oi` は 0DTE の影響を過小評価している。**
-  - 0DTE を捉えるには**リアルタイムフィードが必要で、無料では入手できない。**
-  - 誤読防止のため `gex_volume_0dte` は **0 ではなく `null`**（+status/reason）として出力する。
+- `gex_volume_0dte`（当日満期・出来高ベース）は **gex_oi と分離**（合算しない）。**0DTE の可用性は取得タイミングに依存する（重要）**:
+  - この CBOE `_SPX` は**遅延フィード（前営業日引け時点のスナップショット）**。可用性は取得時刻で変わる:
+    - **引け後 / 週末のスナップショット**では、最も近い満期が既に過ぎており当日満期(0DTE)が消えているため **`n_0dte_contracts == 0` → 捕捉不能**。
+    - **平日の取引時間中にライブ取得**すると当日満期が実在するため **`n_0dte_contracts > 0` → 捕捉可能**。
+  - 判定は build/test/契約すべて **`n_0dte_contracts` を単一の真実**として分岐する:
+    - `n_0dte_contracts == 0` → `gex_volume_0dte: null` / `gex_volume_0dte_status: "unavailable"` / `gex_volume_0dte_reason`(空欄禁止)。**0 ではなく `null`** で「0DTE が存在しない」との誤読を防ぐ。
+    - `n_0dte_contracts > 0`  → `gex_volume_0dte: <数値>` / `gex_volume_0dte_status: "live"` / `reason: null`。
+  - いずれの場合も **建玉ベースの `gex_oi` は 0DTE の影響を過小評価している**（gex_oi と gex_volume_0dte は別軸。合算しない）。
+  - 引け後スナップから 0DTE を遡って捉えるには**リアルタイム/当日フィードが必要で、無料では常時入手できない**（ライブ取得できた瞬間のみ捕捉）。
 - `assumption:"naive_dealer_convention"` + note（コール買い/プット売りの慣習的仮定、CBOE は売買主体非公開、外れると符号反転）を**必ず出力**。
 - `coverage:{us:"full", eu:"unavailable", jp:"unavailable"}`（JPX/Eurex はギリシャ文字非公開）。
 - `vol_structure`: VIX3M/VIX 比（コンタンゴ/バックワーデーション）、SKEW、MOVE/VIX 比（MOVE/VIX は data.json から）。
@@ -1180,7 +1183,7 @@ link_check.json = {as_of_utc, checked, ok, warn, policy,
 - **株式の 4h / 1w を提供しない理由** … §10「株式の 4h / 1w を提供しない理由」（取得コスト数倍・1d で用途十分）。
 - **ERP が unavailable である理由** … §13「`balance.erp`」（指数の日次 EPS に無料の信頼ソースが無い。Shiller ミラーは 2024-09 停止）。空欄禁止・`reason` 必須。
 - **ガンマ層が米国限定である理由** … §12「ガンマ層」（`coverage:{us:"full", eu:"unavailable", jp:"unavailable"}`。JPX/Eurex はギリシャ文字非公開）。
-- **0DTE が捕捉できない理由** … §12「0DTE 捕捉不能の明示」（CBOE `_SPX` は前営業日引けスナップ＝当日満期は既に消えている。無料リアルタイムフィードなし。`null + status:"unavailable" + reason`）。
+- **0DTE の可用性が取得タイミングで変わる理由** … §12「0DTE の可用性は取得タイミングに依存」（CBOE `_SPX` は前営業日引けスナップ。引け後/週末は当日満期が消え `n_0dte_contracts==0` → 捕捉不能=`null+unavailable+reason`。平日ライブ取得中は `n_0dte_contracts>0` → 捕捉可能=数値+live。`n_0dte_contracts` を単一の真実として build/test/契約が分岐）。
 - **EU/JP に実質金利とターム・プレミアムが無い理由** … §13 表（無料日次系列が無い。米国のみ DFII10 / THREEFYTP10）。`relations.{eu,jp}.real_yield = term_premium = null`。
 - **EU 株価が yfinance のみである非対称** … §13「ソース非対称」（FRED に STOXX50E/SX5E は存在しない＝実測確認。EU 株価は yfinance のみが経路）。
 - **GEX の慣習的仮定と符号反転リスク** … §12（`assumption:"naive_dealer_convention"` + note。CBOE は売買主体非公開、仮定が外れると符号反転）。

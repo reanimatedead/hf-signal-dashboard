@@ -332,19 +332,40 @@ def test_gamma_oi_and_0dte_are_separate_keys():
     assert "gex_volume_0dte" in g, "gex_volume_0dte キーが無い（別キーで存在すべき、合算禁止）"
 
 
-def test_gamma_0dte_unavailable_with_reason():
+def test_gamma_0dte_state_matches_contract_availability():
+    """0DTE の可用性は n_0dte_contracts に依存する（一時状態を不変条件に固定しない）。
+
+    このフィードが当日満期(0DTE)を捕捉できるかは取得タイミングで変わる:
+      - 週末/引け後スナップ → 最も近い満期が既に過ぎ n_0dte_contracts == 0 → 捕捉不能
+      - 平日ライブ取得中     → 当日満期が実在し n_0dte_contracts > 0  → 捕捉可能
+    build_gamma.py の分岐（_0dte_captured = n_0dte_contracts > 0）と一致させる。
+    """
     g = _load("gamma.json")
-    assert g.get("gex_volume_0dte") is None, (
-        f"gex_volume_0dte は null であるべき（0DTE は遅延フィードで捕捉不能）"
-        f"（実際: {g.get('gex_volume_0dte')!r}）"
-    )
-    assert g.get("gex_volume_0dte_status") == "unavailable", (
-        f"gex_volume_0dte_status は 'unavailable' であるべき（実際: {g.get('gex_volume_0dte_status')!r}）"
-    )
+    n = g.get("n_0dte_contracts")
+    assert isinstance(n, int) and n >= 0, f"n_0dte_contracts が非負整数でない: {n!r}"
+    val = g.get("gex_volume_0dte")
+    status = g.get("gex_volume_0dte_status")
     reason = g.get("gex_volume_0dte_reason")
-    assert isinstance(reason, str) and reason.strip(), (
-        "gex_volume_0dte_reason は空欄禁止（なぜ捕捉できないかを明示）"
-    )
+
+    if n == 0:
+        # 捕捉不能: null + unavailable + reason（0 と誤読させない）
+        assert val is None, (
+            f"n_0dte_contracts==0 なら gex_volume_0dte は null であるべき（実際: {val!r}）"
+        )
+        assert status == "unavailable", (
+            f"n_0dte_contracts==0 なら status は 'unavailable' であるべき（実際: {status!r}）"
+        )
+        assert isinstance(reason, str) and reason.strip(), (
+            "n_0dte_contracts==0 のとき reason は空欄禁止（なぜ捕捉できないかを明示）"
+        )
+    else:
+        # 捕捉可能: 数値 + live（当日満期が実在）
+        assert isinstance(val, (int, float)), (
+            f"n_0dte_contracts>0 なら gex_volume_0dte は数値であるべき（実際: {val!r}）"
+        )
+        assert status == "live", (
+            f"n_0dte_contracts>0 なら status は 'live' であるべき（実際: {status!r}）"
+        )
 
 
 def test_gamma_coverage_jp_eu_unavailable():
