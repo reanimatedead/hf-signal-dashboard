@@ -1,0 +1,57 @@
+name: Live monitor (synthetic uptime)
+
+# 外形監視: 公開 Pages を外側から叩き、配信・鮮度・被覆が壊れていれば job を
+# 落として通知する。CI 内のゲートは生成物を検査するが「Pages に実際に届いたか」
+# は別問題。data.json が 404 のまま復旧しない事故を人間が気づく前に鳴らすのが目的。
+#
+# 通知経路:
+#   1) job 失敗 → GitHub が репо オーナーへメール（既定挙動）
+#   2) failure() ステップが Issue を自動起票（同題の open Issue があれば重複起票しない）
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 */2 * * *"   # 2時間ごと（デプロイ後のズレを吸収するため毎時ではなく偶数時+17分）
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: "monitor"
+  cancel-in-progress: false
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      PAGES_BASE: "https://reanimatedead.github.io/hf-signal-dashboard"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+
+      - name: Probe live site
+        id: probe
+        run: python3 tools/verify_live.py
+
+      # 失敗時のみ: 同題の open Issue が無ければ起票（メールに加えて追跡可能にする）。
+      - name: Open issue on failure
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TITLE="🔴 Live monitor: 公開サイトの配信異常"
+          EXISTING=$(gh issue list --state open --search "$TITLE in:title" --json number -q '.[0].number' || true)
+          BODY="verify_live.py が公開 Pages の異常を検知しました（run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}）。data.json 404 / STALE / ready 率低下のいずれか。ログを確認してください。"
+          if [ -z "$EXISTING" ]; then
+            gh issue create --title "$TITLE" --body "$BODY" --label monitor 2>/dev/null \
+              || gh issue create --title "$TITLE" --body "$BODY"
+          else
+            gh issue comment "$EXISTING" --body "$BODY"
+          fi
