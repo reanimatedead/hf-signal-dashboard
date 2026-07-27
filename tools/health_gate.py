@@ -252,6 +252,21 @@ def evaluate(d):
             else:
                 add("decisions_review", "WARN", "pass", "見直し期限なし")
 
+    # equity fetch heal（バッチ部分劣化の個別再取得）統計を surface — Task Q4。
+    # 発動頻度を health.json に恒久記録（CI ログは失効する）。still_degraded>0 は WARN。
+    heal = (d.get("meta") or {}).get("equity_fetch_heal") or {}
+    if heal:
+        deg = heal.get("degraded", 0)
+        rec = heal.get("recovered", 0)
+        still = heal.get("still_degraded", 0)
+        detail = (f"degraded={deg} recovered={rec} still_degraded={still} "
+                  f"symbols_degraded={heal.get('symbols_degraded', [])}")
+        if still > 0:
+            add("equity_fetch_heal", "WARN", "warn",
+                detail + " (再取得後も劣化が残存)")
+        else:
+            add("equity_fetch_heal", "WARN", "pass", detail)
+
     # fails/warns may repeat names via add(); de-dup while keeping only real fails.
     real_fails = [c["name"] for c in checks if c["status"] == "fail"]
     real_warns = [c["name"] for c in checks if c["status"] in ("warn", "unknown")]
