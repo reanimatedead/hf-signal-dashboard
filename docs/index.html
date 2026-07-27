@@ -1318,7 +1318,9 @@ async function loadCharts(tabKey){
 // Never leave a chart area silently blank — say WHY it is empty.
 const CHART_MSG = {
   pending:     "この銘柄のチャートは容量方針により未生成です（指数・FX・金利は生成済み）",
-  unavailable: "データ元にこの時間足の系列がありません"
+  unavailable: "データ元にこの時間足の系列がありません",
+  // 「取得はできたが返ってきたデータが劣化」＝未生成/系列なしとは別物。混同させない。
+  degraded:    "取得はできましたが返ってきたデータが劣化していたため表示しません（一時的な取得不良・次回更新で回復見込み）"
 };
 
 // ══ Symbol detail panel ════════════════════════════
@@ -1409,7 +1411,9 @@ function tfChartHTML(r, tf, f){
   const c = r.charts && r.charts[tf];
   if(c && c.available) return chart1dHTML(c, f, label);
   // v6.0: explain the empty state instead of a silent blank.
+  const degraded = r.chart_status === "unavailable" && /degraded/i.test(r.chart_error || "");
   const note = (c && c.note) ? c.note
+             : degraded ? CHART_MSG.degraded
              : (CHART_MSG[r.chart_status] || "Chart data is not available for this timeframe.");
   return `<div class="dt-note">${label} — ${esc(note)}</div>`;
 }

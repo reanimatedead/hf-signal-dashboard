@@ -1837,6 +1837,25 @@ def _equity_empty_charts():
     return c
 
 
+def _close_is_degraded(df):
+    """フレームに行はあるが Close が NaN 劣化しているか（最新バーが非有限、または
+    有限 Close が 48 本未満）を判定する。「そもそもデータが無い」(df None / 行数不足)
+    とは区別し、「取得はできたが返ってきた値が劣化」を表す。UI で degraded 文言を
+    出すために chart_error にこの事実を刻む。"""
+    try:
+        c = pd.to_numeric(df["Close"].squeeze(), errors="coerce")
+        if len(c) == 0:
+            return False
+        return (not np.isfinite(float(c.iloc[-1]))) or int(np.isfinite(c.to_numpy()).sum()) < 48
+    except Exception:
+        return False
+
+
+# UI(index.html CHART_MSG)が degraded を判別するためのマーカー文字列。
+DEGRADED_CHART_ERROR = ("degraded: yfinance returned rows but Close is NaN "
+                        "(transient fetch degradation; recovers on next refresh)")
+
+
 def build_equity_chart_1d(df, source_ticker, now, dp):
     """charts.1d (BB288/CCI) from a daily equity/index OHLC frame, or None."""
     chart = build_1d_chart_from_ohlc(df, dp, now)
@@ -1853,7 +1872,14 @@ def _batched_2y_ohlc(symbols, batch_size=BATCH_SIZE, pause=2.0):
     `pause`s between batches to stay under Yahoo's rate limit (HTTP 429 seen
     before). If a whole batch comes back empty (a grouped-download hiccup rather
     than genuinely-dead tickers), fall back to per-symbol fetch for that batch so
-    one bad ticker never sinks the other 49. Returns {symbol: DataFrame|None}."""
+    one bad ticker never sinks the other 49. Returns {symbol: DataFrame|None}.
+
+    Partial-degradation heal (2026-07-27): a GROUPED download can also return a
+    frame with the right rows but NaN Close for a *subset* of the batch, while a
+    single-symbol fetch of the same ticker returns clean data. Whole-batch-empty is
+    handled above; this pass additionally detects per-symbol NaN degradation and
+    refetches ONLY those tickers once. The batch method (≈8 calls/35 s vs 343
+    calls/17.9 min) is preserved — the heal touches just the few degraded symbols."""
     out = {}
     uniq = list(dict.fromkeys(s for s in symbols if s))      # de-dup, keep order
     chunks = [uniq[i:i + batch_size] for i in range(0, len(uniq), batch_size)]
@@ -1876,6 +1902,29 @@ def _batched_2y_ohlc(symbols, batch_size=BATCH_SIZE, pause=2.0):
                     res[s] = None
         for s in chunk:
             out[s] = res.get(s)
+
+    # Heal partial degradation: refetch (once, per-symbol) any ticker whose grouped
+    # frame has rows but NaN Close. Single-symbol fetch usually returns clean data
+    # for these; only symbols still degraded after the retry fall through to
+    # chart_status=unavailable. This directly reduces spurious coverage dips / gate
+    # blocks from a transient batch hiccup without abandoning batching.
+    degraded = [s for s, df in out.items()
+                if df is not None and _close_is_degraded(df)]
+    if degraded:
+        print(f"  [heal] {len(degraded)} degraded (rows but NaN Close) → "
+              f"per-symbol refetch: {degraded[:8]}")
+        for i, s in enumerate(degraded):
+            if i:
+                time.sleep(0.5)                              # gentle on rate limit
+            try:
+                fresh = fetch_batch([s], period="2y").get(s)
+                if fresh is not None and not _close_is_degraded(fresh):
+                    out[s] = fresh
+                    print(f"  [heal] {s}: recovered on per-symbol refetch")
+                else:
+                    print(f"  [heal] {s}: still degraded after refetch → unavailable")
+            except Exception as exc:
+                print(f"  [heal] {s}: refetch failed ({type(exc).__name__})")
     return out
 
 
@@ -1909,6 +1958,10 @@ def attach_equity_charts(equity_markets):
             price = row.get("price") or 0
             dp = 2 if (price or 0) >= 100 else 3
             c1d = build_equity_chart_1d(df, idx_t, now, dp)
+            if c1d is None and _close_is_degraded(df):
+                # index proxy が NaN 劣化した場合も UI で degraded と分かるよう刻む
+                # (chart_status は split_chart_payload が unavailable にする)。
+                row["chart_error"] = DEGRADED_CHART_ERROR
             ec = _equity_empty_charts()
             row["charts"] = {"4h": ec["4h"], "1d": c1d or ec["1d"], "1w": ec["1w"]}
             # P0 weekly: resample the 2y daily frame (0 extra fetch).
@@ -1955,7 +2008,9 @@ def attach_equity_charts(equity_markets):
             chart = build_equity_chart_1d(df, sym, now, dp)
             if not chart:
                 r["chart_status"] = "unavailable"
-                r["chart_error"] = "indicator/OHLC build returned unavailable"
+                # 「取得したが劣化」と「指標が組めない」を区別（UI で別文言を出す）。
+                r["chart_error"] = (DEGRADED_CHART_ERROR if _close_is_degraded(df)
+                                    else "indicator/OHLC build returned unavailable")
                 fail += 1
                 continue
             ec = _equity_empty_charts()
