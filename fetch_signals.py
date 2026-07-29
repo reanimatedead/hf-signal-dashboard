@@ -862,18 +862,53 @@ def _move_risk(v):
     return "high" if x >= 130 else "medium" if x >= 90 else "low"
 
 
-def process_volatility():
-    """VIX (equity vol) + MOVE (rates vol). Both yfinance, no API key.
+_VIX_RELATION = ("Equity risk gauge; rises in risk-off. Cross-check USDJPY / Gold. "
+                 "Context only.")
 
-    MOVE failure is degraded to placeholder row (data_status='placeholder',
-    price=None) so the whole pipeline never breaks on a single ticker error.
+
+def build_vix_from_fred(now):
+    """VIX row from FRED VIXCLS (daily close, public keyless) — source hedge off Yahoo.
+    FRED VIXCLS is the CBOE VIX daily close. Returns a Volatility row compatible with
+    build_chart_row, or None (→ caller falls back to yfinance ^VIX)."""
+    rec = fetch_fred_rate_series("VIXCLS")
+    if not rec:
+        return None
+    ser = rec["series"]
+    price = rec["value"]
+    prev = ser[-2]["value"] if len(ser) >= 2 else price
+    chg = (price - prev) / abs(prev) * 100 if prev else 0.0
+    chart = build_jp_rate_chart_1d(ser, now, source="FRED (fredgraph.csv): VIXCLS")
+    if not chart or chart.get("available") is not True:
+        return None                                # let yfinance fallback take over
+    return {
+        "symbol": "VIX", "name": "CBOE Volatility Index", "market": "Volatility",
+        "price": round(price, 2), "change_pct": round(chg, 2),
+        "risk": _vix_risk(price), "error": None,
+        "data_status": "auto_fred", "source": "FRED (fredgraph.csv): VIXCLS",
+        "relation": _VIX_RELATION,
+        "charts": {"4h": build_empty_chart("4h"), "1d": chart, "1w": build_empty_chart("1w")},
+        "edge_context": build_empty_edge_context(),
+    }
+
+
+def process_volatility():
+    """VIX (equity vol) + MOVE (rates vol).
+
+    VIX: FRED VIXCLS primary (public, keyless), Yahoo ^VIX fallback — source hedge.
+    MOVE: yfinance only (no free non-Yahoo daily alt); failure degrades to placeholder
+    (data_status='placeholder', price=None) so one ticker error never breaks the run.
     """
-    print("\n[Volatility] VIX + MOVE…")
-    vix = build_chart_row(
-        "^VIX", "VIX", "CBOE Volatility Index", "Volatility", risk_fn=_vix_risk,
-        extra={"relation": "Equity risk gauge; rises in risk-off. Cross-check USDJPY / Gold. Context only.",
-               "data_status": "live"},
-    )
+    print("\n[Volatility] VIX (FRED VIXCLS primary, Yahoo fallback) + MOVE…")
+    now = datetime.now(JST).isoformat()
+    vix = build_vix_from_fred(now)
+    if vix is not None:
+        print(f"  VIX: auto_fred price={vix['price']} src=FRED VIXCLS")
+    else:
+        vix = build_chart_row(
+            "^VIX", "VIX", "CBOE Volatility Index", "Volatility", risk_fn=_vix_risk,
+            extra={"relation": _VIX_RELATION, "data_status": "live"},
+        )
+        print("  VIX: yfinance ^VIX fallback")
     move = build_chart_row(
         "^MOVE", "MOVE", "ICE BofA MOVE Index (US Treasury vol)", "Volatility",
         risk_fn=_move_risk,
