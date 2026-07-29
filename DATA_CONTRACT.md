@@ -1335,3 +1335,53 @@ unavailable へ落として被覆を過小にしていた。`_close_is_degraded`
 - **有効(非NaN) Close が 48 本未満 → 劣化**（本数不足）。
 - **単独の末尾 None（当日未確定）は劣化としない**。指標は有効行のみで計算し、「現在」は
   最後の**確定**バーになる（`build_1d_chart_from_ohlc` は finite 行で BB/CCI を組む）。
+
+## 17. v6.8 — ソース・ヘッジと Yahoo 依存の層別地図（2026-07-29）
+
+### US 金利を FRED にヘッジ（本変更）
+
+`markets.rates` の US2Y/US10Y/US30Y を **Yahoo(`2YY=F`/`^TNX`/`^TYX`) から FRED
+(`DGS2`/`DGS10`/`DGS30`) に切替**。FRED は公的・keyless で yield を直接返す（`^TNX` の x10
+スケーリング不要）。`data_status:"auto_fred"`、link は FRED(`kind:"source"`)。**yfinance は
+fallback として残す**（FRED 障害時のみ発動）＝二重化。実測（2026-07-29）US2Y 4.31 / US10Y 4.65
+/ US30Y 5.12。
+
+### 事実確認: 天秤層の指数は元から FRED（切替不要だった）
+
+`relations.json` の US/JP 株価・感応度ベータは **発足時(commit 6935d34)から FRED**
+（`SP500`/`NIKKEI225`/`NASDAQ100`/`DJIA`）。regime/beta/rebalance も FRED 系列で算出。
+本番実測が裏付け: `jp equity_source=FRED:NIKKEI225` last=62364.92（FRED 実測と一致）、
+β nasdaq100 -0.555 / dow30 -0.517 / sp500 -0.455。**EU 株のみ yfinance**（FRED に
+STOXX50E/SX5E が存在しないため・既知の非対称）。
+
+### 層別 Yahoo 依存地図（Yahoo が死んだとき何が残るか）
+
+| 層 / 系列 | 提供者 | Yahoo 依存 | Yahoo 死亡時 |
+|---|---|---|---|
+| マクロ層 macro_v2（16系列） | FRED | ✗ | 生存 |
+| ガンマ層 gamma（GEX/VIX構造） | CBOE | ✗ | 生存 |
+| 天秤層 regime/beta/rebalance | FRED（SP500/NASDAQ100/DJIA/NIKKEI225 + DGS*） | ✗ | 生存 |
+| 天秤層 US/JP 株価系列 | FRED | ✗ | 生存 |
+| 天秤層 **EU 株価系列(STOXX50E)** | **yfinance** | **✓** | **EU の equity 系列が欠落**（regime/beta は US 基準で生存） |
+| markets **US 金利** US2Y/10Y/30Y | **FRED**（本変更・yfinance は fallback） | ✗（primary） | 生存（FRED） |
+| markets JP 金利 | MoF | ✗ | 生存 |
+| markets EU 金利 | ECB | ✗ | 生存 |
+| markets IMM ポジション | CFTC | ✗ | 生存 |
+| markets valuation（Buffett US） | FRED | ✗ | 生存 |
+| money_flow（US/EU/JP） | FRED / ECB | ✗ | 生存 |
+| markets **個別株 368 銘柄**（一覧＋チャート） | **yfinance** | **✓** | **一覧・チャート(BB/CCI)が全滅**（無料代替なし） |
+| markets **指数行** ^N225/^DJI/^NDX/^GSPC（表示価格＋チャート） | **yfinance** | **✓** | **一覧表示価格・チャートが欠落**（※天秤層の指数値は FRED で生存＝別系統） |
+| markets **FX** 18 ペア | **yfinance** | **✓** | **FX 一覧・チャートが全滅**（無料代替なし） |
+| markets **crypto** 4 銘柄 | **yfinance** | **✓** | crypto 欠落（無料代替なし） |
+| markets **volatility** VIX/MOVE | **yfinance** | **✓** | VIX/MOVE 欠落（VIX は FRED `VIXCLS` に日次あり・未ヘッジ／MOVE は無料代替なし） |
+| 相関層 correlations の **equity ラベル**（SPX/N225/SX5E） | **yfinance** | **✓** | 相関行列の株式ラベルが縮小（金利ラベルは FRED/MoF で生存） |
+
+### 要点
+
+- **分析層（天秤・マクロ・ガンマ）と公的系列（金利・IMM・valuation・money_flow）は Yahoo 非依存**。
+  Yahoo が死んでも「環境の読み筋」の中核（金利分解・天秤・ガンマ・資金フロー）は生き残る。
+- **Yahoo 依存は個別株 368・指数チャート表示・FX・crypto・VIX/MOVE・EU 株・相関の株式ラベル**に集中。
+  これらは無料の非 Yahoo 日次代替が（VIX を除き）存在しないため Yahoo のまま。§16 の chart API
+  フォールバックも Yahoo 内の別経路であり、Yahoo 全体障害には無力（＝二重化ではない）。
+- **未ヘッジで代替候補があるもの（観察・未実装）**: VIX（FRED `VIXCLS` 日次）。MOVE・個別株・
+  FX・crypto・EU 株指数は無料の非 Yahoo 代替が見つかっていない。

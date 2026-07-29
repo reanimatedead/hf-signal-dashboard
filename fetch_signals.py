@@ -914,6 +914,52 @@ RATE_TICKERS = [
 ]
 
 
+# Source hedge (2026-07-29): US Treasury yields come from FRED (public, keyless)
+# instead of Yahoo (^TNX/^TYX/2YY=F). FRED DGS* quote the yield directly (no x10).
+# yfinance stays as a FALLBACK only. Individual stocks / EU equity / FX / crypto have
+# no free non-Yahoo daily source, so they remain on Yahoo (see DATA_CONTRACT §17).
+US_FRED_IDS = {"US2Y": "DGS2", "US10Y": "DGS10", "US30Y": "DGS30"}
+
+
+def fetch_fred_rate_series(series_id, n=520, timeout=30):
+    """FRED keyless daily CSV → {"value": last, "series":[{"date","value"}]} (last n
+    valid points) or None. DGS* is the yield in percent directly (no x10 scaling)."""
+    try:
+        url = f"https://fred.stlouisfed.org/graph/fredgraph.csv?id={series_id}"
+        req = urllib.request.Request(url, headers={"User-Agent": "curl/8 hf-rates"})
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            body = resp.read().decode("utf-8", "replace")
+        ser = []
+        for line in body.splitlines()[1:]:
+            parts = line.split(",")
+            if len(parts) < 2:
+                continue
+            d, v = parts[0].strip(), parts[1].strip()
+            if v in (".", "", None):
+                continue
+            try:
+                ser.append({"date": d, "value": float(v)})
+            except ValueError:
+                continue
+        if len(ser) < 2:
+            return None
+        ser = ser[-n:]
+        return {"value": round(ser[-1]["value"], 3), "series": ser}
+    except Exception as exc:  # noqa: BLE001
+        print(f"  [US rates] FRED {series_id} fetch failed ({type(exc).__name__})")
+        return None
+
+
+def fetch_us_fred_rates():
+    """US2Y/US10Y/US30Y from FRED DGS2/DGS10/DGS30 (source hedge). {} on total fail."""
+    out = {}
+    for sym, fid in US_FRED_IDS.items():
+        rec = fetch_fred_rate_series(fid)
+        if rec:
+            out[sym] = rec
+    return out
+
+
 def _normalize_yield(v):
     """Normalize a raw Yahoo rate value to a percent yield, or None if implausible.
 
@@ -1158,9 +1204,15 @@ def build_rates_market():
     eu_auto = fetch_ecb_yields()          # ECB outage → {} → EU rows become "error"
     if eu_auto:
         print(f"  [EU] auto_ecb ({len(eu_auto)} tenor)")
+    us_fred = fetch_us_fred_rates()       # source hedge: FRED primary, yfinance fallback
+    if us_fred:
+        print(f"  [US] auto_fred ({len(us_fred)} tenor)")
     rows = []
     for sym, name, region, tenor, role, tickers in RATE_TICKERS:
-        df, src_t = fetch_rate_history(tickers) if tickers else (None, None)
+        us_rec = us_fred.get(sym) if region == "US" else None
+        # yfinance only if FRED unavailable for this US tenor (fallback), or non-US.
+        df, src_t = (fetch_rate_history(tickers)
+                     if (tickers and not us_rec) else (None, None))
         live = df is not None and len(df) >= 60
         jp_rec, jp_src = None, None
         if region == "JP":
@@ -1169,7 +1221,19 @@ def build_rates_market():
             elif jp_csv.get(sym):
                 jp_rec, jp_src = jp_csv[sym], "manual_csv"
         eu_rec = eu_auto.get(sym) if region == "EU" else None
-        if live:
+        if us_rec is not None:
+            # US Treasury yields from FRED (public, keyless) — source hedge off Yahoo.
+            ser = us_rec["series"]
+            y = us_rec["value"]
+            chg = round(ser[-1]["value"] - ser[-2]["value"], 3) if len(ser) >= 2 else None
+            us_src = f"FRED (fredgraph.csv): {US_FRED_IDS[sym]}"
+            us_chart = build_jp_rate_chart_1d(ser, now, source=us_src)
+            charts = {"4h": build_empty_chart("4h"), "1d": us_chart, "1w": build_empty_chart("1w")}
+            data_status, source, ticker_out, risk = "auto_fred", us_src, None, "medium"
+            note = ("US Treasury yields auto-ingested from FRED (public, keyless; "
+                    "DGS2/DGS10/DGS30). Yahoo is fallback only. Macro context only, "
+                    "not investment advice.")
+        elif live:
             close = df["Close"].squeeze()
             y = round(float(close.iloc[-1]), 3)
             chg = round(y - float(close.iloc[-2]), 3) if len(close) > 1 else None
@@ -2497,6 +2561,11 @@ _LINK_SRC = {
     "EU2Y":  ("https://data.ecb.europa.eu/data/datasets/YC", "ECB Data Portal"),
     "EU10Y": ("https://data.ecb.europa.eu/data/datasets/YC", "ECB Data Portal"),
     "EU30Y": ("https://data.ecb.europa.eu/data/datasets/YC", "ECB Data Portal"),
+    # US Treasury yields hedged to FRED (2026-07-29). When FRED is the live source the
+    # row carries no Yahoo source_ticker, so build_link routes here (kind:"source").
+    "US2Y":  ("https://fred.stlouisfed.org/series/DGS2", "FRED (DGS2)"),
+    "US10Y": ("https://fred.stlouisfed.org/series/DGS10", "FRED (DGS10)"),
+    "US30Y": ("https://fred.stlouisfed.org/series/DGS30", "FRED (DGS30)"),
     "US_BUFFETT_INDICATOR": ("https://fred.stlouisfed.org/series/NCBEILQ027S",
                              "FRED (NCBEILQ027S)"),
     "JP_BUFFETT_INDICATOR": ("", ""),
