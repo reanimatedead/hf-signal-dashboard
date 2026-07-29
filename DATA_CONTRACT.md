@@ -1224,3 +1224,64 @@ link_check.json = {as_of_utc, checked, ok, warn, policy,
 **本サイトは無償で提供され、投資顧問契約に基づく助言を行わない。** 市場環境の可視化と
 クロスアセットの文脈提示のみを目的とし、投資助言・価格目標・売買推奨・売買執行は提供しない
 （§Scope and disclaimer と同旨）。
+
+## 15. v6.6 — corr_refresh / full の検査対象差異 + 未解決観察（2026-07-29）
+
+### なぜジョブで検査対象ファイルが異なるか
+
+`deploy.yml` の 2 ジョブは**生成するファイルが違う**。にもかかわらず両ジョブで同じ
+契約テスト（`tests/`）を回すため、**存在するファイルの集合をジョブ間で揃える**必要がある。
+
+- **full**（00:00 JST）: `fetch_signals.py` + `build_corr/macro_v2/gamma/relations.py` を
+  実行し、`data.json` / `charts/*.json` / `macro_v2.json` / `relations.json` / `gamma.json`
+  を**全て新規生成**する。→ 契約テストは全ファイルを**実測検査**する。
+- **corr_refresh**（07:30 / 11:00 JST）: 相関だけを安く更新する。マクロ層（macro_v2 /
+  relations / gamma）は**再生成しない**。代わりに `tools/pull_live_base.py` が**公開サイトから
+  持ち越す**（data.json / charts と同様）。→ 契約テストは持ち越した層を検査する。
+
+**重要（artifact deploy の性質）**: Pages の artifact deploy は `docs/` を**全置換**する。
+よって corr_refresh の `docs/` に macro_v2 / relations / gamma が**無ければ、deploy でサイト
+から削除（404）される**。これらは full 専用生成物だが、corr_refresh でも**持ち越さねば
+消える**。`pull_live_base.py` がこの 3 層も取得し、ライブに無ければ **fail-closed**
+（full の生成が壊れている＝不完全な base を伝播しない）。
+
+### どのジョブで何を検査/取得するか（一覧）
+
+| ファイル | full | corr_refresh | corr_refresh での入手経路 |
+|---|---|---|---|
+| `data.json` | 生成→検査 | 検査 | pull_live_base が取得 |
+| `charts/*.json` | 生成→検査 | 検査 | pull_live_base が取得（ready タブ由来） |
+| `macro_v2.json` | 生成→検査 | 検査 | **pull_live_base が持ち越し取得（v6.6）** |
+| `relations.json` | 生成→検査 | 検査 | **pull_live_base が持ち越し取得（v6.6）** |
+| `gamma.json` | 生成→検査 | 検査 | **pull_live_base が持ち越し取得（v6.6）** |
+| `decisions.jsonl` | git 追跡（両ジョブ checkout に存在） | 同左 | git |
+| `health.json` | health_gate 生成 | health_gate 生成 | ジョブ内生成 |
+
+**被覆率（量）は health_gate の 90% 単一ソース**（§14「被覆率閾値の一本化」）。契約テストは
+質（不変条件）のみ。ジョブに関わらず、存在するファイルへの不変条件検査は共通。
+
+### 今回の設計漏れ（記録）
+
+Task 5 で**両ジョブに同じ契約テストを入れた**（オーナーの設計）。しかし corr_refresh の
+checkout+pull 後の `docs/` には macro_v2 / relations / gamma が無く、12 件が
+`ファイルが存在しない` で失敗していた（2026-07-29 の corr_refresh 全滅）。テスト失敗は
+**不完全な artifact のデプロイ＝3 層のサイト削除を防いでいた**（テストがサイトを守った）。
+是正は**テストを緩めるのではなく**、`pull_live_base.py` に 3 層の持ち越しを追加して
+「存在するファイルの集合を full と揃える」ことで解決した（案3。案1/案2 はテストを通す一方で
+3 層をサイトから削除する有害策として却下）。
+
+### 未解決の観察（2026-07-29 時点・本節は記録のみ・未実装）
+
+1. **米国株の広範な NaN 劣化**（2026-07-27 20:35 観測）: 米国株 176 件が「行はあるが Close
+   が NaN」で返り、heal の個別再取得でも **0 件しか回復しなかった**。日本株は無傷。1 時間に
+   full を 4 回実行させたことによる **yfinance レート制限**の可能性がある。2026-07-29 00:00 JST
+   の定期 full で切り分ける（レート制限なら定期実行では再現しないはず）。※ full が成功しない
+   限り公開 data.json が 07-27 のまま古び、48h 鮮度ガードで corr_refresh も連鎖的に止まる。
+2. **heal のリクエスト間待機（0.5s）はオーナー未指示**: `_batched_2y_ohlc` の heal で
+   個別再取得の間に `time.sleep(0.5)` を入れたが、これはオーナーの明示指示ではない実装判断。
+   レート制限が主因なら、この程度の待機では不足の可能性があり要再検討。
+3. **末尾バーが None の扱い（当日バー未確定との誤認リスク）**: `_close_is_degraded` /
+   `build_1d_chart_from_ohlc` は「最新バーが非有限なら unavailable」とするが、**当日バーが
+   未確定で None** の場合（Yahoo chart API で MSFT の last=None を実測確認済み）を**劣化と
+   誤認**して不要に unavailable に落とす可能性がある。当日未確定と真の劣化を区別する判定が
+   要るか要検討（現状は安全側＝表示しない、に倒しているが被覆を過小にしうる）。
