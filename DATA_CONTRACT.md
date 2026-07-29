@@ -1388,3 +1388,5 @@ STOXX50E/SX5E が存在しないため・既知の非対称）。
   参照用に Yahoo ^VIX quote のまま（データ源は FRED、link は「詳細ページ」でありデータ源属性とは別）。
 - **未ヘッジで代替が見つかっていないもの**: MOVE・個別株 368・FX・crypto・EU 株指数
   （いずれも無料の非 Yahoo 日次代替なし）。
+
+関連記録: `docs/_spec/2026-07-29-hf-signal-dashboard-完了.md`（2026-07-29 完了ノート — ソースヘッジ経緯・学習#29・事前検証ハーネス規則8-9。ハーネス本体は `docs/_spec/taka-instruction-preflight.md`）
