@@ -280,20 +280,17 @@ def build_1d_chart_from_ohlc(df_d, dp, updated_at):
     try:
         close_raw = pd.to_numeric(df_d["Close"].squeeze(), errors="coerce")
         # NaN-degraded-frame guard: yfinance intermittently returns a frame with the
-        # correct ROW count but NaN Close values. `len(close) < 48` (row count) then
-        # passes, yet rolling stats come out NaN → _json_safe nulls them → a chart is
-        # marked "ready" with empty BB bands (state stays "neutral", not
-        # "insufficient_data"). Guard on VALUE validity, not row count: the latest bar
-        # must be a real number and there must be >= 48 finite closes. Otherwise this
-        # is unavailable (not ready) — the contract "ready ⇒ valid indicators" holds.
-        if len(close_raw) == 0 or not np.isfinite(float(close_raw.iloc[-1])):
+        # correct ROW count but NaN Close values → rolling stats NaN → _json_safe nulls
+        # them → a chart marked "ready" with empty BB bands. Guard on VALUE validity,
+        # not row count (_close_is_degraded). Note (2026-07-29): a SINGLE trailing None
+        # (today's unconfirmed bar) is NOT degradation — indicators are built on the
+        # finite rows (which drop that bar), so the "current" is the last CONFIRMED bar.
+        if _close_is_degraded(df_d):
             return build_empty_chart("1d")
         finite = df_d[np.isfinite(close_raw.to_numpy())]
         close = finite["Close"].squeeze()
         high = finite["High"].squeeze()
         low = finite["Low"].squeeze()
-        if len(close) < 48:
-            return build_empty_chart("1d")
         ohlc = []
         for ts, r in finite.tail(OHLC_MAX_BARS).iterrows():
             try:
@@ -462,6 +459,85 @@ def fetch_batch(tickers, period=DATA_PERIOD):
             time.sleep(3)
         time.sleep(0.8)
     return results
+
+
+# Browser-like UA is required by the Yahoo chart API (v8); no auth / key needed.
+_CHART_API_UA = ("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+                 "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36")
+
+
+def _chart_api_json(symbol, rng, interval, timeout, retries=3):
+    """GET the chart API JSON with query1→query2 fallback and 429/5xx backoff.
+    Returns the parsed dict or None. Yahoo rate-limits by IP; on 429 we back off
+    (1s, 2s, 4s) and alternate hosts."""
+    enc = urllib.parse.quote(str(symbol), safe="")
+    hosts = ("query1.finance.yahoo.com", "query2.finance.yahoo.com")
+    headers = {"User-Agent": _CHART_API_UA, "Accept": "application/json",
+               "Accept-Language": "en-US,en;q=0.9"}
+    for attempt in range(retries):
+        host = hosts[attempt % len(hosts)]
+        url = (f"https://{host}/v8/finance/chart/{enc}"
+               f"?range={rng}&interval={interval}")
+        try:
+            req = urllib.request.Request(url, headers=headers)
+            with urllib.request.urlopen(req, timeout=timeout) as resp:
+                return json.load(resp)
+        except urllib.error.HTTPError as e:
+            if e.code in (429, 500, 502, 503) and attempt < retries - 1:
+                time.sleep(2 ** attempt)                     # 1s, 2s, 4s
+                continue
+            print(f"  [chart_api] {symbol}: HTTP {e.code}")
+            return None
+        except Exception as e:  # noqa: BLE001
+            if attempt < retries - 1:
+                time.sleep(2 ** attempt)
+                continue
+            print(f"  [chart_api] {symbol}: {type(e).__name__}: {str(e)[:60]}")
+            return None
+    return None
+
+
+def fetch_chart_api(symbol, rng="2y", interval="1d", timeout=30):
+    """Fallback OHLC fetch straight from Yahoo's chart API (v8), bypassing the
+    yfinance batch-download path. 2026-07-27..29 the batch path returned frames with
+    rows-but-NaN-Close for ~176 US symbols while THIS endpoint stayed healthy (owner
+    实测: AAPL/MSFT/CRM bars=501 valid=501). So the data source is fine; the library
+    path is not. Returns a DataFrame [Open,High,Low,Close,Volume] with a DatetimeIndex
+    matching fetch_batch's shape, or None.
+
+    - symbol は URL エンコード（^DJI → %5EDJI、7203.T はそのまま）。
+    - `indicators.quote[0]` の open/high/low/close/volume と `timestamp` を使う。
+    - 429/5xx はホスト交替(query1↔query2)＋バックオフで再試行。
+    """
+    payload = _chart_api_json(symbol, rng, interval, timeout)
+    if payload is None:
+        return None
+    try:
+        result = (payload.get("chart") or {}).get("result") or []
+        if not result:
+            print(f"  [chart_api] {symbol}: empty result")
+            return None
+        r0 = result[0]
+        ts = r0.get("timestamp")
+        q = ((r0.get("indicators") or {}).get("quote") or [{}])[0]
+        if not ts or not q:
+            print(f"  [chart_api] {symbol}: no timestamp/quote")
+            return None
+        df = pd.DataFrame(
+            {
+                "Open": q.get("open"),
+                "High": q.get("high"),
+                "Low": q.get("low"),
+                "Close": q.get("close"),
+                "Volume": q.get("volume"),
+            },
+            index=pd.to_datetime(ts, unit="s"),
+        )
+        return df if len(df) else None
+    except Exception as e:
+        print(f"  [chart_api] {symbol}: parse failed ({type(e).__name__}: {str(e)[:60]})")
+        return None
+
 
 def fetch_fx_4h(symbols):
     """Fetch 1H data → resample to 4H for FX pairs (24h market)."""
@@ -1837,16 +1913,37 @@ def _equity_empty_charts():
     return c
 
 
+def _trailing_nan_run(mask):
+    """末尾から連続する NaN(False) の本数を数える（mask は finite 判定の bool 配列）。"""
+    run = 0
+    for v in mask[::-1]:
+        if v:
+            break
+        run += 1
+    return run
+
+
 def _close_is_degraded(df):
-    """フレームに行はあるが Close が NaN 劣化しているか（最新バーが非有限、または
-    有限 Close が 48 本未満）を判定する。「そもそもデータが無い」(df None / 行数不足)
-    とは区別し、「取得はできたが返ってきた値が劣化」を表す。UI で degraded 文言を
-    出すために chart_error にこの事実を刻む。"""
+    """フレームが劣化しているか判定する（2026-07-29 修正: 末尾1本の None 許容）。
+
+    「末尾が NaN なら劣化」は誤りだった。当日のバーが未確定なだけの正常状態
+    （Yahoo chart API で MSFT の last=None を実測。プレマーケット時間帯）を劣化と
+    誤認していた。末尾を除いた有効性で判定する:
+      - 末尾から連続 2 本以上が None → 劣化（データ欠落）
+      - 有効(非NaN) Close が 48 本未満 → 劣化（本数不足）
+      - それ以外は劣化としない（単独の末尾 None＝当日未確定は正常）
+    「そもそもデータが無い」(df None / 行数不足) とは区別し、「取得はできたが値が劣化」
+    を表す。UI で degraded 文言を出すため chart_error にこの事実を刻む。"""
     try:
         c = pd.to_numeric(df["Close"].squeeze(), errors="coerce")
         if len(c) == 0:
-            return False
-        return (not np.isfinite(float(c.iloc[-1]))) or int(np.isfinite(c.to_numpy()).sum()) < 48
+            return True
+        mask = np.isfinite(c.to_numpy())
+        if _trailing_nan_run(mask) >= 2:
+            return True
+        if int(mask.sum()) < 48:
+            return True
+        return False
     except Exception:
         return False
 
@@ -1880,12 +1977,17 @@ def _batched_2y_ohlc(symbols, batch_size=BATCH_SIZE, pause=2.0):
     than genuinely-dead tickers), fall back to per-symbol fetch for that batch so
     one bad ticker never sinks the other 49. Returns {symbol: DataFrame|None}.
 
-    Partial-degradation heal (2026-07-27): a GROUPED download can also return a
-    frame with the right rows but NaN Close for a *subset* of the batch, while a
-    single-symbol fetch of the same ticker returns clean data. Whole-batch-empty is
-    handled above; this pass additionally detects per-symbol NaN degradation and
-    refetches ONLY those tickers once. The batch method (≈8 calls/35 s vs 343
-    calls/17.9 min) is preserved — the heal touches just the few degraded symbols."""
+    Degradation heal (2026-07-27, chart-API since 2026-07-29): the yfinance batch
+    path can return a frame with the right rows but NaN Close. 2026-07-27..29 this hit
+    ~176 US symbols and a yfinance per-symbol refetch recovered 0 of them — the whole
+    LIBRARY path was degraded, not the data source. So the heal now refetches degraded
+    symbols via the Yahoo chart API directly (`fetch_chart_api`), which stayed healthy
+    throughout. The batch method (≈8 calls/35 s vs 343 calls/17.9 min) is preserved —
+    heal fires only on degraded symbols. NO CAP on the heal count: capping would leave
+    degraded symbols unavailable and could drop equity ready below 90% (health_gate
+    FAIL → deploy blocked). 176 × 0.5 s ≈ 88 s against a ~6 min full run is acceptable,
+    and recovering coverage is the whole point. Full-batch degradation is bounded by
+    the universe size anyway."""
     out = {}
     uniq = list(dict.fromkeys(s for s in symbols if s))      # de-dup, keep order
     chunks = [uniq[i:i + batch_size] for i in range(0, len(uniq), batch_size)]
@@ -1909,34 +2011,30 @@ def _batched_2y_ohlc(symbols, batch_size=BATCH_SIZE, pause=2.0):
         for s in chunk:
             out[s] = res.get(s)
 
-    # Heal partial degradation: refetch (once, per-symbol) any ticker whose grouped
-    # frame has rows but NaN Close. Single-symbol fetch usually returns clean data
-    # for these; only symbols still degraded after the retry fall through to
-    # chart_status=unavailable. This directly reduces spurious coverage dips / gate
-    # blocks from a transient batch hiccup without abandoning batching.
+    # Heal degradation: refetch any ticker whose batch frame is degraded (rows but
+    # NaN Close) via the Yahoo chart API — the yfinance path recovered 0/176 on
+    # 2026-07-27..29, so we bypass it. Only symbols still degraded after the chart-API
+    # retry fall through to chart_status=unavailable. No cap (see docstring).
     degraded = [s for s, df in out.items()
                 if df is not None and _close_is_degraded(df)]
     if degraded:
         print(f"  [heal] {len(degraded)} degraded (rows but NaN Close) → "
-              f"per-symbol refetch: {degraded[:8]}")
+              f"chart-API refetch: {degraded[:8]}{'…' if len(degraded) > 8 else ''}")
         _HEAL_STATS["degraded"] += len(degraded)
         _HEAL_STATS["symbols_degraded"].extend(degraded)
         for i, s in enumerate(degraded):
             if i:
-                time.sleep(0.5)                              # gentle on rate limit
-            try:
-                fresh = fetch_batch([s], period="2y").get(s)
-                if fresh is not None and not _close_is_degraded(fresh):
-                    out[s] = fresh
-                    _HEAL_STATS["recovered"] += 1
-                    _HEAL_STATS["symbols_recovered"].append(s)
-                    print(f"  [heal] {s}: recovered on per-symbol refetch")
-                else:
-                    _HEAL_STATS["still_degraded"] += 1
-                    print(f"  [heal] {s}: still degraded after refetch → unavailable")
-            except Exception as exc:
+                time.sleep(0.5)                              # 0.5s between chart-API calls
+            fresh = fetch_chart_api(s, rng="2y", interval="1d")
+            if fresh is not None and not _close_is_degraded(fresh):
+                out[s] = fresh
+                _HEAL_STATS["recovered"] += 1
+                _HEAL_STATS["symbols_recovered"].append(s)
+                print(f"  [heal] {s}: recovered via chart API "
+                      f"(bars={len(fresh)})")
+            else:
                 _HEAL_STATS["still_degraded"] += 1
-                print(f"  [heal] {s}: refetch failed ({type(exc).__name__})")
+                print(f"  [heal] {s}: still degraded after chart API → unavailable")
     return out
 
 

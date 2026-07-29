@@ -1285,3 +1285,53 @@ checkout+pull 後の `docs/` には macro_v2 / relations / gamma が無く、12 
    未確定で None** の場合（Yahoo chart API で MSFT の last=None を実測確認済み）を**劣化と
    誤認**して不要に unavailable に落とす可能性がある。当日未確定と真の劣化を区別する判定が
    要るか要検討（現状は安全側＝表示しない、に倒しているが被覆を過小にしうる）。
+
+## 16. v6.7 — Yahoo chart API フォールバック（yfinance 一括経路の劣化対策・2026-07-29）
+
+### 事実: yfinance 一括経路が 2 日間劣化（2026-07-27 〜 29）
+
+`deploy.yml` の full が **2026-07-27 11:18 UTC を最後に約 2 日間連続失敗**した。原因は
+`fetch_signals.py` の yfinance 一括ダウンロード（`yf.download` バッチ）が**米国株 176 件で
+「行はあるが Close が NaN」の劣化フレームを返した**こと。heal の yfinance 個別再取得でも
+**176 件中 0 件しか回復せず**、equity ready 率が 90% を割って health_gate FAIL → デプロイが
+止まり続けた。日本株は無傷。レート制限（一時障害）なら数時間で回復するはずが 2 日続いた
+ため、**一時障害ではなく yfinance ライブラリ経路そのものの劣化**と判定した。
+
+### 実測: chart API 直叩きは正常（データ源は壊れていない）
+
+同じ Yahoo でも **chart API（`query1/2.finance.yahoo.com/v8/finance/chart/{symbol}`）は
+正常**だった（オーナー实测 2026-07-29、`range=2y&interval=1d`・User-Agent のみ・認証/キー不要）:
+
+| symbol | HTTP | bars | valid | last |
+|---|---|---|---|---|
+| AAPL | 200 | 501 | 501 | 340.08 |
+| MSFT | 200 | 501 | 501 | 393.35 |
+| CRM（劣化リスト該当） | 200 | 501 | 501 | 181.50 |
+
+→ **壊れているのは yfinance 一括経路であって、データ源ではない。**
+
+### フォールバックの設計と発動条件（`fetch_chart_api`）
+
+- エンドポイント: `https://query{1,2}.finance.yahoo.com/v8/finance/chart/{URLエンコード symbol}?range=2y&interval=1d`。
+  `^DJI → %5EDJI`、`7203.T` はそのまま。ブラウザ相当の `User-Agent` 必須。認証・キー不要。
+- レスポンスの `timestamp` と `indicators.quote[0]`（open/high/low/close/volume）を
+  `fetch_batch` と同一の DataFrame `[Open,High,Low,Close,Volume]`（DatetimeIndex）に変換。
+- 429/5xx は **query1↔query2 交替＋バックオフ（1s/2s/4s）**で再試行。
+- **発動条件は「劣化時のみ」**: `_batched_2y_ohlc` はまずバッチ（8 call/35 s）で取得し、
+  `_close_is_degraded` が劣化と判定した銘柄**だけ** chart API で個別再取得する（heal）。
+  バッチ方式は温存。chart API 呼び出し間は 0.5 s 待機。
+- **heal に件数上限は設けない**: 上限を設けると劣化銘柄が unavailable のまま残り ready 率が
+  90% を割ってデプロイが止まる。176 件 × 0.5 s ≈ 88 s は full 全体（約 6 分）に対し許容範囲で、
+  被覆を取り戻すことが目的。全劣化でも母集団サイズで上限は自然に有界。
+- IP 単位のレート制限に注意（ローカルの重複テストで 429 になりうる）。CI は fresh IP。
+
+### 末尾バー判定の修正（当日未確定を劣化と誤認しない）
+
+旧実装の「末尾が NaN なら unavailable」は**誤り**だった。当日のバーが未確定なだけの正常状態
+（Yahoo chart API で MSFT の `last=None` を実測。プレマーケット時間帯）を劣化と誤認し、不要に
+unavailable へ落として被覆を過小にしていた。`_close_is_degraded` を次の規約に修正:
+
+- **末尾から連続 2 本以上が None → 劣化**（データ欠落）。
+- **有効(非NaN) Close が 48 本未満 → 劣化**（本数不足）。
+- **単独の末尾 None（当日未確定）は劣化としない**。指標は有効行のみで計算し、「現在」は
+  最後の**確定**バーになる（`build_1d_chart_from_ohlc` は finite 行で BB/CCI を組む）。
