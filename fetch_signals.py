@@ -1999,6 +1999,17 @@ EQUITY_INDEX = [
     ("^NDX", "Nasdaq 100 Index", "nasdaq100"),
     ("^GSPC", "S&P 500 Index", "sp500"),
 ]
+
+# Full index membership sizes (the target). The fetched universe is a subset today
+# (nikkei/nasdaq/dow are curated hardcoded dicts; sp500 uses a Wikipedia fetch that
+# falls back to ~102 tickers when blocked). meta.universe records count vs target so
+# degradation is visible, never hidden. See DATA_CONTRACT §18.
+EQUITY_TARGETS = {"nikkei225": 225, "dow30": 30, "nasdaq100": 100, "sp500": 500}
+
+
+def _constituent_count(rows):
+    """Number of real constituents in a tab (excludes the pinned ^index proxy row)."""
+    return sum(1 for r in rows if not str(r.get("symbol", "")).startswith("^"))
 # v6.1: the old hardcoded 12-symbol EQUITY_ALLOWLIST is removed. Chart coverage
 # is now policy-driven (P0-P3, DATA_CONTRACT §10): every constituent gets a 1d
 # chart, so the front-end no longer shows "pending" for arbitrary equities. The
@@ -2791,6 +2802,17 @@ def main():
                 "crypto": len(crypto_results), "valuation": len(valuation_results),
             },
             "yield_curve": yield_curve,
+            # 銘柄ユニバースの取得率（構成銘柄数 vs 期待full index）。劣化を隠さず可視化する。
+            "universe": {
+                tab: {
+                    "count": _constituent_count(rows),           # ^index proxy を除く
+                    "target": EQUITY_TARGETS[tab],
+                    "capture_pct": round(_constituent_count(rows)
+                                         / EQUITY_TARGETS[tab] * 100, 1),
+                }
+                for tab, rows in (("nikkei225", nk_results), ("dow30", dj_results),
+                                  ("nasdaq100", nq_results), ("sp500", sp_results))
+            },
             # equity 2y フェッチのバッチ部分劣化 heal 統計（発動頻度の追跡用）。
             "equity_fetch_heal": {
                 "degraded": _HEAL_STATS["degraded"],

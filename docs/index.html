@@ -691,6 +691,7 @@ tbody tr.mrow-normal:hover{opacity:1}
     </div>
     <section id="corr-panel"></section>
   </div>
+  <div id="universe-badge" style="display:none;padding:6px 16px 0"></div>
   <div class="tbl-wrap">
     <table><thead id="thead"></thead><tbody id="tbody"></tbody></table>
     <div id="errmsg">
@@ -972,6 +973,8 @@ function renderSum(){
 // ══ Tab switch ═════════════════════════════════════
 function sw(key,btn){
   tab=key; fsig=null; sv=""; wlOnly=false;
+  // hide the universe badge; renderTbl() re-shows it only for equity tabs.
+  const ub=document.getElementById("universe-badge"); if (ub) ub.style.display="none";
   const srch=document.getElementById("search"); if (srch) srch.value="";
   document.querySelectorAll(".tab").forEach(t=>t.classList.remove("active"));
   if (btn && btn.classList) btn.classList.add("active");
@@ -1034,6 +1037,34 @@ function renderTbl(){
   renderBody(rows);
   // renderBody now writes #rowcount itself (data rows only, excluding sections).
   updWLBtn();
+  renderUniverseBadge();
+}
+
+// 銘柄ユニバースの取得率をタブ上部に表示（劣化を隠さない・pixel辞書「不明N件」と同方針）。
+// 構成銘柄のみ（各 equity タブに1本 pin される ^index proxy は除外）。取得率<50%は警告色。
+const UNIVERSE_TARGETS={nikkei225:225,dow30:30,nasdaq100:100,sp500:500};
+const UNIVERSE_LABEL={nikkei225:"日経225",dow30:"Dow30",nasdaq100:"Nasdaq100",sp500:"S&P500"};
+function renderUniverseBadge(){
+  const el=document.getElementById("universe-badge");
+  if(!el) return;
+  if(!(tab in UNIVERSE_TARGETS)){ el.style.display="none"; return; }
+  const rec=((DATA.meta&&DATA.meta.universe)||{})[tab]||{};
+  const rows=(DATA.markets&&DATA.markets[tab])||[];
+  const count=(typeof rec.count==="number")?rec.count
+    :rows.filter(r=>!String((r&&r.symbol)||"").startsWith("^")).length;
+  const target=rec.target||UNIVERSE_TARGETS[tab];
+  const pct=target?Math.round(count/target*100):0;
+  const warn=pct<50;
+  const col=warn?"#e5484d":"var(--text-dim,#9aa)";
+  const bg=warn?"rgba(229,72,77,0.12)":"transparent";
+  el.style.display="block";
+  el.innerHTML=
+    `<span style="display:inline-block;padding:3px 10px;border-radius:4px;font-size:12px;`
+    +`background:${bg};color:${col};border:1px solid ${col}">`
+    +`取得 ${UNIVERSE_LABEL[tab]}: <b>${count}/${target}</b> (${pct}%)`
+    +(warn?" ⚠ 取得率50%未満":"")+`</span>`
+    +`<span style="font-size:11px;color:var(--text-faint,#666);margin-left:8px">`
+    +`構成銘柄のみ（指数本体 ^ は別枠）。取得率は隠さず表示。</span>`;
 }
 
 function getRows(){

@@ -1390,3 +1390,61 @@ STOXX50E/SX5E が存在しないため・既知の非対称）。
   （いずれも無料の非 Yahoo 日次代替なし）。
 
 関連記録: `docs/_spec/2026-07-29-hf-signal-dashboard-完了.md`（2026-07-29 完了ノート — ソースヘッジ経緯・学習#29・事前検証ハーネス規則8-9。ハーネス本体は `docs/_spec/taka-instruction-preflight.md`）
+
+## 18. v6.9 — 銘柄ユニバースの取得率と劣化検知（2026-07-30）
+
+### 事実: ユニバースは初回から部分集合（時系列劣化ではない）
+
+`markets` の 4 equity タブの銘柄数は **full index membership ではなく部分集合**であり、
+git 履歴上（初回コミット 2026-03-28 以降）一貫してこのサイズ。**「いつから欠損したか」で
+はなく、最初から subset/fallback だった**。
+
+| タブ | 構成銘柄(現) | target(full) | 取得率 | 由来 |
+|---|---|---|---|---|
+| nikkei225 | 142 | 225 | 63% | ハードコード辞書 `NIKKEI225`(143) − 上場廃止 9613.T |
+| dow30 | 30 | 30 | 100% | ハードコード辞書 `DOW30`(30) |
+| nasdaq100 | 90 | 100 | 90% | ハードコード辞書 `NASDAQ100`(91) − 買収/廃止 ANSS |
+| sp500 | 102 | 500 | 20% | `get_sp500_tickers()` の Wikipedia `pd.read_html` が **HTTP 403** → 102銘柄 fallback |
+
+- **各 equity タブには index proxy が 1 本 pin される**（`^N225`/`^DJI`/`^NDX`/`^GSPC`）。
+  よって `meta.counts`（配列長）は「構成銘柄＋proxy」= nikkei225 143 / dow30 **31** / nasdaq100 91 /
+  sp500 103。**dow30=31 の +1 はこの `^DJI` であり、混入ではなく設計**。
+- 件数テストは **構成銘柄のみ**（`^` 始まりの proxy を除外）で判定する。
+
+### `meta.universe`（取得率の記録・別フィールド）
+
+```
+meta.universe[tab] = {count: 構成銘柄数(^proxy除外), target: full index, capture_pct}
+```
+target(full index) を**別フィールドとして恒久記録**し、UI・テストが突き合わせられるようにする。
+
+### 件数の下限テスト（`tests/test_contract_v2.py`・追記）
+
+- `test_meta_counts_match_actual_lengths` — meta.counts が実配列長と一致。
+- `test_equity_constituent_count_above_min` — 構成銘柄数が下限を下回ったら FAIL。
+  **下限は「期待値の90%」でなく現在値を初期基準**（nikkei225 140 / dow30 30 / nasdaq100 90 /
+  sp500 100）。full index との**乖離率をテスト出力に必ず表示**（乖離自体は FAIL ではない）。
+- `test_dow30_constituents_do_not_exceed_30` — dow30 構成銘柄数 > 30 で FAIL
+  （31 は指数本体/入替前銘柄の混入。^index proxy は別枠で除外済み）。
+- `test_meta_universe_recorded_and_consistent` — meta.universe が 4 タブ分あり実体・target と一致。
+
+### 取得率の可視化（`index.html`・隠さない）
+
+equity タブ上部に `取得 S&P500: 102/500 (20%)` を常時表示。**取得率 50% 未満は警告色**。
+pixel-reference 辞書の「不明 N 件」と同方針で、欠損を隠さず母数を明示する。構成銘柄のみ
+（指数本体 `^` は別枠）。
+
+### 原因の切り分け（調査のみ・本節は未修正）
+
+欠損（full index 比）を件数の多い順に3分類:
+1. **Wikipedia S&P500 取得の 403（最大・約 398 銘柄）**: `get_sp500_tickers()` の
+   `pd.read_html` が Wikipedia にブロックされ(403 Forbidden)、102 銘柄の内蔵 fallback に落ちる。
+   **データ源側のアクセス拒否**（パース以前）。修正案: `pd.read_html` に User-Agent 付き
+   requests セッションを渡す／保守された静的リスト／別ソース。**未実装（原因確定まで対症せず）**。
+2. **ハードコード subset（nikkei 82 + nasdaq 9 ≒ 91 銘柄）**: 辞書が full index を定義していない。
+   修正案: 辞書を full membership に拡充、または動的取得。**未実装**。
+3. **上場廃止・ティッカー変更（2 銘柄）**: 9613.T（日経・廃止）、ANSS（Nasdaq・買収/廃止）。
+   定義には残るが Yahoo にデータ無し。**データ源側の欠損**。修正案: ユニバースの定期棚卸し。**未実装**。
+
+- レート制限/タイムアウトは主因ではない（`meta.elapsed_sec≈104s` でバッチは完走。欠損は
+  上記 subset/廃止が主で、timeout 起因ではない）。データ源側(1,3) と定義側(2) の別を上表に明記。

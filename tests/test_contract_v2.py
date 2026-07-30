@@ -28,6 +28,21 @@ REGIME_ALLOWED = {
     "growth_shock_dominant", "inflation_policy_shock_dominant", "transition",
 }
 
+# ── 銘柄件数の劣化検知（2026-07-30）──────────────────────────────────────
+# min_count は「期待値の90%」でなく "現在の構成銘柄数" を初期基準にする（いま全部を
+# FAIL させても意味がないため）。target は full index membership。乖離率をテスト出力に必ず表示。
+# カウントは構成銘柄のみ（各 equity タブに1本ずつ pin される ^index proxy は除外）。
+EQUITY_MIN_COUNTS = {"nikkei225": 140, "dow30": 30, "nasdaq100": 90, "sp500": 100}
+EQUITY_TARGET_COUNTS = {"nikkei225": 225, "dow30": 30, "nasdaq100": 100, "sp500": 500}
+# dow30 の構成銘柄数の上限は 30。31 は指数本体(^DJI)か入替前銘柄の混入を示す。
+DOW30_MAX_CONSTITUENTS = 30
+
+
+def _constituent_count(rows):
+    """構成銘柄数（^index proxy 行を除く）。"""
+    return sum(1 for r in rows if isinstance(r, dict)
+               and not str(r.get("symbol", "")).startswith("^"))
+
 
 def _load(name):
     p = DOCS / name
@@ -459,3 +474,81 @@ def test_captions_cite_sources():
     )
     for token in ("FRED", "CBOE", "CFTC"):
         assert token in html, f"キャプションに出典トークン {token} が見当たらない"
+
+
+# ─────────────────────── 銘柄件数の劣化検知 ───────────────────────
+def test_meta_counts_match_actual_lengths():
+    """meta.counts が各カテゴリの実配列長と一致する（件数の自己申告が実体とズレない）。"""
+    data = _load("data.json")
+    counts = (data.get("meta") or {}).get("counts") or {}
+    markets = data.get("markets") or {}
+    bad = []
+    for cat, n in counts.items():
+        actual = len(markets.get(cat, []))
+        if n != actual:
+            bad.append(f"{cat}: meta.counts={n} != actual={actual}")
+    assert counts, "meta.counts が無い"
+    assert not bad, f"meta.counts と実配列長の不一致: {bad}"
+
+
+def test_equity_constituent_count_above_min():
+    """各 equity タブの構成銘柄数が下限を下回らない。乖離率(目標比)を必ず出力する。
+
+    下限は現在値ベースの暫定基準。目標(full index)との乖離はデータ品質の可視化であって
+    それ自体は FAIL ではない（下限割れのみ FAIL）。
+    """
+    data = _load("data.json")
+    markets = data.get("markets") or {}
+    report, failed = [], []
+    for tab in EQUITY_TABS:
+        n = _constituent_count(markets.get(tab, []))
+        mn = EQUITY_MIN_COUNTS[tab]
+        tgt = EQUITY_TARGET_COUNTS[tab]
+        dev = round((n - tgt) / tgt * 100, 1)          # 目標比の乖離率（負=不足）
+        line = f"{tab}: count={n} min={mn} target={tgt} 乖離={dev:+.1f}%"
+        report.append(line)
+        if n < mn:
+            failed.append(line)
+    # 乖離率は常に可視化（成功時も出力に残す）
+    summary = " | ".join(report)
+    assert not failed, f"構成銘柄数が下限割れ: {failed} || 全体: {summary}"
+    print("\n[universe] " + summary)
+
+
+def test_dow30_constituents_do_not_exceed_30():
+    """dow30 の構成銘柄数は 30 以下（上限）。31 は指数本体(^DJI)か入替前銘柄の混入。
+
+    ^DJII 等の index proxy は別枠（構成銘柄カウントから除外済み）。構成銘柄が 30 を超えたら
+    それは本当の混入なので FAIL させる。
+    """
+    data = _load("data.json")
+    rows = (data.get("markets") or {}).get("dow30", [])
+    n = _constituent_count(rows)
+    extras = sorted(r.get("symbol") for r in rows
+                    if isinstance(r, dict) and str(r.get("symbol", "")).startswith("^"))
+    assert n <= DOW30_MAX_CONSTITUENTS, (
+        f"dow30 構成銘柄数 {n} > {DOW30_MAX_CONSTITUENTS}（指数本体/入替前銘柄の混入疑い）。"
+        f"index proxy(除外済) = {extras}"
+    )
+
+
+def test_meta_universe_recorded_and_consistent():
+    """meta.universe に4 equity タブの count/target/capture_pct が記録され、実体と一致する。
+
+    target(full index) を別フィールドとして恒久記録し、UI と突き合わせられるようにする。
+    """
+    data = _load("data.json")
+    uni = (data.get("meta") or {}).get("universe") or {}
+    markets = data.get("markets") or {}
+    assert set(uni.keys()) == set(EQUITY_TABS), (
+        f"meta.universe は 4 equity タブを持つべき（実際: {sorted(uni.keys())}）"
+    )
+    bad = []
+    for tab in EQUITY_TABS:
+        rec = uni.get(tab) or {}
+        actual = _constituent_count(markets.get(tab, []))
+        if rec.get("count") != actual:
+            bad.append(f"{tab}: universe.count={rec.get('count')} != actual={actual}")
+        if rec.get("target") != EQUITY_TARGET_COUNTS[tab]:
+            bad.append(f"{tab}: universe.target={rec.get('target')} != {EQUITY_TARGET_COUNTS[tab]}")
+    assert not bad, f"meta.universe が実体/目標と不整合: {bad}"
