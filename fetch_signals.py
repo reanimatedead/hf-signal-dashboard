@@ -16,6 +16,32 @@ import yfinance as yf
 
 warnings.filterwarnings("ignore")
 
+# Browser-like UA for keyless HTTP GETs (Wikipedia/gov sites 403 the default
+# python-requests/urllib UA). Root cause of the 2026-07-29 S&P500 403 → 102 fallback.
+BROWSER_UA = ("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+              "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36")
+
+# ── サイレント fallback 禁止 (2026-07-30) ────────────────────────────────
+# 外部取得が fallback に落ちたら「静かに」やめさせる: meta.fallbacks に記録し、
+# FALLBACK_USED をログ出力し、UI に「代替データ使用中」を出す。気付かない fallback を
+# 構造的に不可能にする。record_fallback() を全 fallback 経路で必ず呼ぶ。
+_FALLBACKS = []
+
+
+def record_fallback(source, reason, http_status=None, fallback_size=None):
+    """Record + loudly log a fallback activation. Never silent."""
+    entry = {
+        "source": source,
+        "reason": str(reason)[:200],
+        "http_status": http_status,
+        "fallback_size": fallback_size,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    }
+    _FALLBACKS.append(entry)
+    print(f"FALLBACK_USED: {source} — {reason} "
+          f"(http_status={http_status}, fallback_size={fallback_size})", flush=True)
+    return entry
+
 
 def _json_safe(obj):
     """Recursively replace non-finite floats (NaN / Infinity) with None so the output
@@ -146,17 +172,48 @@ FX_PAIRS = {
 }
 
 
+def _sp500_from_wikipedia():
+    """S&P500 from Wikipedia — WITH a browser UA (the missing UA caused the 403).
+    Fetch via requests then hand the HTML to read_html (never let read_html fetch)."""
+    import io
+    import requests
+    r = requests.get("https://en.wikipedia.org/wiki/List_of_S%26P_500_companies",
+                     headers={"User-Agent": BROWSER_UA}, timeout=30)
+    r.raise_for_status()
+    df = pd.read_html(io.StringIO(r.text))[0]
+    sym = df["Symbol"].astype(str).str.replace(".", "-", regex=False)
+    return sym.tolist(), dict(zip(sym, df["Security"].astype(str)))
+
+
+def _sp500_from_datahub():
+    """S&P500 2nd source — datahub constituents CSV (independent of Wikipedia)."""
+    import io
+    import requests
+    r = requests.get(
+        "https://raw.githubusercontent.com/datasets/s-and-p-500-companies/main/data/constituents.csv",
+        headers={"User-Agent": BROWSER_UA}, timeout=30)
+    r.raise_for_status()
+    rows = list(csv.DictReader(io.StringIO(r.text)))
+    tickers = [x["Symbol"].replace(".", "-") for x in rows if x.get("Symbol")]
+    names = {x["Symbol"].replace(".", "-"): x.get("Security", "") for x in rows if x.get("Symbol")}
+    return tickers, names
+
+
 def get_sp500_tickers():
-    try:
-        url = "https://en.wikipedia.org/wiki/List_of_S%26P_500_companies"
-        df = pd.read_html(url, header=0)[0]
-        tickers = df["Symbol"].str.replace(".", "-", regex=False).tolist()
-        names   = dict(zip(df["Symbol"].str.replace(".", "-", regex=False), df["Security"]))
-        print(f"✓ {len(tickers)} S&P 500 tickers fetched")
-        return tickers, names
-    except Exception as e:
-        print(f"⚠ S&P 500 fallback: {e}")
-        fallback = [
+    """S&P500 constituents from 2 independent sources (Wikipedia UA → datahub CSV).
+    Only the last-resort 102-ticker fallback is a fallback — and it is RECORDED
+    (record_fallback + FALLBACK_USED log + meta.fallbacks + UI banner), never silent."""
+    for name, fn in (("wikipedia", _sp500_from_wikipedia), ("datahub", _sp500_from_datahub)):
+        try:
+            tickers, names = fn()
+            if len(tickers) >= 400:                       # sanity: this is the full index
+                print(f"✓ {len(tickers)} S&P 500 tickers ({name})")
+                return tickers, names
+            print(f"  [sp500] {name} returned only {len(tickers)} (<400); trying next")
+        except Exception as e:
+            print(f"  [sp500] {name} failed ({type(e).__name__}: {str(e)[:70]})")
+    # both sources failed → RECORDED fallback (not silent)
+    fallback = [
             "AAPL","MSFT","NVDA","AMZN","META","GOOGL","TSLA","BRK-B","UNH","JPM",
             "V","XOM","MA","JNJ","PG","HD","AVGO","LLY","MRK","ABBV","CVX","COST",
             "PEP","KO","BAC","MCD","CSCO","TMO","ADBE","CRM","ACN","ABT","NFLX",
@@ -167,7 +224,10 @@ def get_sp500_tickers():
             "CL","SO","PLD","MDLZ","DUK","HUM","GM","F","GS","SBUX","BKNG","MET",
             "OXY","WM","NSC","EMR","PNC","ADI","KLAC","MAR","FIS","AIG","ECL",
         ]
-        return fallback, {}
+    record_fallback("sp500_constituents",
+                    "both sources failed (Wikipedia UA + datahub CSV)",
+                    fallback_size=len(fallback))
+    return fallback, {}
 
 # ─── INDICATOR LIBRARY ────────────────────────────────────
 
@@ -2788,6 +2848,48 @@ def main():
     next_run = (now_jst + timedelta(days=1)).replace(
         hour=8, minute=0, second=0, microsecond=0)
 
+    # ── Part 3: 上場廃止/入替の検知（定義済みだが取得できなかった銘柄）を meta に記録。
+    #    黙って件数だけ減らさない。nikkei/nasdaq のハードコード subset は full 未達を明示。
+    _defined = {"nikkei225": set(NIKKEI225), "dow30": set(DOW30),
+                "nasdaq100": set(NASDAQ100), "sp500": set(sp500_dict)}
+    if len(sp500_dict) < 400:
+        record_fallback("sp500_constituents",
+                        "constituent universe < 400 (full index not obtained)",
+                        fallback_size=len(sp500_dict))
+
+    # sp500=動的取得(Wikipedia/datahub)。dow30=curated だが full(30/30)。
+    # nikkei/nasdaq=curated subset（無料の動的 full-membership 源が未確認・§18/§19）。
+    _source_mode = {"nikkei225": "curated_subset", "dow30": "curated_full",
+                    "nasdaq100": "curated_subset", "sp500": "dynamic"}
+
+    def _universe_rec(tab, rows):
+        got = set(r.get("symbol") for r in rows if isinstance(r, dict))
+        failures = sorted(_defined[tab] - got)          # defined but missing = fetch fail/delist
+        cnt = _constituent_count(rows)
+        return {
+            "count": cnt, "target": EQUITY_TARGETS[tab],
+            "capture_pct": round(cnt / EQUITY_TARGETS[tab] * 100, 1),
+            "defined": len(_defined[tab]),
+            "source_mode": _source_mode[tab],
+            "fetch_failures": failures,                  # 上場廃止/入替候補
+        }
+
+    # ── Part 6: NaN 計測（修正はしない・計測のみ）。構成銘柄で price=None または
+    #    chart_status=unavailable（NaN 劣化を含む）を数える。全 equity タブ対象。
+    def _nan_rec(rows):
+        con = [r for r in rows if isinstance(r, dict)
+               and not str(r.get("symbol", "")).startswith("^")]
+        return {
+            "constituents": len(con),
+            "price_null": sum(1 for r in con if r.get("price") is None),
+            "chart_unavailable": sum(1 for r in con if r.get("chart_status") == "unavailable"),
+        }
+
+    _equity_pairs = (("nikkei225", nk_results), ("dow30", dj_results),
+                     ("nasdaq100", nq_results), ("sp500", sp_results))
+    universe_meta = {tab: _universe_rec(tab, rows) for tab, rows in _equity_pairs}
+    nan_report = {tab: _nan_rec(rows) for tab, rows in _equity_pairs}
+
     payload = {
         "meta": {
             "updated_at":      now_jst.isoformat(),
@@ -2802,17 +2904,12 @@ def main():
                 "crypto": len(crypto_results), "valuation": len(valuation_results),
             },
             "yield_curve": yield_curve,
-            # 銘柄ユニバースの取得率（構成銘柄数 vs 期待full index）。劣化を隠さず可視化する。
-            "universe": {
-                tab: {
-                    "count": _constituent_count(rows),           # ^index proxy を除く
-                    "target": EQUITY_TARGETS[tab],
-                    "capture_pct": round(_constituent_count(rows)
-                                         / EQUITY_TARGETS[tab] * 100, 1),
-                }
-                for tab, rows in (("nikkei225", nk_results), ("dow30", dj_results),
-                                  ("nasdaq100", nq_results), ("sp500", sp_results))
-            },
+            # 銘柄ユニバースの取得率＋上場廃止/入替候補。劣化を隠さず可視化する。
+            "universe": universe_meta,
+            # サイレント fallback 禁止: 発動した fallback を全て記録（0件なら健全）。
+            "fallbacks": list(_FALLBACKS),
+            # NaN 計測（計測のみ・修正しない）。
+            "nan_report": nan_report,
             # equity 2y フェッチのバッチ部分劣化 heal 統計（発動頻度の追跡用）。
             "equity_fetch_heal": {
                 "degraded": _HEAL_STATS["degraded"],

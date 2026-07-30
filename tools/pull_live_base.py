@@ -49,8 +49,18 @@ EQUITY_TABS = ("nikkei225", "dow30", "nasdaq100", "sp500")
 LAYER_FILES = ("macro_v2.json", "relations.json", "gamma.json")
 
 
+_UA = ("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
+       "(KHTML, like Gecko) Chrome/124.0 Safari/537.36")
+
+
 def _fetch(url, dest):
-    urllib.request.urlretrieve(url, dest)
+    # 横断監査(2026-07-30): urlretrieve は UA を送らない。既定 Python-urllib UA を弾く
+    # サイトがあるため、明示 UA 付き Request で取得する（自 Pages なら無害だが一貫性）。
+    req = urllib.request.Request(url, headers={"User-Agent": _UA})
+    with urllib.request.urlopen(req, timeout=30) as r:
+        body = r.read()
+    with open(dest, "wb") as f:
+        f.write(body)
     return os.path.getsize(dest)
 
 

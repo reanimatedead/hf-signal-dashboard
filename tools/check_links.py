@@ -38,47 +38,71 @@ def _now():
     return datetime.now(timezone.utc).isoformat()
 
 
+_EQUITY_TABS = ("nikkei225", "dow30", "nasdaq100", "sp500")
+_EQUITY_SAMPLE = 5   # equity 構成銘柄リンクは同型(finance.yahoo.com/quote/*)。全数は数百件で
+                     # Yahoo の 2.5s 待機と GET 再確認で CI を超過する。タブごとにサンプル。
+
+
 def _collect_urls(d):
-    """(category, symbol, url) を markets 全行の link.url について列挙（重複 url は 1 回）。"""
+    """(category, symbol, url) を列挙（重複 url は 1 回）。equity 構成銘柄の Yahoo quote は
+    同型なのでタブごとに先頭 _EQUITY_SAMPLE 件だけ検査し、残数は main() でログする
+    （サイレント truncation はしない）。index proxy(^) と非 equity は全数検査。"""
     seen = set()
     out = []
+    skipped = 0
+    per_tab = {}
     for cat, rows in (d.get("markets") or {}).items():
         if not isinstance(rows, list):
             continue
         for r in rows:
             if not isinstance(r, dict):
                 continue
+            sym = r.get("symbol", "?")
             url = ((r.get("link") or {}).get("url")) or ""
             if not url or not url.startswith(("http://", "https://")):
                 continue
+            # equity 構成銘柄(非^)はサンプルのみ。index proxy と非 equity は常に検査。
+            if cat in _EQUITY_TABS and not str(sym).startswith("^"):
+                per_tab[cat] = per_tab.get(cat, 0) + 1
+                if per_tab[cat] > _EQUITY_SAMPLE:
+                    skipped += 1
+                    continue
             if url in seen:
                 continue
             seen.add(url)
-            out.append((cat, r.get("symbol", "?"), url))
-    return out
+            out.append((cat, sym, url))
+    return out, skipped
 
 
-def _head(url):
-    """HEAD リクエスト。(status_code:int|None, note:str) を返す。"""
-    req = urllib.request.Request(url, method="HEAD", headers={"User-Agent": UA})
+def _get_status(url):
+    """GET で到達確認（本文は読まない）。(status_code:int|None, note)。"""
+    greq = urllib.request.Request(url, method="GET", headers={"User-Agent": UA})
     try:
-        with urllib.request.urlopen(req, timeout=TIMEOUT_S) as resp:
-            return resp.status, "ok"
+        with urllib.request.urlopen(greq, timeout=TIMEOUT_S) as resp:
+            return resp.status, "ok_via_get"
     except urllib.error.HTTPError as e:
-        # 一部サーバは HEAD を 405 で返す → GET で再確認（軽量に）。
-        if e.code in (403, 405):
-            try:
-                greq = urllib.request.Request(
-                    url, method="GET", headers={"User-Agent": UA})
-                with urllib.request.urlopen(greq, timeout=TIMEOUT_S) as resp:
-                    return resp.status, "ok_via_get"
-            except urllib.error.HTTPError as e2:
-                return e2.code, "http_error"
-            except Exception as e2:  # noqa: BLE001
-                return None, f"error:{type(e2).__name__}"
         return e.code, "http_error"
     except Exception as e:  # noqa: BLE001
         return None, f"error:{type(e).__name__}"
+
+
+def _head(url):
+    """到達確認。(status_code:int|None, note:str) を返す。
+
+    横断監査(2026-07-30): HEAD 依存は生きたリンクを dead 誤判定する（support.google.com
+    が HEAD に 404 を返す等・pixel-reference と同 class）。HEAD が 2xx/3xx でなければ
+    **必ず GET で再確認**する（403/405 に限定しない）。GET が通れば生存扱い。
+    """
+    req = urllib.request.Request(url, method="HEAD", headers={"User-Agent": UA})
+    try:
+        with urllib.request.urlopen(req, timeout=TIMEOUT_S) as resp:
+            if 200 <= resp.status < 400:
+                return resp.status, "ok"
+            return _get_status(url)                       # 非2xx/3xx は GET で再確認
+    except urllib.error.HTTPError:
+        return _get_status(url)                           # HEAD が HTTP エラー → GET 再確認
+    except Exception:                                     # noqa: BLE001
+        return _get_status(url)                           # HEAD がネットワーク不能 → GET 再確認
 
 
 def main():
@@ -93,7 +117,10 @@ def main():
         print(f"check_links: cannot read {DATA}: {e}")
         return 0  # 警告のみ。CI を落とさない。
 
-    urls = _collect_urls(d)
+    urls, skipped = _collect_urls(d)
+    if skipped:
+        print(f"check_links: {skipped} 件の equity 構成銘柄リンク(同型 finance.yahoo.com/quote/*)"
+              f"はサンプル検査のため未検査（サイレント truncation ではなく明示）", flush=True)
     results = []
     ok = warn = 0
     for cat, sym, url in urls:
@@ -120,9 +147,11 @@ def main():
     rep = {
         "as_of_utc": _now(),
         "checked": len(urls),
+        "equity_constituent_links_skipped": skipped,
         "ok": ok,
         "warn": warn,
-        "policy": "CI warns only; rate-limit(429)/network errors never fail the job",
+        "policy": "CI warns only; rate-limit(429)/network errors never fail the job. "
+                  "equity constituent Yahoo quote links are sampled (homogeneous), not silent.",
         "results": results,
     }
     with open(OUT, "w", encoding="utf-8") as f:

@@ -82,8 +82,12 @@ def evaluate(d):
     fails = []
     warns = []
 
-    def add(name, level, status, detail):
-        checks.append({"name": name, "level": level, "status": status, "detail": detail})
+    # gate: "deploy" = 配信可否を止める（payload構造/被覆/鮮度の破損）。
+    #       "data"   = そのデータ領域(domain)の品質のみ。デプロイは止めない（該当タブを
+    #                  警告表示し、コード/UI/他タブは通常反映）。2026-07-30 分離。
+    def add(name, level, status, detail, gate="deploy", domain=None):
+        checks.append({"name": name, "level": level, "status": status,
+                       "detail": detail, "gate": gate, "domain": domain})
         if status == "fail":
             fails.append(name)
         elif status in ("warn", "unknown"):
@@ -167,32 +171,37 @@ def evaluate(d):
                  if len((regions.get(r) or {}).get("series") or []) < 200}
         if short:
             add("relations_series", "FAIL", "fail",
-                f"series < 200 の地域: {short}")
+                f"series < 200 の地域: {short}", gate="data", domain="relations")
         else:
             add("relations_series", "FAIL", "pass",
-                "us/eu/jp series >= 200")
+                "us/eu/jp series >= 200", gate="data", domain="relations")
 
     # FAIL: correlations.align が inner_join でない
     corr_align = (d.get("correlations") or {}).get("align")
     if corr_align is None:
-        add("corr_align", "FAIL", "unknown", "correlations.align 欠落")
+        add("corr_align", "FAIL", "unknown", "correlations.align 欠落",
+            gate="data", domain="correlations")
     elif corr_align != "inner_join":
         add("corr_align", "FAIL", "fail",
-            f"correlations.align='{corr_align}' (inner_join でない)")
+            f"correlations.align='{corr_align}' (inner_join でない)",
+            gate="data", domain="correlations")
     else:
-        add("corr_align", "FAIL", "pass", "correlations.align=inner_join")
+        add("corr_align", "FAIL", "pass", "correlations.align=inner_join",
+            gate="data", domain="correlations")
 
-    # FAIL: macro_v2 の fisher.ok が False
+    # data_gate: macro_v2 の fisher.ok が False（該当タブのみ警告・デプロイは止めない）
     if mac is None:
-        add("macro_fisher", "FAIL", "unknown", "macro_v2.json 読み込み不可")
+        add("macro_fisher", "FAIL", "unknown", "macro_v2.json 読み込み不可",
+            gate="data", domain="macro")
     else:
         fisher = (mac.get("identities") or {}).get("fisher") or {}
         if fisher.get("ok") is not True:
             add("macro_fisher", "FAIL", "fail",
-                f"fisher.ok={fisher.get('ok')} gap={fisher.get('gap')}")
+                f"fisher.ok={fisher.get('ok')} gap={fisher.get('gap')}",
+                gate="data", domain="macro")
         else:
             add("macro_fisher", "FAIL", "pass",
-                f"fisher.ok gap={fisher.get('gap')}")
+                f"fisher.ok gap={fisher.get('gap')}", gate="data", domain="macro")
 
     # WARN: gamma が data_status: error または unavailable
     if gam is None:
@@ -267,21 +276,36 @@ def evaluate(d):
         else:
             add("equity_fetch_heal", "WARN", "pass", detail)
 
-    # fails/warns may repeat names via add(); de-dup while keeping only real fails.
+    # ── ゲート分離 (2026-07-30) ─────────────────────────────────────────
+    # deploy_gate だけが exit code を左右する。data_gate の fail は該当 domain を
+    # 「degraded」にするだけで配信は止めない（無関係なコード/UI/他タブは即反映）。
     real_fails = [c["name"] for c in checks if c["status"] == "fail"]
     real_warns = [c["name"] for c in checks if c["status"] in ("warn", "unknown")]
-    status = "FAIL" if real_fails else ("WARN" if real_warns else "PASS")
+    deploy_fails = [c["name"] for c in checks
+                    if c["status"] == "fail" and c.get("gate", "deploy") == "deploy"]
+    data_fails = [c["name"] for c in checks
+                  if c["status"] == "fail" and c.get("gate") == "data"]
+    degraded_domains = sorted({c.get("domain") for c in checks
+                               if c["status"] == "fail" and c.get("gate") == "data"
+                               and c.get("domain")})
+    deploy_status = "FAIL" if deploy_fails else "PASS"
+    data_status = "DEGRADED" if data_fails else "OK"
+    # 後方互換: 従来の "status" は残す（deploy_gate に連動）。judgment ロジックは不変。
+    status = deploy_status if deploy_fails else ("WARN" if real_warns or data_fails else "PASS")
     return {
         "status": status,
+        "deploy_gate": {"status": deploy_status, "fails": deploy_fails},
+        "data_gate": {"status": data_status, "fails": data_fails,
+                      "degraded_domains": degraded_domains},
         "generated_from": DATA,
         "as_of_utc": _today().isoformat(),
         "fails": real_fails,
         "warns": real_warns,
         "checks": checks,
         "notes": [
-            "us_rates/jgb/fred_daily lag is proxied by meta.updated_at (pipeline "
-            "run date): the schema has no per-observation date on those rows. This "
-            "catches a stale deploy, not a stale single observation.",
+            "deploy_gate だけが exit code を決める。data_gate の fail(fisher/relations/corr)は "
+            "該当 domain を degraded にするのみで配信は止めない（UI が該当タブを警告表示）。",
+            "us_rates/jgb/fred_daily lag is proxied by meta.updated_at (pipeline run date).",
             "boj_assets and imm use real per-series dates.",
         ],
     }
@@ -301,9 +325,13 @@ def main():
     with open(OUT, "w", encoding="utf-8") as f:
         json.dump(rep, f, ensure_ascii=False, indent=2)
     print(json.dumps(rep, ensure_ascii=False, indent=2))
-    print(f"\nhealth_gate: {rep['status']}  fails={rep['fails']}  "
+    dg = rep.get("deploy_gate", {})
+    da = rep.get("data_gate", {})
+    print(f"\nhealth_gate: deploy_gate={dg.get('status')} (fails={dg.get('fails')}) | "
+          f"data_gate={da.get('status')} (degraded={da.get('degraded_domains')}) | "
           f"warns={rep['warns']}  → {OUT}")
-    return 1 if rep["status"] == "FAIL" else 0
+    # exit code は deploy_gate だけで決める。data_gate の degraded は配信を止めない。
+    return 1 if dg.get("status") == "FAIL" else 0
 
 
 if __name__ == "__main__":

@@ -1448,3 +1448,75 @@ pixel-reference 辞書の「不明 N 件」と同方針で、欠損を隠さず�
 
 - レート制限/タイムアウトは主因ではない（`meta.elapsed_sec≈104s` でバッチは完走。欠損は
   上記 subset/廃止が主で、timeout 起因ではない）。データ源側(1,3) と定義側(2) の別を上表に明記。
+
+## 19. v7.0 — universe 根治・ゲート分離・サイレント fallback 禁止（2026-07-30）
+
+### サイレント fallback の禁止（最優先）
+
+外部取得が fallback に落ちたら **必ず記録し可視化**する。気付かない fallback を構造的に不能にする:
+- `record_fallback(source, reason, http_status, fallback_size)` が `meta.fallbacks[]` に追記し、
+  `FALLBACK_USED: ...` をログ出力する。
+- UI は `meta.fallbacks` があれば「⚠ 代替データ使用中: …」を全タブ上部に常時表示。
+- 契約テスト `test_sp500_fallback_recorded_not_silent` が「構成 < 400 なら必ず記録」を強制。
+
+### 403 の根治（S&P500 を 500 に戻す）
+
+- 原因: `pd.read_html(url)` が **User-Agent を送らず** Wikipedia に 403 で弾かれ、102 銘柄の
+  内蔵 fallback へ静かに落ちていた。
+- 対策: **requests に browser UA を付けて取得**し、その HTML を `read_html` に渡す。さらに
+  **2 系統**（Wikipedia UA → datahub constituents CSV）にし、両方失敗時のみ記録付き fallback。
+  実測: **503 銘柄**取得（fallback 0 件）。
+
+### HTTP 取得の横断監査（同種問題）
+
+本リポジトリの全 HTTP 取得を UA 欠落 / HEAD 依存 / リダイレクト非追従で監査。**同種 2 件**を是正:
+1. `tools/pull_live_base.py` の `urlretrieve` が **UA 欠落**（自 Pages ゆえ低リスクだが一貫性のため
+   明示 UA の Request に変更）。
+2. `tools/check_links.py` が **HEAD 依存**（GET fallback が 403/405 限定で、404 を返す生存リンクを
+   dead 誤判定＝pixel-reference の support.google.com と同 class）。**HEAD が 2xx/3xx でなければ
+   必ず GET 再確認**するよう是正。
+- requests/urllib はリダイレクトを既定追従するため該当なし。root 原因(pd.read_html UA)含め計 3 箇所。
+- check_links は equity 構成銘柄の Yahoo quote(同型・数百件)をサンプル検査に変更（残数を
+  `equity_constituent_links_skipped` とログに明示・サイレント truncation はしない）。
+
+### 日経225 / Nasdaq100（source_mode で可視化）
+
+- `meta.universe[tab].source_mode`: sp500=`dynamic`、dow30=`curated_full`(30/30)、
+  nikkei225/nasdaq100=`curated_subset`。**無料でパース可能な full-membership 動的源が未確認**
+  （英語/日本語 Wikipedia とも構成テーブルが navbox で機械抽出不可）。subset である事実は
+  `capture_pct`・タブ名の実数併記・UI バッジで**可視化**（サイレントでない）。動的化は源が
+  見つかり次第。
+- **上場廃止/入替を黙って減らさない**: `meta.universe[tab].fetch_failures` に定義済みだが取得
+  できなかった銘柄を列挙（例 9613.T / ANSS）。
+
+### ラベル整合（母集団を偽らない）
+
+- **取得率 100% でない equity タブ名に実数を併記**する（例「S&P 500（142/225）」）。
+  「S&P 500」の名称で 500 未満の集合を表示する状態を残さない。UI が `meta.universe` から生成。
+- **原則: ラベルは実際の母集団を偽ってはならない。** 母数未達は名称・バッジ・count/target で明示する。
+
+### health_gate のゲート分離（deploy_gate / data_gate）
+
+無関係なコード変更のデプロイをマクロ指標異常が止めていた問題を分離:
+- **deploy_gate**（exit code を左右・配信可否）: 構造欠落 / equity ready < 90% / 鮮度 lag。
+  ＝payload 自体の破損。
+- **data_gate**（配信を止めない・domain 単位）: `macro_fisher` / `relations_series` / `corr_align`。
+  NG なら該当 `domain` を degraded にし health.json の `data_gate.degraded_domains` に記録するのみ。
+- `health_gate` の exit code は **deploy_gate だけ**で決まる。data_gate の fail はコード/UI/他タブの
+  反映を止めない。
+- **fisher NG 時は「前回good値を維持」**: `build_macro_v2` が自分の fisher gap>0.05 を検知したら、
+  異常な macro を公開せず**ライブから last-good macro_v2 を取得して再公開**（`last_good_retained`
+  注記付き）。これで health_gate/contract test は通り、universe/コード変更は即反映、マクロ層のみ
+  前回値＋警告になる。**しきい値 0.05 は緩和しない**（対症療法回避）。last-good も取得不能な稀な
+  場合のみ現行を公開し data_gate が degraded を記録（deploy は分離済で継続）。
+
+### NaN 計測（計測のみ・修正しない）
+
+- `meta.nan_report[tab] = {constituents, price_null, chart_unavailable}`。構成銘柄で price=None
+  または chart 不能（NaN 劣化含む）の件数を記録。銘柄件数問題と NaN 劣化は別問題として分離計測。
+
+### 契約テスト（+4・計 291）
+
+`test_meta_fallbacks_is_recorded_list` / `test_sp500_fallback_recorded_not_silent` /
+`test_meta_universe_has_source_mode_and_failures` / `test_meta_nan_report_present`。
+既存 287 は不変。

@@ -621,6 +621,7 @@ tbody tr.mrow-normal:hover{opacity:1}
     <button class="tab" data-tab="relations" onclick="sw('relations',this)">利回り×株価</button>
     <button class="tab" data-tab="moneyflow" onclick="sw('moneyflow',this)">お金の流れ</button>
   </div>
+  <div id="data-notice" style="display:none;padding:6px 16px 0"></div>
   <div id="toolbar">
     <div id="srch-wrap">
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -935,6 +936,8 @@ function init(){
   document.getElementById("upd-at").textContent="Updated: "+(DATA.meta?.updated_at_str||"—");
   document.getElementById("nxt-upd").textContent="Next: "+(DATA.meta?.next_update_str||"—");
   renderSum();
+  updateTabLabels();
+  renderDataNotice();
   document.getElementById("loading").style.display="none";
   document.getElementById("header").style.display="flex";
   document.getElementById("sum-bar").style.display="flex";
@@ -945,6 +948,35 @@ function init(){
   // v4.2 Phase 1: SURVIVAL is the default tab — first thing the user sees.
   sw("survival", document.querySelector(".tab.active"));
 }
+
+// ラベル整合: 取得率100%でない equity タブ名に実数を併記（「S&P 500（102/500）」）。
+// 「S&P 500」の名称で500未満の集合を表示している状態を残さない（母集団を偽らない）。
+const TAB_BASE_LABEL={nikkei225:"日経 225",dow30:"Dow 30",nasdaq100:"Nasdaq 100",sp500:"S&P 500"};
+function updateTabLabels(){
+  const uni=(DATA.meta&&DATA.meta.universe)||{};
+  for(const t in TAB_BASE_LABEL){
+    const btn=document.querySelector(`.tab[data-tab="${t}"]`); if(!btn) continue;
+    const rec=uni[t]; let label=TAB_BASE_LABEL[t];
+    if(rec&&typeof rec.count==="number"&&typeof rec.target==="number"&&rec.count<rec.target){
+      label+=`（${rec.count}/${rec.target}）`;
+      btn.style.color="#e5a23d";   // 母数が満たない＝注意色
+    }
+    btn.textContent=label;
+  }
+}
+
+// サイレント fallback 禁止(UI側): fallback 発動時に「代替データ使用中」を明示。
+function renderDataNotice(){
+  const el=document.getElementById("data-notice"); if(!el) return;
+  const fbs=(DATA.meta&&DATA.meta.fallbacks)||[];
+  if(!fbs.length){ el.style.display="none"; return; }
+  const items=fbs.map(f=>`${esc2(f.source)}（${esc2(f.reason)}${f.fallback_size!=null?` / ${f.fallback_size}件`:""}）`).join(" ・ ");
+  el.style.display="block";
+  el.innerHTML=`<span style="display:inline-block;padding:4px 10px;border-radius:4px;font-size:12px;`
+    +`background:rgba(229,72,77,0.12);color:#e5484d;border:1px solid #e5484d">`
+    +`⚠ 代替データ使用中: ${items}</span>`;
+}
+function esc2(s){return String(s==null?"":s).replace(/[&<>]/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[m]));}
 
 // ══ Summary bar ════════════════════════════════════
 const MKT_LBL={nikkei225:"日経 225",dow30:"Dow 30",nasdaq100:"Nasdaq 100",sp500:"S&P 500",fx:"FX"};

@@ -552,3 +552,64 @@ def test_meta_universe_recorded_and_consistent():
         if rec.get("target") != EQUITY_TARGET_COUNTS[tab]:
             bad.append(f"{tab}: universe.target={rec.get('target')} != {EQUITY_TARGET_COUNTS[tab]}")
     assert not bad, f"meta.universe が実体/目標と不整合: {bad}"
+
+
+# ─────────────────── サイレント fallback 禁止 / ユニバース健全性 ───────────────────
+def test_meta_fallbacks_is_recorded_list():
+    """meta.fallbacks が存在し list である（fallback を静かに使わない土台）。
+
+    0 件なら健全。発動時は {source, reason, ...} を持つ。
+    """
+    data = _load("data.json")
+    fbs = (data.get("meta") or {}).get("fallbacks")
+    assert isinstance(fbs, list), "meta.fallbacks は list であるべき（サイレント fallback 禁止の記録先）"
+    for f in fbs:
+        assert f.get("source") and f.get("reason"), f"fallback 記録に source/reason が無い: {f}"
+
+
+def test_sp500_fallback_recorded_not_silent():
+    """S&P500 が full を取れない(構成 < 400)とき、必ず meta.fallbacks に記録される。
+
+    静かに 102 fallback へ落ちる状態を禁止する。403 根治が効いていれば構成 >= 400 で
+    fallback 0 件。全ソース障害時のみ fallback だが、その時は必ず記録されること。
+    """
+    data = _load("data.json")
+    meta = data.get("meta") or {}
+    cnt = (meta.get("universe") or {}).get("sp500", {}).get("count", 0)
+    if cnt < 400:
+        rec = [f for f in (meta.get("fallbacks") or [])
+               if "sp500" in str(f.get("source", ""))]
+        assert rec, (
+            f"sp500 構成 {cnt} < 400 なのに meta.fallbacks に sp500 記録が無い（サイレント fallback）"
+        )
+
+
+def test_meta_universe_has_source_mode_and_failures():
+    """meta.universe の各 equity タブが source_mode と fetch_failures を持つ。
+
+    上場廃止/入替を黙って件数だけ減らさない（fetch_failures に列挙）。
+    """
+    data = _load("data.json")
+    uni = (data.get("meta") or {}).get("universe") or {}
+    valid_modes = {"dynamic", "curated_full", "curated_subset"}
+    bad = []
+    for tab in EQUITY_TABS:
+        rec = uni.get(tab) or {}
+        if rec.get("source_mode") not in valid_modes:
+            bad.append(f"{tab}: source_mode={rec.get('source_mode')!r}")
+        if not isinstance(rec.get("fetch_failures"), list):
+            bad.append(f"{tab}: fetch_failures が list でない")
+    assert not bad, f"meta.universe の source_mode/fetch_failures 不備: {bad}"
+
+
+def test_meta_nan_report_present():
+    """meta.nan_report が 4 equity タブ分あり、件数フィールドを持つ（計測の記録）。"""
+    data = _load("data.json")
+    nan = (data.get("meta") or {}).get("nan_report") or {}
+    assert set(nan.keys()) == set(EQUITY_TABS), (
+        f"meta.nan_report は 4 equity タブを持つべき（実際: {sorted(nan.keys())}）"
+    )
+    for tab in EQUITY_TABS:
+        rec = nan.get(tab) or {}
+        for k in ("constituents", "price_null", "chart_unavailable"):
+            assert isinstance(rec.get(k), int), f"nan_report.{tab}.{k} が int でない"

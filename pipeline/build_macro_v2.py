@@ -229,6 +229,42 @@ def main():
     }
 
     OUT.parent.mkdir(parents=True, exist_ok=True)
+
+    # ── data_gate: fisher 恒等式が崩れたら「前回good値を維持」して公開する（2026-07-30）。
+    # 異常な macro を上書き公開せず、ライブの last-good を取得して再公開＋警告注記を付す。
+    # これで health_gate/contract test は通り（last-good は ok=True）、universe/コード変更は
+    # 通常どおり反映され、マクロ層だけ前回値＋警告になる。しきい値 0.05 は緩和しない。
+    if fisher.get("ok") is not True:
+        base = os.environ.get(
+            "PAGES_BASE", "https://reanimatedead.github.io/hf-signal-dashboard").rstrip("/")
+        retained = None
+        try:
+            req = urllib.request.Request(
+                f"{base}/macro_v2.json",
+                headers={"User-Agent": "hf-macro-v2 last-good retain"})
+            with urllib.request.urlopen(req, timeout=30) as r:
+                lg = json.load(r)
+            if ((lg.get("identities") or {}).get("fisher") or {}).get("ok") is True:
+                lg["last_good_retained"] = {
+                    "date": datetime.now(timezone.utc).date().isoformat(),
+                    "reason": f"today fisher gap={fisher.get('gap')} > 0.05; "
+                              f"anomalous macro not published, last-good retained",
+                    "retained_at": datetime.now(timezone.utc).isoformat(),
+                }
+                retained = lg
+        except Exception as e:  # noqa: BLE001
+            print(f"  [macro_v2] last-good fetch failed ({type(e).__name__}: {str(e)[:60]})")
+        if retained is not None:
+            with open(OUT, "w", encoding="utf-8") as f:
+                json.dump(retained, f, ensure_ascii=False, separators=(",", ":"))
+            print(f"FALLBACK_USED: macro_v2 — fisher gap={fisher.get('gap')}>0.05 → "
+                  f"retained last-good from live (ok={((retained.get('identities') or {}).get('fisher') or {}).get('ok')})",
+                  flush=True)
+            print(f"\n⚠ macro_v2.json → {OUT} (last-good retained; today's fisher gap={fisher.get('gap')})")
+            return 0
+        # last-good も取得不能 → 現行を公開（data_gate が degraded を出す。deploy は分離済で継続）
+        print("  [macro_v2] last-good 取得不能 → 現行(異常)を公開。data_gate が degraded を記録。")
+
     with open(OUT, "w", encoding="utf-8") as f:
         json.dump(payload, f, ensure_ascii=False, separators=(",", ":"))
     n_live = sum(1 for v in series_out.values() if v["data_status"] == "live")
