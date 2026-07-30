@@ -1479,13 +1479,26 @@ pixel-reference 辞書の「不明 N 件」と同方針で、欠損を隠さず�
 - check_links は equity 構成銘柄の Yahoo quote(同型・数百件)をサンプル検査に変更（残数を
   `equity_constituent_links_skipped` とログに明示・サイレント truncation はしない）。
 
-### 日経225 / Nasdaq100（source_mode で可視化）
+### 日経225 — 動的化はしない（権利上の制約による**恒久的な設計判断**・確定 2026-07-31）
 
-- `meta.universe[tab].source_mode`: sp500=`dynamic`、dow30=`curated_full`(30/30)、
-  nikkei225/nasdaq100=`curated_subset`。**無料でパース可能な full-membership 動的源が未確認**
-  （英語/日本語 Wikipedia とも構成テーブルが navbox で機械抽出不可）。subset である事実は
-  `capture_pct`・タブ名の実数併記・UI バッジで**可視化**（サイレントでない）。動的化は源が
-  見つかり次第。
+- `meta.universe.nikkei225.source_mode = curated_subset` を**恒久の設計**とする。これは
+  「宿題（源が見つかり次第動的化）」ではない。**確定済みの判断**である（オーナー記録
+  2026-07-31: 「宿題として残すと半年後に誰かが掘り返すため設計判断として確定」）。
+- 根拠は**技術ではなく権利**: 日本経済新聞社は日経平均株価（日経225）の**知的財産権を
+  保有**し、指数データ（構成銘柄・構成比を含む）を入力とした**機械処理・再利用には所定の
+  手続き（ライセンス）が必要**と案内している。構成テーブルが技術的にパース不能なのでは
+  なく、無許諾での機械取得・再配信を**設計として行わない**という判断である。
+- したがって本リポジトリでは curated 辞書（部分集合）を維持し、subset である事実は
+  `capture_pct`・タブ名の実数併記・UI バッジで**可視化**する（サイレントでない）。
+  この節を「TODO」として再解釈してはならない。再訪条件は「日経新聞社が無償かつ
+  機械可読な再利用許諾を公式に提供した場合」のみ。
+
+### Nasdaq100 — 費用対効果により**保留**（日経225 とは性質が異なる・別項目）
+
+- `meta.universe.nasdaq100.source_mode = curated_subset`（90/100・被覆90%）。欠損10銘柄の
+  full 化は**費用対効果により保留**。権利上の禁止（日経225）とは**性質が異なる**:
+  技術・権利とも決定的な障害は確認されておらず、単に欠損10銘柄を埋める便益が
+  実装・保守コストに見合わないための**保留**である（禁止ではない・再訪可）。
 - **上場廃止/入替を黙って減らさない**: `meta.universe[tab].fetch_failures` に定義済みだが取得
   できなかった銘柄を列挙（例 9613.T / ANSS）。
 
@@ -1520,3 +1533,63 @@ pixel-reference 辞書の「不明 N 件」と同方針で、欠損を隠さず�
 `test_meta_fallbacks_is_recorded_list` / `test_sp500_fallback_recorded_not_silent` /
 `test_meta_universe_has_source_mode_and_failures` / `test_meta_nan_report_present`。
 既存 287 は不変。
+
+## 20. v7.1 — S&P500 件数の正・payload_size 実測・初回ロード契約（2026-07-31）
+
+### S&P500 件数の**正とする数字**（503 は正常であり異常ではない）
+
+三つの数字は**別物**であり、混同がズレに見えていただけである（バグではない）:
+
+| 数字 | 意味 | 正とする定義 |
+|---|---|---|
+| **503** | `meta.universe.sp500.count` | **構成銘柄数（^GSPC proxy 除外）。これが母集団の正。** |
+| 504 | `markets.sp500` の行数（`meta.counts.sp500`） | 構成銘柄 503 ＋ pin される `^GSPC` index proxy 1 行 |
+| 502 | `verify_live` の `502/504` の分子 | `chart_status=ready` の**行数**（分母は proxy 込み 504） |
+
+- **S&P500 は「500 社」の指数だが、複数議決権株（dual/multi share class）の複数クラス採用に
+  より構成「銘柄」数は 500 を超える。** 2026-07-31 実測の 503 = 500 社 ＋ 追加クラス 3
+  （GOOGL/GOOG＝Alphabet、FOX/FOXA＝Fox、NWS/NWSA＝News Corp。Berkshire は BRK-B のみ
+  採用のため +1 にならない）。**503 は正常**。S&P DJI の入替で 502〜505 程度に変動しうる。
+  500 への丸め・切り詰めは §19「ラベル整合（母集団を偽らない）」違反であり**禁止**。
+- `capture_pct` が 100% を超える（例 100.6%）のは target=500 を「社数」の名目値として
+  据え置いているため。**count > target は異常検知の対象にしない**（下限テストのみ）。
+
+### 502/504 の経路（ready 差分の原因・実測 2026-07-31）
+
+- 504 − 502 = 2 の不足は **FDXF（FedEx Freight）と HONA（Honeywell Aerospace）**。いずれも
+  スピンオフ直後の新規上場で、**quote（現在値）は取得済み**（price あり・行は存在する）だが
+  **Yahoo に 2y 日足履歴が無い**ため `chart_status=unavailable`（`no 2y daily data`）。
+- 原因分類は**取得タイミング差**（指数構成リストの更新が価格履歴の蓄積より先行する）で
+  あり、重複排除・欠落バグではない。履歴が溜まれば自然に ready へ回復するため**修正しない**
+  （ready 率ゲート 90% は 502/504=99.6% で余裕）。銘柄自体の欠落（fetch_failures）とは別物。
+- **市場営業状態と独立**: `meta.universe` の count/target は**指数構成リスト（membership）**由来で
+  あり、当該市場の休場・取引時間帯に**依存しない**（休場日でも 2y 日足履歴・構成リストは取得
+  できる）。よって取得率バッジと件数下限テストは日本の祝日等で赤くならない。逆に、今後
+  「ライブ quote の取得成否」に基づく判定・テストを足す場合は、休場中のカテゴリを欠測でなく
+  market_closed として分母から外すこと。**固定閾値で休場を「取得失敗」に見せる契約テストは禁止**
+  （2026-07-31 オーナー指示）。
+
+### 遅延ロードと初回ロード契約（実測 2026-07-31）
+
+- **配信レイアウト（v6.0 で分割済・確認）**: 初回ロードは `index.html` ＋ `data.json` のみ。
+  `charts/{tab}.json` は行展開時に `loadCharts(tab)` が fetch する遅延ロードで、初回には
+  含まれない。タブ切替自体は data.json 内の行データで描画される（追加 fetch なし）。
+- **実測**: 初回 595,437 B（index.html 165,937 ＋ data.json 429,500）＝ **1 MiB 目標達成**。
+  全体（初回＋charts 9 ファイル）12,670,637 B。経路上は GitHub Pages の自動 gzip が効き
+  実転送は初回 ≈118 KB（index.html gz 49,224 ＋ data.json gz ≈69,000）。
+- **meta.payload_size = {initial_bytes, total_bytes}**: 生成時に**実測**で記録
+  （`fetch_signals.record_payload_size`。data.json 自身のサイズを含むため不動点まで再書き込み）。
+  `build_corr` の correlations マージ後・`tools/split_payload.py` でも再実測される。
+- **契約テスト（`tests/test_payload_budget.py`・+4 で計 295）**: 初回ロード実測合計 >
+  **2 MiB で FAIL**／charts の data.json インライン復帰で FAIL／payload_size の欠落・実測との
+  5% 超乖離で FAIL。1 MiB は目標（未達は FAIL にせず実測値を必ず表示）。
+- **事前圧縮（.json.gz / .br）は採用しない**: GitHub Pages は text/json を CDN で自動 gzip
+  配信する。自前 .gz は Content-Encoding が付かず JS 側で DecompressionStream 解凍が必要に
+  なり、得られる差分（brotli 相当でも 2 割弱）に対して複雑さが見合わない。
+
+### 配信方式（確認・変更なし）
+
+- Pages は **`build_type=workflow`**（`gh api repos/{owner}/{repo}/pages` で 2026-07-31 実測確認）。
+  deploy.yml が `actions/upload-pages-artifact@v5` → `actions/deploy-pages@v5` で配信し、
+  毎回 `actions/configure-pages@v6` が build_type=workflow を再固定する（§11 v6.2 のまま）。
+  生成物は git 非追跡（.gitignore 済）。移行作業は不要であった。
