@@ -112,6 +112,16 @@ def main():
             if tot and pct < READY_MIN:
                 fails.append(f"equity ready {pct:.1f}% < {READY_MIN}%")
 
+            # 件数の意味を混同させない（DATA_CONTRACT §20）: 上の "r/len(rows)" は
+            # ready 数 / 行数（^index proxy 込み）。構成銘柄数の正は meta.universe。
+            # S&P500 は複数株式クラス（GOOGL/GOOG・FOX/FOXA・NWS/NWSA）で 500 社 >500
+            # 銘柄になるため count=503 は正常（異常ではない）。表示のみ・判定は不変。
+            sp = ((d.get("meta") or {}).get("universe") or {}).get("sp500") or {}
+            if sp:
+                lines.append(f"  sp500 universe  count={sp.get('count')}"
+                             f"/target={sp.get('target')} (構成銘柄のみ・^GSPC除外; "
+                             f"複数株式クラスにより >500 は正常)")
+
     # 3) 派生層の到達性
     for extra in ("relations.json", "gamma.json", "macro_v2.json"):
         st, _, err = _get(extra)

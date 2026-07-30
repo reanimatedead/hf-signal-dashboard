@@ -406,8 +406,19 @@ def merge_into_data_json(correlations: dict, sink_metrics_by_region: Dict[str, d
         print(f"  money_flow.{r} 既存キー保全: {'OK' if ok else 'NG'} ({sorted(keys)} ⊆ {sorted(after_keys)})")
 
     if not dry_run:
-        with open(DATA_JSON, "w", encoding="utf-8") as fh:
-            json.dump(data, fh, ensure_ascii=False, separators=(",", ":"))
+        # v7.1: correlations マージで data.json のサイズが変わるため meta.payload_size を
+        # 再実測してから確定書き込み（record_payload_size が書き込みまで行う）。
+        # import 失敗（依存欠落等）でもマージは失わない: 従来書き込みへ degrade（記録付き）。
+        try:
+            sys.path.insert(0, str(ROOT))
+            from fetch_signals import record_payload_size
+            ps = record_payload_size(data, ROOT / "docs")
+            print(f"  meta.payload_size 再実測: initial={ps['initial_bytes']:,} B "
+                  f"/ total={ps['total_bytes']:,} B")
+        except Exception as exc:  # noqa: BLE001
+            print(f"  payload_size 再実測スキップ ({type(exc).__name__}: {exc}) — 従来書き込み")
+            with open(DATA_JSON, "w", encoding="utf-8") as fh:
+                json.dump(data, fh, ensure_ascii=False, separators=(",", ":"))
 
     return data
 

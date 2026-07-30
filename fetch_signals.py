@@ -2801,6 +2801,35 @@ def split_chart_payload(payload, out_dir=OUTPUT_DIR):
     return written
 
 
+def record_payload_size(payload, out_dir=OUTPUT_DIR):
+    """meta.payload_size = {initial_bytes, total_bytes} を**実測**で記録し data.json を書く（v7.1）。
+
+    - initial_bytes = docs/index.html + docs/data.json（ブラウザ初回ロードで取得する同一
+      オリジンのファイルはこの2つだけ。charts/{tab}.json は行展開時の遅延 fetch で初回に
+      含まれない — index.html の loadCharts 参照）。
+    - total_bytes   = initial_bytes + docs/charts/*.json 全ファイル。
+    - data.json は自分自身のサイズを meta に含むため、書き込み→実測→再書き込みを値が
+      不動点に達するまで反復する（桁数変動のみなので実質2回で収束）。
+    契約: 初回ロード > 2 MiB は tests/test_payload_budget.py が FAIL させる。
+    """
+    out_dir = Path(out_dir)
+    out_file = out_dir / "data.json"
+    meta = payload.setdefault("meta", {})
+    for _ in range(5):
+        with open(out_file, "w", encoding="utf-8") as f:
+            json.dump(payload, f, ensure_ascii=False, separators=(",", ":"))
+        idx = out_dir / "index.html"
+        initial = out_file.stat().st_size + (idx.stat().st_size if idx.exists() else 0)
+        charts = sum(p.stat().st_size
+                     for p in sorted((out_dir / "charts").glob("*.json"))) \
+            if (out_dir / "charts").is_dir() else 0
+        rec = {"initial_bytes": initial, "total_bytes": initial + charts}
+        if meta.get("payload_size") == rec:
+            break
+        meta["payload_size"] = rec
+    return meta["payload_size"]
+
+
 def main():
     t0      = time.time()
     now_jst = datetime.now(JST)
@@ -2973,13 +3002,15 @@ def main():
     # v6.0 — split charts out to docs/charts/{tab}.json, keep only chart_status.
     chart_bytes = split_chart_payload(payload, OUTPUT_DIR)
 
-    with open(OUTPUT_FILE, "w", encoding="utf-8") as f:
-        json.dump(payload, f, ensure_ascii=False, separators=(",", ":"))
+    # v7.1: meta.payload_size を実測で埋めつつ data.json を確定書き込み。
+    ps = record_payload_size(payload, OUTPUT_DIR)
 
     kb = OUTPUT_FILE.stat().st_size / 1024
     charts_kb = sum(chart_bytes.values()) / 1024
     print(f"\n✅ data.json → {OUTPUT_FILE} ({kb:.1f} KB, {time.time()-t0:.0f}s)")
     print(f"✅ charts/   → {len(chart_bytes)} tabs, {charts_kb:.1f} KB total")
+    print(f"✅ payload_size: initial={ps['initial_bytes']:,} B / total={ps['total_bytes']:,} B "
+          f"(初回ロード契約 < 2 MiB, 目標 < 1 MiB)")
 
 if __name__ == "__main__":
     main()
