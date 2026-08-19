@@ -34,6 +34,20 @@ BASE = (sys.argv[1] if len(sys.argv) > 1 else DEFAULT_BASE).rstrip("/")
 
 STALE_H = float(os.environ.get("VERIFY_STALE_HOURS", "48"))
 READY_MIN = float(os.environ.get("VERIFY_READY_MIN", "90"))
+# しきい値の正本は tools/gate_thresholds.py。ここは互換のため env→デフォルト
+# の従来経路を残しつつ、CI で gate_thresholds を上書きしていない事を確認する
+# ためのクロスチェック（値が乖離していれば運用ミス）。
+try:
+    from gate_thresholds import STALE_HOURS as _CANON_STALE_H  # type: ignore
+    from gate_thresholds import READY_MIN_PCT as _CANON_READY_MIN  # type: ignore
+    if abs(STALE_H - _CANON_STALE_H) > 1e-9 or abs(READY_MIN - _CANON_READY_MIN) > 1e-9:
+        print(
+            f"verify_live: WARN threshold mismatch verify_live=({STALE_H},{READY_MIN}) "
+            f"gate_thresholds=({_CANON_STALE_H},{_CANON_READY_MIN})",
+            file=sys.stderr,
+        )
+except Exception:  # noqa: BLE001
+    pass
 EQUITY_TABS = ("nikkei225", "dow30", "nasdaq100", "sp500")
 UA = {"User-Agent": "hf-signal-dashboard verify_live (synthetic monitor)"}
 TIMEOUT = 20

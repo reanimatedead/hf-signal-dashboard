@@ -14,6 +14,8 @@ on:
 
 permissions:
   contents: write
+  # 2026-08-19 追加: 失敗時 Issue 自動起票のため（同型盲点の横展開修正）。
+  issues: write
 
 jobs:
   collect:
@@ -93,3 +95,20 @@ jobs:
           done
           echo "::error::Push failed after 3 retries"
           exit 1
+
+      # 2026-08-19 追加: collect ジョブ失敗時の自動 Issue 起票（同型盲点の横展開）。
+      # deploy.yml / monitor.yml と対称。同題の open Issue があればコメント追加。
+      - name: Open issue on failure (collect)
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TITLE="🔴 collect.yml: 週末 autocollect が失敗"
+          EXISTING=$(gh issue list --state open --search "$TITLE in:title" --json number -q '.[0].number' || true)
+          BODY="collect.yml run が失敗。run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}。data/history / collect_log の更新が止まっている可能性。"
+          if [ -z "$EXISTING" ]; then
+            gh issue create --title "$TITLE" --body "$BODY" --label monitor 2>/dev/null \
+              || gh issue create --title "$TITLE" --body "$BODY"
+          else
+            gh issue comment "$EXISTING" --body "$BODY"
+          fi

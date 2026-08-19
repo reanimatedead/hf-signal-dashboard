@@ -30,11 +30,23 @@ permissions:
   contents: read
   pages: write
   id-token: write
+  # 2026-08-19 追加: 失敗時に自動 Issue 起票するため（`Open issue on failure`
+  # ステップで gh CLI を使う）。読取専用の contents と併存。
+  issues: write
 
-# One live Pages deployment at a time; never cancel an in-flight deploy.
+# One live Pages deployment at a time.
+# 2026-08-19 変更: cancel-in-progress を false → true に反転。
+# 経緯: 2026-08-11 16:00Z の full run が GitHub 側都合で 8 日間 queued の
+# まま滞留し、以後の全 scheduled run が同 concurrency group で cancelled
+# 扱いになり、data.json が 213h 古いまま配信され続けた（Issue #4）。
+# false は "in-flight を殺さない" 意図だったが、queued 詰まりが起きた瞬間
+# 復旧が全て人手ゲート待ちになる。true にすることで次の schedule が詰まった
+# 前段を強制上書きしてパイプラインが自己回復する。deploy は数分で終わり、
+# schedule 間隔(最短でも 3.5h)より十分短いため正常運用中の意図せぬ cancel は
+# 起きない。
 concurrency:
   group: "pages"
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   # ── FULL: 00:00 JST daily (or manual `job=full`) ──────────────────────────
@@ -107,6 +119,12 @@ jobs:
       - name: Health gate
         run: python3 tools/health_gate.py
 
+      # 2026-08-19 追加: 生成直後の freshness<48h & completeness>=90% 二条件
+      # ハード assert。しきい値は tools/gate_thresholds.py。probe(verify_live)
+      # は外形監視で 2h 遅延あり、生成ジョブ内で自壊させる方が発覚が早い。
+      - name: Assert generated payload health (freshness + completeness)
+        run: PYTHONPATH=tools python3 tools/assert_gen_health.py
+
       - name: Contract tests
         run: python3 -m pytest tests/ -q
 
@@ -123,6 +141,24 @@ jobs:
       - name: Deploy to Pages
         id: deploy
         uses: actions/deploy-pages@v5
+
+      # 2026-08-19 追加: full ジョブ失敗時の自動 Issue 起票。
+      # monitor.yml の外形検知は 2h 間隔で遅延するため、更新ジョブ自身が
+      # 失敗した瞬間に通知する。同題 open Issue があればコメント追加のみ。
+      - name: Open issue on failure (full)
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TITLE="🔴 deploy.yml full: 更新ジョブが失敗"
+          EXISTING=$(gh issue list --state open --search "$TITLE in:title" --json number -q '.[0].number' || true)
+          BODY="deploy.yml (full) run が失敗。run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}。data.json が更新されず、外形監視 verify_live が freshness で FAIL になる前段。ログを確認してください。"
+          if [ -z "$EXISTING" ]; then
+            gh issue create --title "$TITLE" --body "$BODY" --label monitor 2>/dev/null \
+              || gh issue create --title "$TITLE" --body "$BODY"
+          else
+            gh issue comment "$EXISTING" --body "$BODY"
+          fi
 
   # ── CORR_REFRESH: 07:30 / 11:00 JST Mon-Fri (or manual `job=corr_refresh`) ─
   corr_refresh:
@@ -174,6 +210,11 @@ jobs:
       - name: Health gate
         run: python3 tools/health_gate.py
 
+      # 2026-08-19 追加: corr_refresh も生成後 assert（freshness は pull_live_base
+      # が持ってきた base の updated_at が 48h 以内である事を再確認する意味）。
+      - name: Assert generated payload health (freshness + completeness)
+        run: PYTHONPATH=tools python3 tools/assert_gen_health.py
+
       - name: Contract tests
         run: python3 -m pytest tests/ -q
 
@@ -185,3 +226,19 @@ jobs:
       - name: Deploy to Pages
         id: deploy
         uses: actions/deploy-pages@v5
+
+      # 2026-08-19 追加: corr_refresh 失敗時の自動 Issue 起票。
+      - name: Open issue on failure (corr_refresh)
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TITLE="🔴 deploy.yml corr_refresh: 相関パネル更新が失敗"
+          EXISTING=$(gh issue list --state open --search "$TITLE in:title" --json number -q '.[0].number' || true)
+          BODY="deploy.yml (corr_refresh) run が失敗。run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}。相関パネル/被覆低下の疑い。"
+          if [ -z "$EXISTING" ]; then
+            gh issue create --title "$TITLE" --body "$BODY" --label monitor 2>/dev/null \
+              || gh issue create --title "$TITLE" --body "$BODY"
+          else
+            gh issue comment "$EXISTING" --body "$BODY"
+          fi
