@@ -152,14 +152,21 @@ NASDAQ100 = {
     "CEG":"Constellation Energy","KHC":"Kraft Heinz","FANG":"Diamondback Energy",
     "VRSK":"Verisk Analytics","MCHP":"Microchip Technology","CPRT":"Copart",
     "XEL":"Xcel Energy","ALGN":"Align Technology","DDOG":"Datadog",
-    "ANSS":"ANSYS","WDAY":"Workday","TMUS":"T-Mobile","MRNA":"Moderna",
+    "WDAY":"Workday","TMUS":"T-Mobile","MRNA":"Moderna",
     "VRTX":"Vertex Pharmaceuticals","ASML":"ASML","LULU":"Lululemon",
     "FSLR":"First Solar","SNOW":"Snowflake","NET":"Cloudflare","TEAM":"Atlassian",
     "DLTR":"Dollar Tree","EBAY":"eBay","PDD":"PDD Holdings",
-    "EA":"Electronic Arts","TTWO":"Take-Two Interactive","SWKS":"Skyworks",
+    "TTWO":"Take-Two Interactive","SWKS":"Skyworks",
     "CTSH":"Cognizant","EXPE":"Expedia","ENPH":"Enphase Energy","ZM":"Zoom Video",
     "BMRN":"BioMarin","AEP":"American Electric Power","CSX":"CSX Corp",
     "HON":"Honeywell","SIRI":"Sirius XM","LCID":"Lucid Group",
+    # 2026-08-20 追加: NASDAQ100 の curated dict 更新。
+    # 除外: "ANSS"(ANSYS, 2026-3Q に SNPS が買収完了→上場廃止),
+    #       "EA"(Electronic Arts, 民営化コンソーシアム買収で上場廃止)。
+    #       2026-08-19 の deploy heal ログで chart_api でも取得不可を実測確認済み。
+    # 追加: 近年 NASDAQ100 に採入された高時価銘柄。curated size を >=91 維持し
+    #       min=90 の buffer を確保する。tickers は Yahoo が返す実在シンボル。
+    "PLTR":"Palantir Technologies","APP":"AppLovin","ARM":"ARM Holdings",
 }
 
 FX_PAIRS = {
