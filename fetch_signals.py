@@ -697,6 +697,24 @@ def process_ticker(df, symbol, name):
 def process_market(symbols_dict, label):
     print(f"\n[{label}] {len(symbols_dict)} symbols…")
     raw = fetch_batch(list(symbols_dict.keys()))
+    # 2026-08-19 追加: バッチで欠落した銘柄を Yahoo chart API 個別取得で回収する。
+    # 経緯: NASDAQ100 の count が 8/11 時点で 90（min=90 ぎりぎり）、8/19 に
+    # 89 まで落ちて test_equity_constituent_count_above_min が FAIL し deploy が
+    # 通らなくなった。バッチ path (yf.download) は個別失敗を握りつぶし、curated
+    # dict の何が失敗しているかも見えない。fetch_chart_api は 429/5xx バックオフ
+    # と query1↔query2 交替を含む既存の per-symbol リカバリで、批量欠落の 1〜2
+    # 銘柄を静かに回収できるならそれで足りる。真に delist された銘柄はここでも
+    # None が返る（ログに残る）ので curated dict の更新指示が明示的になる。
+    missing = [s for s in symbols_dict if s not in raw]
+    if missing:
+        print(f"  [heal] batch missing {len(missing)}: {missing} → chart_api retry")
+        healed = 0
+        for sym in missing:
+            df = fetch_chart_api(sym)
+            if df is not None and len(df) >= 20:
+                raw[sym] = df
+                healed += 1
+        print(f"  [heal] recovered {healed}/{len(missing)} via chart_api")
     results = []
     for sym, df in raw.items():
         results.append(process_ticker(df, sym, symbols_dict.get(sym, sym)))
