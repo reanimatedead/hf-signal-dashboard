@@ -4,9 +4,14 @@ name: Live monitor (synthetic uptime)
 # 落として通知する。CI 内のゲートは生成物を検査するが「Pages に実際に届いたか」
 # は別問題。data.json が 404 のまま復旧しない事故を人間が気づく前に鳴らすのが目的。
 #
-# 通知経路:
-#   1) job 失敗 → GitHub が репо オーナーへメール（既定挙動）
-#   2) failure() ステップが Issue を自動起票（同題の open Issue があれば重複起票しない）
+# 通知経路（M3 で改訂）:
+#   1) job 失敗 → GitHub が repo オーナーへメール（既定挙動）
+#   2) verify_live.py が exit 2 (404/403/410 = ファイル消失) → 単発でも Issue 起票
+#   3) verify_live.py が exit 1 (5xx/接続系リトライ後失敗 / 鮮度切れ等) →
+#      直前の scheduled run も failure だった場合のみ Issue 起票
+#      (単発の 5xx でオオカミ少年にならないため。213h サイレント停止のような
+#       持続的な状態には 1 サイクル = 2h 遅れて必ず気付く)
+#   4) 同題の open Issue が既にあれば重複起票せずコメントを追加する
 
 on:
   workflow_dispatch:
@@ -16,6 +21,7 @@ on:
 permissions:
   contents: read
   issues: write
+  actions: read
 
 concurrency:
   group: "monitor"
@@ -38,20 +44,75 @@ jobs:
 
       - name: Probe live site
         id: probe
-        run: python3 tools/verify_live.py
+        run: |
+          set +e
+          python3 tools/verify_live.py
+          ec=$?
+          echo "exit_code=$ec" >> "$GITHUB_OUTPUT"
+          # 0=OK, 1=soft fail (retry-able / stale), 2=hard fail (404/403/410)
+          exit $ec
 
-      # 失敗時のみ: 同題の open Issue が無ければ起票（メールに加えて追跡可能にする）。
-      - name: Open issue on failure
-        if: failure()
+      # ハード失敗（exit 2）は 1 回で Issue 起票。ファイル消失は待つ理由がない。
+      - name: Open issue immediately on hard failure (exit 2)
+        if: failure() && steps.probe.outputs.exit_code == '2'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           TITLE="🔴 Live monitor: 公開サイトの配信異常"
+          RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
           EXISTING=$(gh issue list --state open --search "$TITLE in:title" --json number -q '.[0].number' || true)
-          BODY="verify_live.py が公開 Pages の異常を検知しました（run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}）。data.json 404 / STALE / ready 率低下のいずれか。ログを確認してください。"
+          BODY="verify_live.py が公開 Pages のハード異常 (exit 2 = 404/403/410 相当) を検知しました。ファイル消失または権限異常。この失敗は単発でも即 Issue します（待っても直らないため）。run: $RUN_URL"
           if [ -z "$EXISTING" ]; then
             gh issue create --title "$TITLE" --body "$BODY" --label monitor 2>/dev/null \
               || gh issue create --title "$TITLE" --body "$BODY"
           else
             gh issue comment "$EXISTING" --body "$BODY"
+          fi
+
+      # ソフト失敗（exit 1）は「直前の scheduled run も failure だった」場合のみ
+      # Issue 起票（N=2 連続で発火）。単発 5xx でオオカミ少年にならない。
+      # 前回状態の永続化方式: GitHub Actions API（gh run list）で直前の同一
+      # workflow の scheduled 実行結果を読む。
+      #   選んだ理由:
+      #     - リポジトリ内に .monitor-state.json を書く方式は
+      #       * 権限 (contents: write) が要る
+      #       * 監視ジョブが履歴を汚す (毎 2h コミット)
+      #       * 同時実行の race
+      #     - Actions cache は key 設計と TTL に依存し、cache miss で誤って
+      #       単発扱いになる
+      #     - GitHub の run 履歴は既に真理値であり、workflow_dispatch と
+      #       schedule を区別できて追加権限も要らない
+      - name: Check previous scheduled run and gate Issue creation (soft failure)
+        if: failure() && steps.probe.outputs.exit_code == '1'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # 直前の SCHEDULED 実行のみ対象にする (workflow_dispatch でのテスト実行が
+          # 誤って「連続失敗」を成立させないため)。この run 自身は除外して 1 件取得。
+          THIS_RUN_ID="${{ github.run_id }}"
+          PREV=$(gh run list \
+                   --workflow "${{ github.workflow }}" \
+                   --event schedule \
+                   --limit 5 \
+                   --json databaseId,conclusion,createdAt \
+                   -q "[.[] | select(.databaseId != ${THIS_RUN_ID})] | .[0]")
+          PREV_ID=$(echo "$PREV" | python3 -c "import sys,json; d=json.load(sys.stdin) if sys.stdin.readable() else None; print(d['databaseId'] if d else '')" 2>/dev/null || true)
+          PREV_CONCL=$(echo "$PREV" | python3 -c "import sys,json; d=json.load(sys.stdin) if sys.stdin.readable() else None; print(d['conclusion'] if d else '')" 2>/dev/null || true)
+          echo "previous scheduled run: id=$PREV_ID conclusion=$PREV_CONCL"
+
+          TITLE="🟡 Live monitor: 公開サイトの一時的失敗が連続"
+          RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+
+          if [ "$PREV_CONCL" = "failure" ]; then
+            EXISTING=$(gh issue list --state open --search "$TITLE in:title" --json number -q '.[0].number' || true)
+            BODY="verify_live.py が exit 1 (5xx リトライ後失敗 / 鮮度切れ / 429 等) を 2 サイクル連続で検知しました。単発の 5xx はリトライで吸収する仕様のため、これは持続的な状態です。213h サイレント停止のような症状の初期兆候の可能性があります。run: $RUN_URL / 直前 run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/$PREV_ID"
+            if [ -z "$EXISTING" ]; then
+              gh issue create --title "$TITLE" --body "$BODY" --label monitor 2>/dev/null \
+                || gh issue create --title "$TITLE" --body "$BODY"
+            else
+              gh issue comment "$EXISTING" --body "$BODY"
+            fi
+          else
+            echo "single soft failure — suppressing Issue creation (previous conclusion was '$PREV_CONCL', not 'failure')"
+            echo "次回 scheduled run も failure なら Issue を起票します。"
           fi
