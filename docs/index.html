@@ -997,7 +997,9 @@ function renderDataNotice(){
   const el=document.getElementById("data-notice"); if(!el) return;
   const fbs=(DATA.meta&&DATA.meta.fallbacks)||[];
   if(!fbs.length){ el.style.display="none"; return; }
-  const items=fbs.map(f=>T("notice.fallback_item",{src:esc2(f.source),reason:esc2(I18.code("fallback_reason",f.reason)),
+  // reason はコード。未知の値（生の例外文など）は画面に出さず「取得エラー」と表示（原文は title にだけ残す）
+  const rsn=r=>I18.has("code.fallback_reason."+r)?esc2(I18.code("fallback_reason",r)):`<span title="${esc2(r).replace(/"/g,"&quot;")}">${T("common.fetch_error")}</span>`;
+  const items=fbs.map(f=>T("notice.fallback_item",{src:esc2(f.source),reason:rsn(f.reason),
     size:f.fallback_size!=null?T("notice.fallback_size",{n:I18.fmtNum(f.fallback_size,0)}):""})).join(T("common.sep_list"));
   el.style.display="block";
   el.innerHTML=`<span style="display:inline-block;padding:4px 10px;border-radius:4px;font-size:12px;`
