@@ -209,9 +209,12 @@
     // "<market>:<chart|composite>:<code>"（旧形式 "<market>: <label>" も読む）
     const p = String(x || "").split(":").map((v) => v.trim());
     if (p.length < 2) return String(x || "");
+    // 1 項目に出す判定の名前は 1 つだけ（チャート判定 か 総合スコア のどちらか）
     const kind = p.length >= 3 ? p[1] : "chart", c = p[p.length - 1];
-    const label = kind === "composite" ? I18.code("signal", c) : sigText(sig(c));
-    return T("vf.weak_item", { market: I18.code("verify_market", I18.norm("verify_market", p[0])), signal: label });
+    const composite = kind === "composite";
+    const label = composite ? I18.code("signal", I18.norm("signal", c)) : sigText(sig(c));
+    return T(composite ? "vf.weak_item_composite" : "vf.weak_item_chart",
+      { market: I18.code("verify_market", I18.norm("verify_market", p[0])), signal: label });
   }
   function renderWeakBanner(t) {
     const el = document.getElementById("weak-banner"); if (!el) return;

@@ -994,7 +994,7 @@ ja: {
   "val.series_tf": "評価系列 (1d)",
   "val.series_title": "評価系列 — バフェット指数 (1d)",
   "vf.base_row": "基準（全営業日）",
-  "vf.existing": "既存 {s}",
+  "vf.existing": "総合スコア {s}",
   "vf.full": "全期間",
   "vf.loading": "verify.json を読み込み中…",
   "vf.market_h": "{label}（{n}銘柄・最終日 {last}）",
@@ -1017,7 +1017,8 @@ ja: {
   "vf.vs_stats": "20日後 中央値 <b>{median}</b>・上昇 <b>{up}%</b>・{n}件（{base}）",
   "vf.vs_unreadable": "検証データなし（verify.json を読めません）",
   "vf.vs_zero": "20日後: この判定の過去例 0件（{base}）",
-  "vf.weak_item": "{market}: {signal}",
+  "vf.weak_item_chart": "{market}のチャート判定「{signal}」",
+  "vf.weak_item_composite": "{market}の総合スコア「{signal}」",
   "vf.weak_mark": "⚠ 弱まり"
 },
 en: {
@@ -2010,7 +2011,7 @@ en: {
   "val.series_tf": "Valuation series (1d)",
   "val.series_title": "Valuation series — Buffett Indicator (1d)",
   "vf.base_row": "Baseline (all trading days)",
-  "vf.existing": "Existing {s}",
+  "vf.existing": "Composite score {s}",
   "vf.full": "Full period",
   "vf.loading": "Loading verify.json…",
   "vf.market_h": "{label} ({n} symbols, last day {last})",
@@ -2033,7 +2034,8 @@ en: {
   "vf.vs_stats": "20d later: median <b>{median}</b>, up <b>{up}%</b>, n={n} ({base})",
   "vf.vs_unreadable": "No verification data (verify.json cannot be read)",
   "vf.vs_zero": "20d later: no past cases of this signal ({base})",
-  "vf.weak_item": "{market}: {signal}",
+  "vf.weak_item_chart": "{market} chart signal “{signal}”",
+  "vf.weak_item_composite": "{market} composite score “{signal}”",
   "vf.weak_mark": "⚠ weakening"
 }
 };
