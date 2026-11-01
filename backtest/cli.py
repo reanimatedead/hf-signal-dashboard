@@ -134,7 +134,7 @@ def run_smoke(seed: int = 42, n_bars: int = 600,
         "n_oos_trades": len(oos_trades),
         "n_is_trades": len(is_trades),
         "summary": pair,
-        "note": "Macro environment visualization / not investment advice. Phase 1.7 smoke.",
+        "note": "disclaimer_macro_viz_smoke",   # Macro environment visualization / not investment advice. Phase 1.7 smoke.
     }
     try:
         PUBLIC_RESULT_PATH.parent.mkdir(parents=True, exist_ok=True)
@@ -294,9 +294,8 @@ def run_local(*, interval: str = "1d",
             "judge": overall_judge["judge"],
             "calibration": overall_pair["out_of_sample"].get("calibration"),
         },
-        "note": "想定精度のみ / This is the system's estimated accuracy, "
-                "not real trading P&L. Macro environment visualization, "
-                "not investment advice. Phase 2 (model training) is not implemented.",
+        # 想定精度のみ / estimated accuracy, not real trading P&L. not investment advice. Phase 2 not implemented.
+        "note": "backtest_estimated_accuracy_not_pnl",
     }
 
     # 詳細結果は data/local に保存 (リポ外)
@@ -545,19 +544,16 @@ def main(argv: Optional[List[str]] = None) -> int:
             "hypothesis": "h1-robustness",
             "jp_symbol": ns.jp_symbol, "us_symbol": ns.us_symbol,
             "source_used": loaded["source_used"],
-            "executable_assumption":
-                "JP open is the 9:00 JST 板寄せ price; ETF (1306/1321) or "
-                "NK225 futures fill at this price. Retail slippage + commission "
-                "captured by 5/10/20 bps round-trip sensitivity.",
+            # JP open is the 9:00 JST 板寄せ price; ETF (1306/1321) or NK225 futures fill at this price.
+            # Retail slippage + commission captured by 5/10/20 bps round-trip sensitivity.
+            "executable_assumption": "jp_open_itayose_fill",
             "segments": {
                 "since_2023": res_since,
                 "pre_2023": res_pre,        # 参照のみ
             },
             "primary_verdict": res_since["verdict"],
-            "note": "H1 open_to_close robustness analysis (Phase 1.9.1). "
-                    "Single-hypothesis raw predictive power tested against costs, "
-                    "outliers, subperiod stability, and fade skewness. "
-                    "Not investment advice. Phase 2 (learning) not implemented.",
+            # H1 open_to_close robustness analysis (Phase 1.9.1). costs / outliers / subperiod / fade. Not advice.
+            "note": "h1_robustness_analysis_note",
         }
         # 詳細は data/local
         try:

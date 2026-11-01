@@ -74,11 +74,10 @@ KEY_PAIRS = [
 ]
 
 SOURCES = ["yfinance", "FRED:fredgraph", "MOF:jgbcm"]
-METHOD_NOTE = (
-    "log-returns (equity/FX) and bp-changes (yields), inner join (no forward fill), "
-    "Pearson rolling 60/20 business days"
-)
-CORR_NOTE = "For data visualization purposes only. Not investment advice."
+# method / note はコード（表示文は UI 辞書）。
+# log-returns (equity/FX) and bp-changes (yields), inner join (no forward fill), Pearson rolling 60/20 business days
+METHOD_NOTE = "corr_method_logret_bp_inner_pearson"
+CORR_NOTE = "disclaimer_data_viz_not_advice"   # For data visualization purposes only. Not investment advice.
 
 # --- sink_metrics 定義: 地域 -> シンク種別 -> (label, ticker) ---
 SINK_SPEC = {
@@ -86,7 +85,8 @@ SINK_SPEC = {
     "eu": {"stocks": ("^STOXX50E", "STOXX50E"), "gold": ("GC=F", "GOLD"), "crypto": ("BTC-USD", "BTC"), "cash": ("EURUSD=X", "EURUSD")},
     "jp": {"stocks": ("^N225", "N225"), "gold": ("GC=F", "GOLD"), "crypto": ("BTC-USD", "BTC"), "cash": ("JPY=X", "USDJPY")},
 }
-SINK_METRICS_NOTE = "Weekly % change of representative series. Particle arrival % is a visual effect, not measured flow."
+# Weekly % change of representative series. Particle arrival % is a visual effect, not measured flow.
+SINK_METRICS_NOTE = "sink_metrics_visual_effect_note"
 
 
 # yfinance 由来の内部ラベル (未確定バー除外の対象。FRED/MOF/ECB は公表ラグがあり
@@ -310,9 +310,8 @@ def build_correlations(raw: Dict[str, Optional[Dict[str, float]]]) -> dict:
         "sources": SOURCES,
         "method": METHOD_NOTE,
         "align": "inner_join",
-        "align_note": ("変化系列を全ラベル共通営業日で inner join（dropna, 前方補完なし）。"
-                       "日米欧の祝日・TARGET 休業日が一致しないため n_obs は各系列より小さくなる。"
-                       "休場日のズレを ffill でごまかさない。"),
+        # 変化系列を全ラベル共通営業日で inner join（dropna, 前方補完なし）。祝日不一致で n_obs は各系列より小さい。ffill しない
+        "align_note": "inner_join_no_ffill_note",
         "note": CORR_NOTE,
     }
 

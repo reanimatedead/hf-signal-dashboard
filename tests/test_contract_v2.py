@@ -62,6 +62,14 @@ def _read_index():
     return p.read_text(encoding="utf-8")
 
 
+def _dict_lang(lang):
+    """docs/assets/i18n/dict.js の 1 言語ぶんの値を連結した文字列（node で評価）。"""
+    import subprocess
+    js = ("global.window={};require(%s);process.stdout.write(Object.values(window.I18N[%s]).join('\\n'))"
+          % (json.dumps(str(DOCS / "assets" / "i18n" / "dict.js")), json.dumps(lang)))
+    return subprocess.run(["node", "-e", js], capture_output=True, text=True, check=True).stdout
+
+
 def _iter_market_rows(data):
     """(category, row) を全 markets リストについて列挙。"""
     for cat, rows in (data.get("markets") or {}).items():
@@ -453,11 +461,15 @@ def test_every_figure_has_a_caption():
 
     未来の自分が誤読しないための引き継ぎ。消えたら検出する。
     """
+    # 2026-11 i18n: キャプションの文面は辞書（docs/assets/i18n/dict.js の ja / en）にある。
+    # index.html はヘルパと DOM、辞書は ja「この図」/ en「This figure」を同数持つこと。
     html = _read_index()
     assert "const cap=" in html, "caption ヘルパ (const cap=) が消えている"
     assert 'class="rel-cap"' in html, "キャプション DOM (rel-cap) が消えている"
-    n_fig = html.count("この図")
+    ja, en = _dict_lang("ja"), _dict_lang("en")
+    n_fig = ja.count("この図")
     assert n_fig >= 10, f"図キャプション（『この図』）が {n_fig} 件しかない（期待 >= 10）"
+    assert en.count("This figure") == n_fig, "英語のキャプション（This figure）が日本語と同数でない"
 
 
 def test_captions_cite_sources():
@@ -466,14 +478,15 @@ def test_captions_cite_sources():
     出典行（出典・算出）の数が図キャプション数を下回らないこと＝各図が出典を伴う。
     加えて主要出典トークンが本文に存在すること。
     """
-    html = _read_index()
-    n_fig = html.count("この図")
-    n_src = html.count("出典")
+    ja, en = _dict_lang("ja"), _dict_lang("en")   # 文面は辞書（i18n）
+    n_fig = ja.count("この図")
+    n_src = ja.count("出典")
     assert n_src >= n_fig, (
         f"出典行 {n_src} 件 < 図 {n_fig} 件。出典を欠くキャプションがある疑い。"
     )
+    assert en.count("Source") >= en.count("This figure"), "英語のキャプションに出典（Source）を欠くものがある"
     for token in ("FRED", "CBOE", "CFTC"):
-        assert token in html, f"キャプションに出典トークン {token} が見当たらない"
+        assert token in ja and token in en, f"キャプションに出典トークン {token} が見当たらない"
 
 
 # ─────────────────────── 銘柄件数の劣化検知 ───────────────────────

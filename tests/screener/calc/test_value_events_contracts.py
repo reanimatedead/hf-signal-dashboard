@@ -4,7 +4,7 @@ from screener.calc import contracts, events, value
 
 
 def test_one_off_flag():
-    assert value.one_off_flag(131, 100)["flag"] and value.one_off_flag(131, 100)["note"] == "決算短信で確認"
+    assert value.one_off_flag(131, 100)["flag"] and value.one_off_flag(131, 100)["note"] == "check_earnings_release"
     assert not value.one_off_flag(130, 100)["flag"]  # ちょうど1.3倍は対象外（「超える」）
     assert value.one_off_flag(None, None, roe_fwd=0.21, roe_act=0.10)["flag"]
     assert not value.one_off_flag(None, None, roe_fwd=0.20, roe_act=0.10)["flag"]

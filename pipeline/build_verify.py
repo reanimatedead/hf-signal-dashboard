@@ -2,8 +2,9 @@
 """pipeline/build_verify.py — 判定の検証層（docs/verify.json）。DATA_CONTRACT §21。
 
 Yahoo の日足だけを使い、次の判定を**同じ方法**で検証する:
-  - チャート判定（marketcalc.ind）: 強い買い / 買い / 買い（長期の売られすぎ）/ 売り / 強い売り
-  - 既存の composite_score（fetch_signals.compute_signal）: STRONG BUY / BUY / HOLD / WATCH / AVOID
+  - チャート判定（marketcalc.ind）: buy_strong / buy / buy_long_oversold / sell / sell_strong
+  - 既存の composite_score（fetch_signals.compute_signal）: strong_buy / buy / hold / watch / avoid
+ラベル・説明はすべてコード（表示文は UI 辞書 docs/assets/i18n）。
 方法（marketcalc.events）: 判定が出た日の終値 → 20 営業日後の騰落率。同じ銘柄の連続判定は
 20 日に 1 回だけ数える。基準 = 同じ銘柄・同じ期間の全営業日の 20 日後騰落率（全期間平均）。
 指標が揃うまでの 288 本は数えない。全期間版と直近 6 か月版を出し、直近版で
@@ -34,15 +35,17 @@ from marketcalc import events, fund_us, ind  # noqa: E402
 
 SCHEMA = "verify/1"
 RECENT_MONTHS = 6
-COMPOSITE_LABELS = ("STRONG BUY", "BUY", "HOLD", "WATCH", "AVOID")
-COMPOSITE_BUY = ("STRONG BUY", "BUY")
-MARKET_LABEL = {"nikkei225": "日経225", "us": "米国（Dow30・Nasdaq100・S&P500 の和集合）"}
+COMPOSITE_LABELS = ("strong_buy", "buy", "hold", "watch", "avoid")
+COMPOSITE_BUY = ("strong_buy", "buy")
+# nikkei225=日経225 / us_union=米国（Dow30・Nasdaq100・S&P500 の和集合）
+MARKET_LABEL = {"nikkei225": "nikkei225", "us": "us_union"}
 METHOD = {
     "horizon_days": events.H, "gap_days": events.GAP, "warmup_bars": events.WARMUP,
-    "recent_months": RECENT_MONTHS, "price_source": "Yahoo 日足（2年）",
-    "base": "同じ銘柄・同じ期間の全営業日の20営業日後騰落率（全期間平均）",
-    "weakened_rule": "直近6か月で、買い系の判定後の中央値が基準の中央値を下回る（件数5未満は判定しない）",
-    "note": "過去の値動きの集計であり、将来の値動きや売買を約束するものではありません。",
+    "recent_months": RECENT_MONTHS,
+    "price_source": "yahoo_daily_2y",                 # Yahoo 日足（2年）
+    "base": "same_symbol_all_days_h20_mean",          # 同じ銘柄・同じ期間の全営業日の20営業日後騰落率（全期間平均）
+    "weakened_rule": "recent6m_buy_median_below_base",  # 直近6か月で買い系の判定後の中央値 < 基準の中央値（件数5未満は判定しない）
+    "note": "past_aggregate_not_promise",             # 過去の値動きの集計であり、将来の値動きや売買を約束するものではない
 }
 
 
@@ -113,7 +116,7 @@ def build(markets, generated_at=None):
         out["markets"][key] = m
         for k, v in m["weakened"].items():
             if v:
-                weak_items.append(f"{m['label']}: {k.split(':', 1)[1]}")
+                weak_items.append(f"{m['label']}:{k}")   # 例 "nikkei225:chart:buy_long_oversold"
     dates = [m["last_date"] for m in out["markets"].values() if m.get("last_date")]
     out["as_of"] = max(dates) if dates else None
     out["weakened"] = bool(weak_items)

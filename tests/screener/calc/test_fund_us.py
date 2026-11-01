@@ -18,16 +18,16 @@ def test_rows_and_f_score(fx):
     rs = rows(fx)
     assert len(rs) == 5
     for r in rs:
-        assert r["F満点"] == 7 and r["F"] == 7  # サンプルは全項目が改善するように作ってある
-        assert r["RI余地%"] is not None and r["PBR"] > 0
+        assert r["f_max"] == 7 and r["F"] == 7  # サンプルは全項目が改善するように作ってある
+        assert r["ri_upside_pct"] is not None and r["PBR"] > 0
 
 
 def test_magic_rank_excludes_financials(fx):
     rs = rows(fx)
-    ranked = sorted([r for r in rs if r.get("魔法の公式順位")], key=lambda r: r["魔法の公式順位"])
-    assert [r["魔法の公式順位"] for r in ranked] == [1, 2, 3, 4]
+    ranked = sorted([r for r in rs if r.get("magic_rank")], key=lambda r: r["magic_rank"])
+    assert [r["magic_rank"] for r in ranked] == [1, 2, 3, 4]
     assert all(not r["fin"] for r in ranked)
-    assert "魔法の公式順位" not in next(r for r in rs if r["ticker"] == "EEE")
+    assert "magic_rank" not in next(r for r in rs if r["ticker"] == "EEE")
 
 
 def test_magic_rank_hand():

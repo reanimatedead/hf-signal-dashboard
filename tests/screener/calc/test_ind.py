@@ -76,14 +76,14 @@ def test_long_oversold_and_labels():
     assert ind.long_oversold(x).tolist() == [True, False, False]
     j0 = ind.judge(x, i=0)
     j2 = ind.judge(x, i=2)
-    assert j0["label"] == "買い（長期の売られすぎ）" and j0["long_oversold"]
-    assert ind.judge(x, i=1)["label"] == "様子見"
+    assert j0["label"] == "buy_long_oversold" and j0["long_oversold"]
+    assert ind.judge(x, i=1)["label"] == "neutral"
     # 2: c=94 は mS-2σ(80) を下回らないので買いにならない
-    assert j2["label"] == "様子見"
+    assert j2["label"] == "neutral"
 
 
 def test_labels_on_fixtures(fx):
-    want = {"AAA": "強い買い", "BBB": "強い売り", "CCC": "様子見", "EEE": "買い（長期の売られすぎ）"}
+    want = {"AAA": "buy_strong", "BBB": "sell_strong", "CCC": "neutral", "EEE": "buy_long_oversold"}
     for t, lab in want.items():
         p = fx["px"][t]
         assert ind.summary(p["h"], p["l"], p["c"])["chart_signal"] == lab, t

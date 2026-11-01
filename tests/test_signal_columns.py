@@ -38,7 +38,7 @@ def test_rows_get_chart_signal_fields_and_series(markets, tmp_path):
             assert all(0 <= m["i"] < n for m in s["marks"])
             assert "index_map" not in s
     aaa = next(r for r in markets["nasdaq100"] if r["symbol"] == "AAA")
-    assert aaa["chart_signal"] in ("強い買い", "買い")          # 架空 AAA は長期上向き→急落
+    assert aaa["chart_signal"] in ("buy_strong", "buy")          # 架空 AAA は長期上向き→急落
     bbb = next(r for r in markets["nasdaq100"] if r["symbol"] == "BBB")
     assert bbb["chart_signal_code"] < 0                          # 架空 BBB は長期下向き→急騰
     assert set(collect) == {"nikkei225", "dow30", "nasdaq100", "sp500"}
@@ -62,8 +62,8 @@ def test_rows_get_chart_signal_fields_and_series(markets, tmp_path):
     assert set(v["markets"]) == {"nikkei225", "us"}
     assert v["markets"]["us"]["symbols"] == 5                    # Dow/NDX/S&P の重複は1回
     full = v["markets"]["us"]["full"]
-    assert set(full["chart"]) == {"強い買い", "買い", "買い（長期の売られすぎ）", "売り", "強い売り"}
-    assert {"BUY", "WATCH", "AVOID"} <= set(full["composite"])
+    assert set(full["chart"]) == {"buy_strong", "buy", "buy_long_oversold", "sell", "sell_strong"}
+    assert {"buy", "watch", "avoid"} <= set(full["composite"])
     assert full["base"]["n"] > 0 and isinstance(v["weakened"], bool)
     assert v["as_of"] == "2026-07-15"
 
@@ -79,7 +79,7 @@ def test_composite_series_matches_process_ticker_on_last_day():
     _, _, _, c = fs._finite_hlc(df)
     labels = fs.composite_label_series(c)
     assert len(labels) == len(c)
-    assert set(labels) <= {"STRONG BUY", "BUY", "HOLD", "WATCH", "AVOID"}
+    assert set(labels) <= {"strong_buy", "buy", "hold", "watch", "avoid"}
     assert labels[-1] == fs.process_ticker(df, "CCC", "c")["signal"]
 
 

@@ -4,7 +4,7 @@
     "pipeline_version": "macro-0.1",
     "reference_seed": false,
     "branch": "feat/macro-environment",
-    "note": "JP rates / IMM(CFTC) / VIX / yield_curve は docs/data.json を再利用。FRED 系は FRED_API_KEY 設定時のみ live、未設定なら missing。捏造はしない。",
+    "note": "macro_legacy_reuse_note",
     "sources_as_of": {
       "treasury_tga": "2026-07-23",
       "coingecko": "2026-07-25T16:08:31Z",
@@ -47,7 +47,7 @@
   },
   "tiles": {
     "usdjpy_carry": {
-      "label": "ドル円 金利差（US10Y − JP10Y）",
+      "label": "usdjpy_carry",
       "value": 1.989,
       "unit": "%",
       "z": 0.0,
@@ -55,12 +55,12 @@
       "as_of": "2026-07-26T01:04:41.019942+09:00",
       "lag_days": -1,
       "status": "ok",
-      "source": "docs/data.json (再利用)",
-      "explain": "差が縮むと円高→キャリー巻き戻し→世界的リスクオフ。",
-      "caveat": "yieldは日替わり。z は履歴ストア未配線のため0（本番ストアで算定予定）。"
+      "source": "docs/data.json",
+      "explain": "usdjpy_carry_explain",
+      "caveat": "usdjpy_carry_caveat"
     },
     "cot_jpy": {
-      "label": "円 投機ポジション(CFTC COT)",
+      "label": "cot_jpy",
       "value": {
         "net": -152125,
         "wow": -29462,
@@ -72,12 +72,12 @@
       "as_of": "2026-07-21",
       "lag_days": 4,
       "status": "ok",
-      "source": "docs/data.json (CFTC COT, 再利用)",
-      "explain": "投機筋の円ネットポジション。極端な円売り(マイナス大)は巻き戻しの燃料。",
-      "caveat": "週次・火曜集計の金曜公表。zは履歴ストア未配線のため0（本番で配線）。"
+      "source": "docs/data.json (CFTC COT)",
+      "explain": "cot_jpy_explain",
+      "caveat": "cot_jpy_caveat"
     },
     "vix": {
-      "label": "VIX",
+      "label": "vix",
       "value": 18.58,
       "unit": "pt",
       "z": 0.0,
@@ -85,12 +85,12 @@
       "as_of": "2026-07-26T01:04:41.019942+09:00",
       "lag_days": -1,
       "status": "ok",
-      "source": "docs/data.json (yfinance, 再利用)",
-      "explain": "株の予想変動率=恐怖指数。",
-      "caveat": "同時的で予測ではない。zは履歴ストア未配線のため0。"
+      "source": "docs/data.json (yfinance)",
+      "explain": "vix_explain",
+      "caveat": "vix_caveat"
     },
     "valuation_us": {
-      "label": "Buffett Indicator (US)",
+      "label": "valuation_us",
       "value": 232.7,
       "unit": "%",
       "z": 0.0,
@@ -99,24 +99,24 @@
       "lag_days": 297,
       "status": "stale",
       "source": "FRED (fredgraph.csv): NCBEILQ027S, GDP",
-      "explain": "米株時価総額 / 米GDP。長期の過熱/割安の温度計。",
-      "caveat": "四半期更新（GDP）。水準より傾きを見る。"
+      "explain": "valuation_us_explain",
+      "caveat": "valuation_us_caveat"
     },
     "tga": {
-      "label": "米財務省 TGA 残高",
+      "label": "tga",
       "value": 835.4,
-      "unit": "USD十億",
+      "unit": "usd_bn",
       "z": 0.0,
       "color": "neutral",
       "as_of": "2026-07-23",
       "lag_days": 2,
       "status": "ok",
       "source": "fiscaldata.treasury.gov DTS",
-      "explain": "TGA(政府預金)。増えると市場から流動性を吸う。WALCL/RRPと並ぶ純流動性の3要素。",
-      "caveat": "代理指標。会計サイクル(税収/国債発行)で揺れる。"
+      "explain": "tga_explain",
+      "caveat": "tga_caveat"
     },
     "btc_price": {
-      "label": "BTC価格",
+      "label": "btc_price",
       "value": 64145.0,
       "unit": "USD",
       "z": 0.0,
@@ -124,12 +124,12 @@
       "as_of": "2026-07-25T16:08:31Z",
       "lag_days": 0,
       "status": "ok",
-      "source": "CoinGecko (キーレス)",
-      "explain": "ビットコインのドル価格。流動性と暗号資産の温度計。",
-      "caveat": "zは履歴ストア未配線のため0。"
+      "source": "CoinGecko",
+      "explain": "btc_price_explain",
+      "caveat": "btc_price_caveat"
     },
     "stablecoin_peg": {
-      "label": "ステーブルコイン ペグ",
+      "label": "stablecoin_peg",
       "value": {
         "USDT": 0.999263,
         "USDC": 0.999827
@@ -140,38 +140,38 @@
       "as_of": "2026-07-25T16:08:31Z",
       "lag_days": 0,
       "status": "ok",
-      "source": "CoinGecko (キーレス)",
-      "explain": "USDT/USDCの1ドルからの乖離。0.5〜1%は日常、10%超が続けば本物のストレス。",
-      "caveat": "薄商い会場の乖離は技術的なこともある。Tetherは完全監査なし。"
+      "source": "CoinGecko",
+      "explain": "stablecoin_peg_explain",
+      "caveat": "stablecoin_peg_caveat"
     },
     "walcl": {
-      "label": "FRB総資産(WALCL)",
+      "label": "walcl",
       "value": 6747378.0,
-      "unit": "USD百万",
+      "unit": "usd_mn",
       "z": 0.0,
       "color": "neutral",
       "as_of": "2026-07-22",
       "lag_days": 3,
       "status": "ok",
       "source": "FRED:WALCL",
-      "explain": "FRBの総資産。お金の総量の源泉。",
-      "caveat": "週次・木曜更新。単位は百万。net_liquidity 計算に使用。"
+      "explain": "walcl_explain",
+      "caveat": "walcl_caveat"
     },
     "rrp": {
-      "label": "翌日物RRP",
+      "label": "rrp",
       "value": 0.675,
-      "unit": "USD十億",
+      "unit": "usd_bn",
       "z": 0.0,
       "color": "neutral",
       "as_of": "2026-07-24",
       "lag_days": 1,
       "status": "ok",
       "source": "FRED:RRPONTSYD",
-      "explain": "中銀に置かれた余り金。増えると市場から流動性を吸う。",
-      "caveat": "単位は十億(WALCLは百万)→揃える。"
+      "explain": "rrp_explain",
+      "caveat": "rrp_caveat"
     },
     "real_yield": {
-      "label": "10年実質金利(DFII10)",
+      "label": "real_yield",
       "value": 2.43,
       "unit": "%",
       "z": 0.0,
@@ -180,11 +180,11 @@
       "lag_days": 2,
       "status": "ok",
       "source": "FRED:DFII10",
-      "explain": "実質金利が下がると金の魅力が増す。",
-      "caveat": "2022年以降、金vs実質金利は崩れた(中銀/PBOC買い)→regimeシフト注記必須。"
+      "explain": "real_yield_explain",
+      "caveat": "real_yield_regime_shift_caveat"
     },
     "hy_spread": {
-      "label": "HY信用スプレッド",
+      "label": "hy_spread",
       "value": 2.77,
       "unit": "%",
       "z": 0.0,
@@ -193,24 +193,24 @@
       "lag_days": 2,
       "status": "ok",
       "source": "FRED:BAMLH0A0HYM2",
-      "explain": "低格付け社債と国債の利回り差。広がる=リスクオフ。株安に先行しやすい。",
-      "caveat": "FREDは直近3年窓→本番はストアに自前保存。水準より広がる速さ。"
+      "explain": "hy_spread_explain",
+      "caveat": "hy_spread_caveat"
     },
     "net_liquidity": {
-      "label": "米ネット流動性 (WALCL−TGA−RRP)",
+      "label": "net_liquidity",
       "value": 5.911,
-      "unit": "USD兆",
+      "unit": "usd_tn",
       "z": 0.0,
       "color": "neutral",
       "as_of": "2026-07-22",
       "lag_days": 3,
       "status": "ok",
-      "source": "FRED + Treasury (合成)",
-      "explain": "市場で実際に使えるドルの総量。増=追い風、減=逆風。",
-      "caveat": "代理指標。単位整合必須(WALCL百万/RRP/TGA十億)。構成で誤誘導しうる。"
+      "source": "FRED + Treasury",
+      "explain": "net_liquidity_explain",
+      "caveat": "net_liquidity_caveat"
     },
     "clock_phase_tile": {
-      "label": "景気局面 (GDPNow+CPI)",
+      "label": "clock_phase_tile",
       "value": {
         "phase": "stagflation",
         "gdpnow": 1.68,
@@ -224,9 +224,9 @@
       "as_of": "2026-06-01",
       "lag_days": 54,
       "status": "ok",
-      "source": "FRED:GDPNOW + FRED:CPIAUCSL (キーレスCSV)",
-      "explain": "リフレ/回復/過熱/スタグ。お金がどの器に傾くかを決める。",
-      "caveat": "GDPNow は四半期内で大きく改定される。CPI YoY は前年同月比で月次更新。2軸分類は簡素化したもので、転換期(ピボット)では実体と乖離しうる。"
+      "source": "FRED:GDPNOW + FRED:CPIAUCSL",
+      "explain": "clock_phase_tile_explain",
+      "caveat": "clock_phase_tile_caveat"
     }
   }
 }

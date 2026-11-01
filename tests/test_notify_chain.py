@@ -55,7 +55,7 @@ def test_chain_append_returns_hash_fields(tmp_chain_path):
     for k in ("event_id", "ts_utc", "prev_hash", "curr_hash", "notice"):
         assert k in row, f"row missing {k}"
     assert row["curr_hash"] != row["prev_hash"]
-    assert row["notice"] == "事実記録 / not investment advice"
+    assert row["notice"] == "fact_record_not_advice"
 
 
 def test_chain_genesis_prev_hash_all_zeros(tmp_chain_path):

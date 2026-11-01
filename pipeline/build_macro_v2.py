@@ -34,29 +34,29 @@ OUT = ROOT / "docs" / "macro_v2.json"
 FRED_CSV = "https://fred.stlouisfed.org/graph/fredgraph.csv?id={id}"
 _UA = {"User-Agent": "hf-signal-dashboard macro_v2 (FRED keyless)"}
 
-# 16 daily series: id -> (label, category)
+# 16 daily series: id -> (label code, category)。label はコード（表示名は UI 辞書）
 FRED_SERIES = {
     # decomposition (Fisher / term-premium identity)
-    "DGS10":        ("US 10Y nominal",        "rates_decomp"),
-    "DFII10":       ("US 10Y real (TIPS)",    "rates_decomp"),
-    "T10YIE":       ("10Y breakeven",         "rates_decomp"),
-    "THREEFYTP10":  ("10Y term premium",      "rates_decomp"),
+    "DGS10":        ("us10y_nominal",         "rates_decomp"),
+    "DFII10":       ("us10y_real_tips",       "rates_decomp"),
+    "T10YIE":       ("breakeven_10y",         "rates_decomp"),
+    "THREEFYTP10":  ("term_premium_10y",      "rates_decomp"),
     # credit
-    "BAMLH0A0HYM2": ("US HY OAS",             "credit"),
-    "BAMLC0A0CM":   ("US IG OAS",             "credit"),
+    "BAMLH0A0HYM2": ("us_hy_oas",             "credit"),
+    "BAMLC0A0CM":   ("us_ig_oas",             "credit"),
     # funding
-    "SOFR":         ("SOFR",                  "funding"),
-    "IORB":         ("IORB",                  "funding"),
-    "SOFR99":       ("SOFR 99th pct",         "funding"),
-    "WRESBAL":      ("Bank reserves",         "funding"),
+    "SOFR":         ("sofr",                  "funding"),
+    "IORB":         ("iorb",                  "funding"),
+    "SOFR99":       ("sofr_99pct",            "funding"),
+    "WRESBAL":      ("bank_reserves",         "funding"),
     # conditions / regime
-    "NFCI":         ("Chicago Fed NFCI",      "conditions"),
-    "ANFCI":        ("Adjusted NFCI",         "conditions"),
-    "STLFSI4":      ("StL Fed Fin Stress",    "conditions"),
-    "DTWEXBGS":     ("Broad Dollar Index",    "conditions"),
+    "NFCI":         ("chicago_fed_nfci",      "conditions"),
+    "ANFCI":        ("adjusted_nfci",         "conditions"),
+    "STLFSI4":      ("stl_fed_fin_stress",    "conditions"),
+    "DTWEXBGS":     ("broad_dollar_index",    "conditions"),
     # recession
-    "T10Y3M":       ("10Y-3M spread",         "recession"),
-    "SAHMREALTIME": ("Sahm rule",             "recession"),
+    "T10Y3M":       ("spread_10y_3m",         "recession"),
+    "SAHMREALTIME": ("sahm_rule",             "recession"),
 }
 
 # extra series only for the reference net_liquidity formula (WALCL-TGA-RRP)
@@ -148,7 +148,7 @@ def contextualize(series, value, lookback=1250):
 def check_fisher(nominal, real, breakeven, tol=0.05):
     """名目 = 実質 + 期待インフレ。ズレたらデータ不整合を疑う。"""
     if None in (nominal, real, breakeven):
-        return {"ok": None, "gap": None, "reason": "missing input"}
+        return {"ok": None, "gap": None, "reason": "missing_input"}
     gap = abs(nominal - (real + breakeven))
     return {"ok": bool(gap <= tol), "gap": round(gap, 4),
             "nominal": nominal, "real": real, "breakeven": breakeven}
@@ -184,8 +184,7 @@ def main():
         "fisher": fisher,
         "expectations": {
             "value": expectations, "nominal": nom, "term_premium": tp,
-            "note": ("名目 = 利上げ予想(expectations) + ターム・プレミアム(risk premium)。"
-                     "同じ名目でも内訳で株への効き方が違うため両方を出す。"),
+            "note": "expectations_term_premium_note",   # 名目 = 利上げ予想 + ターム・プレミアム。内訳で株への効き方が違うため両方を出す
         },
     }
 
@@ -203,16 +202,16 @@ def main():
     net_liquidity = {
         "primary_metric": "WRESBAL",
         "primary": {
-            "metric": "WRESBAL", "label": "Bank reserves (trillions USD)",
+            "metric": "WRESBAL", "label": "bank_reserves_tn",   # Bank reserves (trillions USD)
             "value_tn": wresbal_tn,
             "context": (contextualize(wresbal_s / 1e6, wresbal_tn) if wresbal_s is not None else None),
-            "note": "準備預金残高。RRP がほぼ枯渇した現在の第一指標。",
+            "note": "wresbal_primary_note",   # 準備預金残高。RRP がほぼ枯渇した現在の第一指標
         },
         "reference": {
             "metric": "WALCL - TGA - RRP", "value_tn": simple,
             "components_tn": {"WALCL": walcl_tn, "TGA": tga_tn, "RRP": rrp_tn},
-            "note": ("SNS 由来の簡易式。参考値。RRP は約 {} 兆ドルでほぼ枯渇し情報量が乏しい。"
-                     .format(rrp_tn if rrp_tn is not None else "n/a")),
+            # SNS 由来の簡易式。参考値。RRP は約 {components_tn.RRP} 兆ドルでほぼ枯渇し情報量が乏しい
+            "note": "net_liquidity_reference_note",
         },
         "which_is_primary": "WRESBAL",
     }
@@ -224,8 +223,8 @@ def main():
         "series": series_out,
         "identities": identities,
         "net_liquidity": net_liquidity,
-        "coverage": {"note": "US-only macro layer (FRED). EU yields live in markets.rates via ECB."},
-        "disclaimer": "For data visualization purposes only. Not investment advice.",
+        "coverage": {"note": "us_only_macro_layer"},   # US-only macro layer (FRED). EU yields live in markets.rates via ECB.
+        "disclaimer": "disclaimer_data_viz_not_advice",   # For data visualization purposes only. Not investment advice.
     }
 
     OUT.parent.mkdir(parents=True, exist_ok=True)
@@ -247,8 +246,9 @@ def main():
             if ((lg.get("identities") or {}).get("fisher") or {}).get("ok") is True:
                 lg["last_good_retained"] = {
                     "date": datetime.now(timezone.utc).date().isoformat(),
-                    "reason": f"today fisher gap={fisher.get('gap')} > 0.05; "
-                              f"anomalous macro not published, last-good retained",
+                    # today fisher gap > 0.05; anomalous macro not published, last-good retained
+                    "reason": "fisher_gap_exceeded_last_good_retained",
+                    "gap": fisher.get("gap"),
                     "retained_at": datetime.now(timezone.utc).isoformat(),
                 }
                 retained = lg

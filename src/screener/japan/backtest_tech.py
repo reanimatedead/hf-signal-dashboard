@@ -21,15 +21,10 @@ from ..local_report import dump_json, verify_dir
 from .panel import load_panel
 from .screen import FIN
 
-NAMES = {
-    "base": "全期間の平均（比べる基準）",
-    "buy": "買い（長期上向き・-2σ・CCI48<-100）",
-    "buy3": "強い買い（-3σ）",
-    "sell": "売り（長期下向き・+2σ・CCI48>+100）",
-    "sell3": "強い売り（+3σ）",
-    "brk_up": "比較：順張り買い（上向き・+2σ超え）",
-    "brk_dn": "比較：順張り売り（下向き・-2σ割れ）",
-}
+# 検証するシグナルのコード（言葉: base=全期間の平均（比べる基準）/ buy=買い（長期上向き・-2σ・CCI48<-100）/
+# buy3=強い買い（-3σ）/ sell=売り（長期下向き・+2σ・CCI48>+100）/ sell3=強い売り（+3σ）/
+# brk_up=比較：順張り買い（上向き・+2σ超え）/ brk_dn=比較：順張り売り（下向き・-2σ割れ））
+NAMES = ("base", "buy", "buy3", "sell", "sell3", "brk_up", "brk_dn")
 GAP = 20  # 同じ銘柄の連続シグナルは20日に1回だけ数える
 
 
@@ -60,9 +55,9 @@ def st(v: list[float]) -> dict[str, Any] | None:
         return None
     return {
         "n": int(len(a)),
-        "平均%": round(float(a.mean()), 2),
-        "中央値%": round(float(np.median(a)), 2),
-        "上昇の割合%": round(float((a > 0).mean() * 100), 1),
+        "mean_pct": round(float(a.mean()), 2),
+        "median_pct": round(float(np.median(a)), 2),
+        "up_ratio_pct": round(float((a > 0).mean() * 100), 1),
     }
 
 
@@ -104,7 +99,7 @@ def run(cfg: Config, min_bars: int = 420, min_mcap: float = 300e8) -> dict[str, 
                     res[t][hh].append(fw[hh])
     out = {k: {h: st(v) for h, v in d.items()} for k, d in res.items()}
     period = [dates[min(int(ind.P["bb_long"]), len(dates) - 1)], dates[-1]] if dates else None
-    return {"names": NAMES, "res": out, "period": period, "stocks": len(panel)}
+    return {"names": list(NAMES), "res": out, "period": period, "stocks": len(panel)}
 
 
 def main(argv: list[str] | None = None) -> int:

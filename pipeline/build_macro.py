@@ -123,6 +123,7 @@ def fred_latest(series_id):
 
 
 def tile(label, value, unit, z, color, as_of, lag_days, status, source, explain, caveat):
+    """label / unit / explain / caveat はコード（表示文は UI 辞書。旧文言は codes.json）。"""
     return {"label": label, "value": value, "unit": unit, "z": float(z) if z is not None else 0.0,
             "color": color, "as_of": as_of, "lag_days": lag_days,
             "status": status, "source": source, "explain": explain, "caveat": caveat}
@@ -221,16 +222,16 @@ if isinstance(usjp10, dict) and usjp10.get("value") is not None:
     lag = days_since(as_of) if as_of else None
     status = "ok" if (lag is not None and lag <= 2) else ("stale" if lag is not None else "ok")
     record("usdjpy_carry", tile(
-        "ドル円 金利差（US10Y − JP10Y）", val, "%", 0.0, "neutral",
-        as_of, lag, status, "docs/data.json (再利用)",
-        "差が縮むと円高→キャリー巻き戻し→世界的リスクオフ。",
-        "yieldは日替わり。z は履歴ストア未配線のため0（本番ストアで算定予定）。"))
+        "usdjpy_carry", val, "%", 0.0, "neutral",
+        as_of, lag, status, "docs/data.json",
+        "usdjpy_carry_explain",
+        "usdjpy_carry_caveat"))
 else:
     record("usdjpy_carry", tile(
-        "ドル円 金利差（US10Y − JP10Y）", None, "%", 0.0, "neutral",
-        None, None, "missing", "docs/data.json (再利用)",
-        "差が縮むと円高→キャリー巻き戻し→世界的リスクオフ。",
-        "既存 data.json に meta.yield_curve.us_jp_10y_spread が無いため missing。"))
+        "usdjpy_carry", None, "%", 0.0, "neutral",
+        None, None, "missing", "docs/data.json",
+        "usdjpy_carry_explain",
+        "missing_in_data_json"))
 
 
 # ─── existing-derived: COT JPY ────────────────────────────────────
@@ -245,16 +246,16 @@ if imm_jpy and imm_jpy.get("net_position") is not None:
     status = "ok" if (lag is not None and lag <= 10) else ("stale" if lag is not None else "ok")
     color = {"high": "red", "medium": "amber", "low": "green"}.get(crowd, "neutral")
     record("cot_jpy", tile(
-        "円 投機ポジション(CFTC COT)", {"net": npos, "wow": chg, "crowd": crowd}, "contracts",
+        "cot_jpy", {"net": npos, "wow": chg, "crowd": crowd}, "contracts",
         0.0, color, date, lag, status,
-        "docs/data.json (CFTC COT, 再利用)",
-        "投機筋の円ネットポジション。極端な円売り(マイナス大)は巻き戻しの燃料。",
-        "週次・火曜集計の金曜公表。zは履歴ストア未配線のため0（本番で配線）。"))
+        "docs/data.json (CFTC COT)",
+        "cot_jpy_explain",
+        "cot_jpy_caveat"))
 else:
     record("cot_jpy", tile(
-        "円 投機ポジション(CFTC COT)", None, "contracts", 0.0, "neutral",
-        None, None, "missing", "docs/data.json (CFTC COT, 再利用)",
-        "投機筋の円ネットポジション。", "既存 markets.imm に JPY_IMM が無いため missing。"))
+        "cot_jpy", None, "contracts", 0.0, "neutral",
+        None, None, "missing", "docs/data.json (CFTC COT)",
+        "cot_jpy_explain", "missing_in_data_json"))
 
 
 # ─── existing-derived: VIX ────────────────────────────────────────
@@ -265,12 +266,12 @@ if vix is not None:
     status = "ok" if lag is None or lag <= 3 else "stale"
     color = "red" if vix >= 25 else ("amber" if vix >= 18 else "green")
     record("vix", tile(
-        "VIX", round(vix, 2), "pt", 0.0, color, as_of, lag, status, "docs/data.json (yfinance, 再利用)",
-        "株の予想変動率=恐怖指数。", "同時的で予測ではない。zは履歴ストア未配線のため0。"))
+        "vix", round(vix, 2), "pt", 0.0, color, as_of, lag, status, "docs/data.json (yfinance)",
+        "vix_explain", "vix_caveat"))
 else:
     record("vix", tile(
-        "VIX", None, "pt", 0.0, "neutral", None, None, "missing", "docs/data.json",
-        "株の予想変動率=恐怖指数。", "既存 data.json に VIX 価格が無いため missing。"))
+        "vix", None, "pt", 0.0, "neutral", None, None, "missing", "docs/data.json",
+        "vix_explain", "missing_in_data_json"))
 
 
 # ─── existing-derived: Valuation (Buffett US) ─────────────────────
@@ -281,15 +282,15 @@ if buf:
     status = "ok" if (lag is not None and lag <= 95) else "stale"
     color = "red" if val >= 200 else ("amber" if val >= 150 else "green")
     record("valuation_us", tile(
-        "Buffett Indicator (US)", val, "%", 0.0, color, buf.get("date"), lag, status,
+        "valuation_us", val, "%", 0.0, color, buf.get("date"), lag, status,
         buf.get("source") or "data/valuation_metrics.csv",
-        "米株時価総額 / 米GDP。長期の過熱/割安の温度計。",
-        "四半期更新（GDP）。水準より傾きを見る。"))
+        "valuation_us_explain",
+        "valuation_us_caveat"))
 else:
     record("valuation_us", tile(
-        "Buffett Indicator (US)", None, "%", 0.0, "neutral", None, None, "missing",
+        "valuation_us", None, "%", 0.0, "neutral", None, None, "missing",
         "data/valuation_metrics.csv",
-        "米株時価総額 / 米GDP。", "valuation_metrics.csv が無い／US 行欠損。"))
+        "valuation_us_explain", "missing_valuation_csv"))
 
 
 # ─── LIVE: TGA (Treasury Operating Cash, 日次・キーレス) ───────────
@@ -314,15 +315,15 @@ if tga_val_bn is not None:
     lag = days_since(tga_date)
     status = "ok" if (lag is not None and lag <= 7) else "stale"
     record("tga", tile(
-        "米財務省 TGA 残高", round(tga_val_bn, 1), "USD十億", 0.0, "neutral",
+        "tga", round(tga_val_bn, 1), "usd_bn", 0.0, "neutral",
         tga_date, lag, status, "fiscaldata.treasury.gov DTS",
-        "TGA(政府預金)。増えると市場から流動性を吸う。WALCL/RRPと並ぶ純流動性の3要素。",
-        "代理指標。会計サイクル(税収/国債発行)で揺れる。"))
+        "tga_explain",
+        "tga_caveat"))
 else:
     record("tga", tile(
-        "米財務省 TGA 残高", None, "USD十億", 0.0, "neutral", None, None, "missing",
+        "tga", None, "usd_bn", 0.0, "neutral", None, None, "missing",
         "fiscaldata.treasury.gov DTS",
-        "TGA(政府預金)。", "取得不可のため missing。"))
+        "tga_explain", "missing_unavailable"))
 
 
 # ─── LIVE: CoinGecko (BTC + stablecoin peg, キーレス) ──────────────
@@ -338,15 +339,15 @@ except Exception as e:
 
 if btc is not None:
     record("btc_price", tile(
-        "BTC価格", round(float(btc), 1), "USD", 0.0, "neutral", NOW, 0, "ok",
-        "CoinGecko (キーレス)",
-        "ビットコインのドル価格。流動性と暗号資産の温度計。",
-        "zは履歴ストア未配線のため0。"))
+        "btc_price", round(float(btc), 1), "USD", 0.0, "neutral", NOW, 0, "ok",
+        "CoinGecko",
+        "btc_price_explain",
+        "btc_price_caveat"))
 else:
     record("btc_price", tile(
-        "BTC価格", None, "USD", 0.0, "neutral", None, None, "missing",
+        "btc_price", None, "USD", 0.0, "neutral", None, None, "missing",
         "CoinGecko",
-        "ビットコインのドル価格。", "取得不可のため missing。"))
+        "btc_price_explain", "missing_unavailable"))
 
 
 def _peg_color(p):
@@ -361,24 +362,24 @@ if usdt is not None or usdc is not None:
     worst = max(devs)
     z_proxy = round(worst / 0.005, 2)  # 0.5%=1z 相当の近似
     record("stablecoin_peg", tile(
-        "ステーブルコイン ペグ", {"USDT": usdt, "USDC": usdc}, "USD", z_proxy,
+        "stablecoin_peg", {"USDT": usdt, "USDC": usdc}, "USD", z_proxy,
         _peg_color(usdt or usdc), NOW, 0, "ok",
-        "CoinGecko (キーレス)",
-        "USDT/USDCの1ドルからの乖離。0.5〜1%は日常、10%超が続けば本物のストレス。",
-        "薄商い会場の乖離は技術的なこともある。Tetherは完全監査なし。"))
+        "CoinGecko",
+        "stablecoin_peg_explain",
+        "stablecoin_peg_caveat"))
 else:
     record("stablecoin_peg", tile(
-        "ステーブルコイン ペグ", None, "USD", 0.0, "neutral", None, None, "missing",
-        "CoinGecko", "USDT/USDCの1ドルからの乖離。", "取得不可のため missing。"))
+        "stablecoin_peg", None, "USD", 0.0, "neutral", None, None, "missing",
+        "CoinGecko", "stablecoin_peg_explain", "missing_unavailable"))
 
 
 # ─── FRED 依存 ────────────────────────────────────────────────────
 def fred_tile(tid, label, series, unit, explain, caveat, color_thr=None):
     r = fred_latest(series)
     if r is None:
-        why = "FRED_API_KEY 未設定" if not FRED_KEY else "FRED 取得失敗"
+        why = "missing_fred_api_key_unset" if not FRED_KEY else "missing_fred_fetch_failed"
         record(tid, tile(label, None, unit, 0.0, "neutral", None, None, "missing",
-                         f"FRED:{series}", explain, f"{caveat} ／ {why} のため missing。"))
+                         f"FRED:{series}", explain, why))
         return None
     val, dt = r
     sources_as_of.setdefault("fred", dt)
@@ -394,21 +395,21 @@ def fred_tile(tid, label, series, unit, explain, caveat, color_thr=None):
     return val, dt
 
 
-walcl = fred_tile("walcl", "FRB総資産(WALCL)", "WALCL", "USD百万",
-                  "FRBの総資産。お金の総量の源泉。",
-                  "週次・木曜更新。単位は百万。net_liquidity 計算に使用。")
+walcl = fred_tile("walcl", "walcl", "WALCL", "usd_mn",
+                  "walcl_explain",
+                  "walcl_caveat")
 
-rrp = fred_tile("rrp", "翌日物RRP", "RRPONTSYD", "USD十億",
-                "中銀に置かれた余り金。増えると市場から流動性を吸う。",
-                "単位は十億(WALCLは百万)→揃える。")
+rrp = fred_tile("rrp", "rrp", "RRPONTSYD", "usd_bn",
+                "rrp_explain",
+                "rrp_caveat")
 
-real_yield = fred_tile("real_yield", "10年実質金利(DFII10)", "DFII10", "%",
-                       "実質金利が下がると金の魅力が増す。",
-                       "2022年以降、金vs実質金利は崩れた(中銀/PBOC買い)→regimeシフト注記必須。")
+real_yield = fred_tile("real_yield", "real_yield", "DFII10", "%",
+                       "real_yield_explain",
+                       "real_yield_regime_shift_caveat")
 
-hy = fred_tile("hy_spread", "HY信用スプレッド", "BAMLH0A0HYM2", "%",
-               "低格付け社債と国債の利回り差。広がる=リスクオフ。株安に先行しやすい。",
-               "FREDは直近3年窓→本番はストアに自前保存。水準より広がる速さ。",
+hy = fred_tile("hy_spread", "hy_spread", "BAMLH0A0HYM2", "%",
+               "hy_spread_explain",
+               "hy_spread_caveat",
                color_thr=(5.0, 7.0))
 
 
@@ -425,17 +426,17 @@ if walcl and (tga_val_bn is not None) and rrp:
     status = "ok" if lag <= 7 else "stale"
     net_liq_status = status
     record("net_liquidity", tile(
-        "米ネット流動性 (WALCL−TGA−RRP)", net_liq_val_tn, "USD兆", 0.0, "neutral",
+        "net_liquidity", net_liq_val_tn, "usd_tn", 0.0, "neutral",
         sources_as_of.get("fred"), lag, status,
-        "FRED + Treasury (合成)",
-        "市場で実際に使えるドルの総量。増=追い風、減=逆風。",
-        "代理指標。単位整合必須(WALCL百万/RRP/TGA十億)。構成で誤誘導しうる。"))
+        "FRED + Treasury",
+        "net_liquidity_explain",
+        "net_liquidity_caveat"))
 else:
     record("net_liquidity", tile(
-        "米ネット流動性 (WALCL−TGA−RRP)", None, "USD兆", 0.0, "neutral", None, None, "missing",
+        "net_liquidity", None, "usd_tn", 0.0, "neutral", None, None, "missing",
         "FRED + Treasury",
-        "市場で実際に使えるドルの総量。",
-        "WALCL/RRPはFREDキー必須。欠損時アニメは中立値(6.0兆)で動作。"))
+        "net_liquidity_explain",
+        "net_liquidity_missing_neutral_anim"))
 
 
 # ─── Clock phase: GDPNow (Atlanta Fed) + CPI YoY (BLS via FRED) ─────
@@ -445,7 +446,7 @@ clock_phase_status = "missing"
 clock_phase_value = None
 clock_phase_as_of = None
 clock_phase_lag = None
-clock_phase_caveat = "GDPNow/CPI 取得不可のため missing。"
+clock_phase_caveat = "missing_unavailable"
 
 gdpnow = fred_latest_keyless("GDPNOW")  # 現四半期GDP（年率%）
 cpi_series = fred_series_keyless("CPIAUCSL")
@@ -492,9 +493,7 @@ if gdpnow is not None and cpi_yoy is not None:
     clock_phase_status = "ok"
     clock_phase_as_of = max(gdp_d, cpi_date)
     clock_phase_lag = days_since(clock_phase_as_of)
-    clock_phase_caveat = (
-        "GDPNow は四半期内で大きく改定される。CPI YoY は前年同月比で月次更新。"
-        "2軸分類は簡素化したもので、転換期(ピボット)では実体と乖離しうる。")
+    clock_phase_caveat = "clock_phase_tile_caveat"
 elif gdpnow is not None:
     gdp_v, gdp_d = gdpnow
     clock_phase = "recovery" if gdp_v >= 2.0 else "reflation"
@@ -502,13 +501,13 @@ elif gdpnow is not None:
     clock_phase_status = "stale"
     clock_phase_as_of = gdp_d
     clock_phase_lag = days_since(gdp_d)
-    clock_phase_caveat = "CPI YoY 取得失敗のため成長軸のみで暫定判定。"
+    clock_phase_caveat = "clock_phase_growth_only"
 
 record("clock_phase_tile", tile(
-    "景気局面 (GDPNow+CPI)", clock_phase_value, "phase", 0.0, "neutral",
+    "clock_phase_tile", clock_phase_value, "phase", 0.0, "neutral",
     clock_phase_as_of, clock_phase_lag, clock_phase_status,
-    "FRED:GDPNOW + FRED:CPIAUCSL (キーレスCSV)",
-    "リフレ/回復/過熱/スタグ。お金がどの器に傾くかを決める。",
+    "FRED:GDPNOW + FRED:CPIAUCSL",
+    "clock_phase_tile_explain",
     clock_phase_caveat))
 
 if clock_phase_status == "ok":
@@ -590,7 +589,7 @@ data = {
         "pipeline_version": "macro-0.1",
         "reference_seed": False,
         "branch": "feat/macro-environment",
-        "note": "JP rates / IMM(CFTC) / VIX / yield_curve は docs/data.json を再利用。FRED 系は FRED_API_KEY 設定時のみ live、未設定なら missing。捏造はしない。",
+        "note": "macro_legacy_reuse_note",
         "sources_as_of": sources_as_of,
         "store": {"path": str(store_dir), "used_gb": used_gb, "limit_gb": 250},
         "inputs": {

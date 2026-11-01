@@ -258,7 +258,7 @@ def get_sp500_tickers():
             "OXY","WM","NSC","EMR","PNC","ADI","KLAC","MAR","FIS","AIG","ECL",
         ]
     record_fallback("sp500_constituents",
-                    "both sources failed (Wikipedia UA + datahub CSV)",
+                    "sp500_both_sources_failed",   # both sources failed (Wikipedia UA + datahub CSV)
                     fallback_size=len(fallback))
     return fallback, {}
 
@@ -323,8 +323,7 @@ def _bb_block(close, period, dev, dp):
     """One Bollinger Band (period, deviation). Volatility context, not a signal."""
     if len(close) < period:
         return {"basis": None, "upper": None, "lower": None, "width": None,
-                "state": "insufficient_data",
-                "comment": f"{period}-period Bollinger Band with {dev} standard deviations. Not enough OHLC data for this period."}
+                "state": "insufficient_data", "comment": "bb_insufficient_data"}
     sma = close.rolling(period).mean()
     std = close.rolling(period).std(ddof=0)
     basis = float(sma.iloc[-1]); sd = float(std.iloc[-1])
@@ -332,36 +331,36 @@ def _bb_block(close, period, dev, dp):
     last = float(close.iloc[-1])
     state = (f"upper_{dev}sigma_touch" if last >= upper
              else f"lower_{dev}sigma_touch" if last <= lower else "neutral")
-    cycle = "Shorter" if period == 48 else "Longer"
-    extreme = " Extreme" if dev == 3 else ""
+    # comment はコード（表示文は UI 辞書）: bb_{short|long}_cycle[_extreme]_context
+    cycle = "short" if period == 48 else "long"
+    extreme = "_extreme" if dev == 3 else ""
     return {"basis": round(basis, dp), "upper": round(upper, dp), "lower": round(lower, dp),
             "width": round(upper - lower, dp), "state": state,
-            "comment": f"{period}-period Bollinger Band with {dev} standard deviations.{extreme} {cycle}-cycle volatility context."}
+            "comment": f"bb_{cycle}_cycle{extreme}_context"}
 
 
 def _cci_block(high, low, close, period):
     """One CCI (period). Momentum context, not a signal."""
     if len(close) < period:
-        return {"value": None, "state": "insufficient_data",
-                "comment": f"{period}-period CCI. Not enough OHLC data for this period."}
+        return {"value": None, "state": "insufficient_data", "comment": "cci_insufficient_data"}
     s = calc_cci(high, low, close, period)
     v = float(s.iloc[-1]) if not np.isnan(s.iloc[-1]) else 0.0
     state = "overbought_context" if v >= 200 else "oversold_context" if v <= -200 else "neutral"
-    cycle = "Shorter" if period == 48 else "Longer"
-    return {"value": round(v, 1), "state": state, "comment": f"{cycle} cycle momentum context."}
+    cycle = "short" if period == 48 else "long"
+    return {"value": round(v, 1), "state": state, "comment": f"cci_{cycle}_cycle_context"}
 
 
 def _elliott_1d_placeholder():
     return {"candidate": "unknown", "confidence": "low", "degree": "unknown", "phase": "unknown",
-            "invalidation_level": None, "note": "Heuristic placeholder only. Not a trading signal."}
+            "invalidation_level": None, "note": "elliott_placeholder_not_signal"}
 
 
 def build_empty_chart(tf_label):
     """Placeholder chart block for a not-yet-available timeframe (4h / 1w)."""
     return {"available": False, "source": None, "updated_at": None, "ohlc": [], "indicators": None,
             "elliott": {"candidate": "unknown", "confidence": "low",
-                        "note": f"{tf_label} chart data is not available yet."},
-            "note": f"{tf_label} chart data is planned for a later phase."}
+                        "note": "chart_not_available_yet"},
+            "note": "chart_planned_later_phase"}
 
 
 def build_1d_chart_from_ohlc(df_d, dp, updated_at):
@@ -401,7 +400,7 @@ def build_1d_chart_from_ohlc(df_d, dp, updated_at):
         }
         return {"available": True, "source": "fx-analysis-system/yfinance", "updated_at": updated_at,
                 "ohlc": ohlc, "indicators": indicators, "elliott": _elliott_1d_placeholder(),
-                "note": "Indicators are market context only."}
+                "note": "chart_context_only"}
     except Exception:
         return build_empty_chart("1d")
 
@@ -462,7 +461,7 @@ def build_empty_edge_context():
         "risk_adjusted": {"state": "unknown", "factors": []},
         "supporting_factors": [],
         "conflicting_factors": [],
-        "note": "Edge context is an analytical summary for market review only. It is not investment advice, a trading signal, or an instruction to enter or exit positions.",
+        "note": "edge_context_not_advice",
     }
 
 
@@ -512,11 +511,12 @@ def compute_signal(rsi, macd_hist, ema20, ema50, ema200, bb_pct, price):
     elif bb_pct <= 0.90: score += 2
 
     score = min(100, max(0, score))
-    if   score >= 78: label = "STRONG BUY"
-    elif score >= 63: label = "BUY"
-    elif score >= 43: label = "HOLD"
-    elif score >= 28: label = "WATCH"
-    else:             label = "AVOID"
+    # ラベルはコード（表示文は UI 辞書）。
+    if   score >= 78: label = "strong_buy"
+    elif score >= 63: label = "buy"
+    elif score >= 43: label = "hold"
+    elif score >= 28: label = "watch"
+    else:             label = "avoid"
     return score, label
 
 # ─── DATA FETCHING ────────────────────────────────────────
@@ -724,8 +724,9 @@ def process_ticker(df, symbol, name):
             "composite_score": score, "signal": signal, "error": None,
         }
     except Exception as exc:
+        print(f"  [ticker] {symbol}: {type(exc).__name__}: {str(exc)[:80]}")
         return {"symbol": symbol, "name": name, "composite_score": -1,
-                "signal": "ERROR", "error": str(exc)}
+                "signal": "error", "error": "exception"}
 
 def process_market(symbols_dict, label):
     print(f"\n[{label}] {len(symbols_dict)} symbols…")
@@ -775,7 +776,7 @@ def process_fx_advanced(fx_dict):
             df_d = daily_data.get(sym)
             if df_d is None or len(df_d) < 60:
                 results.append({"symbol":out_sym,"name":name,"composite_score":-1,
-                                 "signal":"ERROR","error":"No daily data"})
+                                 "signal":"error","error":"no_daily_data"})
                 continue
 
             close_d = df_d["Close"].squeeze()
@@ -845,19 +846,19 @@ def process_fx_advanced(fx_dict):
             # STRONG SHORT : CCI ≤ -200 + BB below 2σ + MC ≥ 55%
 
             if   cci_combo >= 200 and bb_combo >= 1.0 and mc_valid:
-                signal = "STRONG LONG"
+                signal = "strong_long"
                 score  = min(100, int(88 + min(12, (cci_combo - 200) / 40)))
             elif cci_combo >= 100 and bb_combo >= 0.6 and mc_valid:
-                signal = "LONG"
+                signal = "long"
                 score  = 70
             elif cci_combo <= -200 and bb_combo <= 0.0 and mc_valid:
-                signal = "STRONG SHORT"
+                signal = "strong_short"
                 score  = max(0, int(12 - min(12, (abs(cci_combo) - 200) / 40)))
             elif cci_combo <= -100 and bb_combo <= 0.4 and mc_valid:
-                signal = "SHORT"
+                signal = "short"
                 score  = 30
             else:
-                signal = "NEUTRAL"
+                signal = "neutral"
                 score  = 50
 
             # ── Standard indicators for display ──────────
@@ -906,8 +907,9 @@ def process_fx_advanced(fx_dict):
             results.append(row)
 
         except Exception as exc:
+            print(f"  [fx] {out_sym}: {type(exc).__name__}: {str(exc)[:80]}")
             results.append({"symbol": out_sym, "name": name, "composite_score": -1,
-                             "signal": "ERROR", "error": str(exc)})
+                             "signal": "error", "error": "exception"})
 
     results.sort(key=lambda x: x.get("composite_score", -1), reverse=True)
     ok = sum(1 for r in results if not r.get("error"))
@@ -973,8 +975,7 @@ def _move_risk(v):
     return "high" if x >= 130 else "medium" if x >= 90 else "low"
 
 
-_VIX_RELATION = ("Equity risk gauge; rises in risk-off. Cross-check USDJPY / Gold. "
-                 "Context only.")
+_VIX_RELATION = "vix_relation"  # Equity risk gauge; rises in risk-off. Cross-check USDJPY / Gold. Context only.
 
 
 def build_vix_from_fred(now):
@@ -1023,7 +1024,7 @@ def process_volatility():
     move = build_chart_row(
         "^MOVE", "MOVE", "ICE BofA MOVE Index (US Treasury vol)", "Volatility",
         risk_fn=_move_risk,
-        extra={"relation": "Rates implied vol; pairs with VIX for liquidity-stress reading. Context only.",
+        extra={"relation": "move_relation",  # Rates implied vol; pairs with VIX for liquidity-stress reading.
                "data_status": "live"},
     )
     # `build_chart_row` sets price=None + error on failure; degrade explicitly.
@@ -1039,7 +1040,7 @@ CRYPTO = [("BTC-USD", "Bitcoin"), ("ETH-USD", "Ethereum"),
 def process_crypto():
     print(f"\n[Crypto] {len(CRYPTO)} assets…")
     return [build_chart_row(sym, sym, name, "Crypto",
-                            extra={"relation": "High-volatility asset; cross-check risk / liquidity regime. Context only."})
+                            extra={"relation": "crypto_relation"})  # High-volatility asset; cross-check risk / liquidity regime.
             for sym, name in CRYPTO]
 
 
@@ -1266,9 +1267,8 @@ def fetch_mof_jgb_yields(timeout=40, max_points=OHLC_MAX_BARS):
 
 
 _JP_RATE_ELLIOTT = {"candidate": "unknown", "confidence": "low",
-                    "note": "Not applicable. JP yields are macro context, not a trading wave signal."}
-_JP_CHART_NOTE = ("Japan yield chart is macro context only. It is not investment advice "
-                  "or a trading signal.")
+                    "note": "elliott_not_applicable_jp_yield"}
+_JP_CHART_NOTE = "chart_context_not_advice"   # macro context only, not advice / not a trading signal
 
 
 def build_jp_rate_chart_1d(series, updated_at, source="data/jp_rates.csv"):
@@ -1280,7 +1280,7 @@ def build_jp_rate_chart_1d(series, updated_at, source="data/jp_rates.csv"):
     if chart:
         return chart
     c = build_empty_chart("1d")
-    c["note"] = "Japan rates time series needs at least two dated points; not configured yet."
+    c["note"] = "jp_rates_series_insufficient"   # needs >= 2 dated points
     return c
 
 
@@ -1376,9 +1376,7 @@ def build_rates_market():
             us_chart = build_jp_rate_chart_1d(ser, now, source=us_src)
             charts = {"4h": build_empty_chart("4h"), "1d": us_chart, "1w": build_empty_chart("1w")}
             data_status, source, ticker_out, risk = "auto_fred", us_src, None, "medium"
-            note = ("US Treasury yields auto-ingested from FRED (public, keyless; "
-                    "DGS2/DGS10/DGS30). Yahoo is fallback only. Macro context only, "
-                    "not investment advice.")
+            note = "rates_us_fred_auto"
         elif live:
             close = df["Close"].squeeze()
             y = round(float(close.iloc[-1]), 3)
@@ -1386,10 +1384,10 @@ def build_rates_market():
             chart = build_1d_chart_from_ohlc(df, 3, now)      # BB48/288 + CCI48/288
             chart["source"] = "yfinance"
             chart["source_ticker"] = src_t
-            chart["note"] = "Yield chart and indicators are market context only."
+            chart["note"] = "chart_context_only"
             charts = {"4h": build_empty_chart("4h"), "1d": chart, "1w": build_empty_chart("1w")}
             data_status, source, ticker_out, risk = "live", "yfinance", src_t, "medium"
-            note = "Yield chart and indicators are market context only, not investment advice."
+            note = "rates_yfinance_context"
         elif jp_rec is not None:
             ser = jp_rec.get("series") or []
             y = jp_rec["value"]
@@ -1399,10 +1397,7 @@ def build_rates_market():
             jp_chart = build_jp_rate_chart_1d(ser, now, source=src_label)
             charts = {"4h": build_empty_chart("4h"), "1d": jp_chart, "1w": build_empty_chart("1w")}
             data_status, source, ticker_out, risk = jp_src, src_label, None, "medium"
-            note = ("Japan yields auto-ingested from the official MoF JGB historical CSV. "
-                    "Macro context only, not investment advice." if jp_src == "auto_mof"
-                    else "Japan yield data loaded from a user-verified manual CSV. "
-                         "Market context only, not investment advice.")
+            note = "rates_jp_mof_auto" if jp_src == "auto_mof" else "rates_jp_manual_csv"
         elif region == "EU":
             if eu_rec is not None:
                 ser = eu_rec["series"]
@@ -1412,29 +1407,22 @@ def build_rates_market():
                 eu_chart = build_jp_rate_chart_1d(ser, now, source=eu_src)
                 charts = {"4h": build_empty_chart("4h"), "1d": eu_chart, "1w": build_empty_chart("1w")}
                 data_status, source, ticker_out, risk = "auto_ecb", eu_src, None, "medium"
-                note = ("Euro-area AAA spot yields auto-ingested from the ECB Data Portal (daily). "
-                        "Macro context only, not investment advice.")
+                note = "rates_eu_ecb_auto"
             else:
                 # ECB down: degrade EU only, do NOT break US/JP.
                 y, chg = None, None
                 charts = {"4h": build_empty_chart("4h"), "1d": build_empty_chart("1d"),
                           "1w": build_empty_chart("1w")}
-                charts["1d"]["note"] = "ECB Data Portal fetch failed; EU yield unavailable."
+                charts["1d"]["note"] = "ecb_fetch_failed"
                 data_status, source, ticker_out, risk = "error", None, None, "unknown"
-                note = ("ECB yield fetch failed; EU row degraded to data_status='error'. "
-                        "US/JP are unaffected. Macro context only.")
+                note = "rates_eu_ecb_failed"
         else:
             y, chg = None, None
             charts = {"4h": build_empty_chart("4h"), "1d": build_empty_chart("1d"),
                       "1w": build_empty_chart("1w")}
-            charts["1d"]["note"] = ("Japan rates source (MoF auto / verified CSV) is not configured yet."
-                                    if region == "JP" else
-                                    "Rates chart unavailable for this symbol.")
+            charts["1d"]["note"] = "jp_rates_not_configured" if region == "JP" else "rates_chart_unavailable"
             data_status, source, ticker_out, risk = "placeholder", None, None, "unknown"
-            note = ("Japan yield data unavailable (MoF auto-ingest failed and no verified "
-                    "data/jp_rates.csv). Placeholder retained for macro context."
-                    if region == "JP" else
-                    "Yield data unavailable. Placeholder row retained for macro context.")
+            note = "rates_jp_unavailable" if region == "JP" else "rates_unavailable"
         rows.append({
             "symbol": sym, "name": name, "market": "Rates", "region": region,
             "tenor": tenor, "yield": y, "change": chg, "curve_role": role,
@@ -1485,14 +1473,14 @@ def build_yield_curve_state(rates_rows):
             else None)
     return {
         "us_10y_2y_spread": {"value": us_s, "state": us_state, "risk": us_risk,
-                             "comment": "US curve. Inversion is a recession/policy-stress context, not a trade signal."},
+                             "comment": "us_curve_context"},
         "jp_10y_2y_spread": {"value": jp_s, "state": jp_state, "risk": jp_risk,
-                             "comment": "Japan curve assessed separately (BOJ policy / JGB). US inversion logic is not applied."},
+                             "comment": "jp_curve_context"},
         "eu_10y_2y_spread": {"value": eu_s, "state": eu_state, "risk": eu_risk,
-                             "comment": "Euro-area AAA curve assessed separately (ECB policy, mixed-sovereign composition). US inversion logic is not applied."},
+                             "comment": "eu_curve_context"},
         "us_jp_10y_spread": {"value": usjp, "state": "unknown" if usjp is None else "computed",
-                             "relation": "USDJPY yield-spread context",
-                             "comment": "Context only, not investment advice."},
+                             "relation": "usdjpy_yield_spread_context",
+                             "comment": "context_not_advice"},
     }
 
 
@@ -1501,8 +1489,7 @@ IMM = [("JPY_IMM", "JPY", "JPY IMM Positioning"), ("EUR_IMM", "EUR", "EUR IMM Po
        ("CAD_IMM", "CAD", "CAD IMM Positioning"), ("CHF_IMM", "CHF", "CHF IMM Positioning")]
 
 
-_IMM_NOTE = ("IMM positioning is weekly market context only. long/short refer to CFTC "
-             "positioning categories and are not trade instructions.")
+_IMM_NOTE = "imm_context_only"  # weekly context; long/short are CFTC categories, not trade instructions
 _IMM_CCY = {"JPY", "EUR", "GBP", "AUD", "CAD", "CHF"}
 
 # Official CFTC Commitments of Traders (legacy futures-only) — public Socrata
@@ -1652,7 +1639,7 @@ def build_imm_market():
                 "long_contracts": None, "short_contracts": None,
                 "positioning_state": "placeholder", "crowding_risk": "unknown",
                 "data_status": "placeholder", "source": None,
-                "note": _IMM_NOTE + " CFTC auto-ingest unavailable and no verified data/imm_positions.csv.",
+                "note": "imm_unavailable",   # CFTC auto-ingest unavailable and no verified data/imm_positions.csv
                 "error": None,
             }
         rows.append(row)
@@ -1663,8 +1650,7 @@ def build_imm_market():
 VALUATION = [("US_BUFFETT_INDICATOR", "US", "US Buffett Indicator"),
              ("JP_BUFFETT_INDICATOR", "Japan", "Japan Buffett Indicator")]
 
-_VAL_NOTE = ("Buffett Indicator is shown as long-term equity market valuation context "
-             "only. It is not a trading signal, market timing tool, or investment advice.")
+_VAL_NOTE = "valuation_context_not_advice"  # long-term valuation context only; not a signal / timing tool / advice
 _VAL_REGIONS = {"US", "JAPAN"}
 
 
@@ -1768,11 +1754,9 @@ def load_valuation_metrics_from_csv(path="data/valuation_metrics.csv"):
         return {}
 
 
-_VAL_CHART_NOTE = ("Buffett Indicator chart is shown as long-term equity market valuation "
-                   "context only. It is not a trading signal, market timing tool, or "
-                   "investment advice.")
+_VAL_CHART_NOTE = "valuation_chart_context_not_advice"
 _VAL_ELLIOTT = {"candidate": "unknown", "confidence": "low",
-                "note": "Not applicable. Buffett Indicator is not a trading wave signal."}
+                "note": "elliott_not_applicable_valuation"}
 
 
 def _valuation_1d_unavailable(note):
@@ -1786,10 +1770,10 @@ def _valuation_side_charts():
     return {
         "4h": {"available": False, "source": None, "updated_at": None, "ohlc": [],
                "indicators": None, "elliott": _VAL_ELLIOTT,
-               "note": "Intraday valuation chart is not applicable."},
+               "note": "valuation_intraday_not_applicable"},
         "1w": {"available": False, "source": None, "updated_at": None, "ohlc": [],
                "indicators": None, "elliott": _VAL_ELLIOTT,
-               "note": "Weekly valuation chart is not configured."},
+               "note": "valuation_weekly_not_configured"},
     }
 
 
@@ -1803,7 +1787,7 @@ def build_valuation_chart_1d(series, updated_at, dp=1):
     chart = _build_value_series_chart_1d(series, updated_at, dp, "data/valuation_metrics.csv",
                                          _VAL_CHART_NOTE, dict(_VAL_ELLIOTT))
     return chart or _valuation_1d_unavailable(
-        "Verified valuation time series needs at least two dated points; not configured yet.")
+        "valuation_series_insufficient")
 
 
 def build_valuation_market():
@@ -1835,7 +1819,7 @@ def build_valuation_market():
             }
         else:
             charts = {"1d": _valuation_1d_unavailable(
-                          "Verified valuation time series is not configured yet."),
+                          "valuation_series_not_configured"),
                       **_valuation_side_charts()}
             row = {
                 "symbol": sym, "name": name, "market": "Valuation", "region": region,
@@ -1844,8 +1828,7 @@ def build_valuation_market():
                 "valuation_context": "placeholder",
                 "data_status": "placeholder", "source": None, "date": None,
                 "charts": charts,
-                "note": "Verified market cap / GDP data is not configured yet. "
-                        "Add a verified data/valuation_metrics.csv to enable. " + _VAL_NOTE,
+                "note": "valuation_not_configured",   # add a verified data/valuation_metrics.csv to enable
                 "error": None,
             }
         rows.append(row)
@@ -1857,8 +1840,8 @@ def build_valuation_market():
 # / risk context into one summary. "Edge" = clarity of the analytical picture,
 # NOT a trading advantage. No buy/sell, entry/exit, target, TP/SL, or automation.
 
-_EDGE_NOTE = ("Edge context is an analytical summary for market review only. "
-              "It is not investment advice or a trading signal.")
+_EDGE_NOTE = "edge_context_not_advice"
+# factors[] はコード（表示文は UI 辞書）。
 
 
 def classify_technical_edge(chart1d):
@@ -1873,11 +1856,11 @@ def classify_technical_edge(chart1d):
     dir_of = {"overbought_context": 1, "oversold_context": -1}.get
     d48, d288 = dir_of(c48.get("state")), dir_of(c288.get("state"))
     if c48.get("state") == "neutral" and c288.get("state") == "neutral":
-        state = "neutral_context"; sup.append("CCI 48/288 both neutral — no extreme momentum")
+        state = "neutral_context"; sup.append("cci_both_neutral")
     elif d48 is not None and d48 == d288:
-        state = "favorable_context"; sup.append("CCI 48/288 aligned — clear momentum-context read")
+        state = "favorable_context"; sup.append("cci_aligned")
     elif d48 is not None and d288 is not None and d48 != d288:
-        state = "neutral_context"; con.append("CCI 48/288 divergent — mixed momentum context")
+        state = "neutral_context"; con.append("cci_divergent")
     else:
         state = "neutral_context"
     last = ohlc[-1].get("close")
@@ -1885,11 +1868,11 @@ def classify_technical_edge(chart1d):
     up2, lo2, up3, lo3 = s2.get("upper"), s2.get("lower"), s3.get("upper"), s3.get("lower")
     if isinstance(last, (int, float)):
         if isinstance(up3, (int, float)) and last >= up3:
-            con.append("Close above BB288 3σ — extreme stretch (caution)")
+            con.append("close_above_bb288_3sigma")
         elif isinstance(lo3, (int, float)) and last <= lo3:
-            con.append("Close below BB288 3σ — extreme stretch (caution)")
+            con.append("close_below_bb288_3sigma")
         elif isinstance(up2, (int, float)) and isinstance(lo2, (int, float)) and lo2 <= last <= up2:
-            sup.append("Close within BB288 2σ band — contained volatility context")
+            sup.append("close_within_bb288_2sigma")
     return state, sup, con
 
 
@@ -1901,15 +1884,15 @@ def classify_macro_edge(rates, yield_curve):
         return "insufficient_data", sup, con
     st = ((yield_curve or {}).get("us_10y_2y_spread") or {}).get("state")
     if st == "inverted":
-        con.append("US 10Y-2Y inverted — recession / policy-stress context"); state = "mixed_macro_context"
+        con.append("us_curve_inverted"); state = "mixed_macro_context"
     elif st == "normal_or_steepening":
-        sup.append("US 10Y-2Y normal/steepening — non-recessionary curve context"); state = "favorable_context"
+        sup.append("us_curve_normal_or_steepening"); state = "favorable_context"
     elif st == "flat_or_watch":
-        con.append("US 10Y-2Y flat — late-cycle watch"); state = "mixed_macro_context"
+        con.append("us_curve_flat"); state = "mixed_macro_context"
     else:
         state = "neutral_context"
     if us10 >= 4.0:
-        sup.append("US10Y elevated (>=4%) — yield context supportive for USD")
+        sup.append("us10y_elevated")
     return state, sup, con
 
 
@@ -1919,26 +1902,25 @@ def classify_cross_asset_edge(usdjpy_row, fx, vol, yield_curve, imm=None):
     sup, con, gaps = [], [], []
     vix = (vol[0] if vol else {}) or {}
     if vix.get("risk") in ("high", "medium") and vix.get("price") is not None:
-        con.append("VIX elevated — risk-off pressure (yen safe-haven context)")
+        con.append("vix_elevated")
     elif vix.get("risk") == "low":
-        sup.append("Volatility contained (VIX low) — calm risk environment")
+        sup.append("vix_low")
     gold = next((r for r in (fx or []) if r.get("symbol") in ("XAUUSD", "XAUUSD=X")), {}) or {}
     gch, uch = gold.get("change_pct"), usdjpy_row.get("change_pct")
     if isinstance(gch, (int, float)) and isinstance(uch, (int, float)) and gch > 0 and uch > 0:
-        con.append("Gold and USDJPY both firming — cross-asset risk-on/off tension")
+        con.append("gold_usdjpy_both_firming")
     usjp = (yield_curve or {}).get("us_jp_10y_spread") or {}
     if usjp.get("value") is None:
-        gaps.append("US-JP 10Y spread unavailable (JP yields placeholder) — incomplete FX-rates context")
+        gaps.append("usjp_spread_unavailable")
     else:
-        sup.append("US-JP 10Y spread available — USDJPY yield-spread context")
+        sup.append("usjp_spread_available")
     # v3.4 + auto-ingest: JPY IMM positioning context (CFTC auto or verified CSV)
     jpy_imm = next((r for r in (imm or []) if r.get("symbol") == "JPY_IMM"), {}) or {}
     if jpy_imm.get("data_status") in ("auto_cftc", "manual_csv") and jpy_imm.get("positioning_state") not in (None, "placeholder", "invalid_data"):
-        sup.append(f"JPY IMM positioning available — {jpy_imm.get('positioning_state')} "
-                   f"(crowding {jpy_imm.get('crowding_risk')}); CFTC category context only")
+        sup.append("jpy_imm_available")   # 状態は markets.imm[JPY_IMM].positioning_state / crowding_risk
     else:
-        gaps.append("JPY IMM positioning unavailable — positioning context incomplete")
-    gaps.append("DXY not in dataset — USD-strength cross-check unavailable")
+        gaps.append("jpy_imm_unavailable")
+    gaps.append("dxy_not_in_dataset")
     state = "partially_aligned" if (sup and con) else ("favorable_context" if sup else "mixed_macro_context")
     return state, sup, con, gaps
 
@@ -1947,11 +1929,11 @@ def classify_risk_adjusted_edge(vol, conflict_count):
     sup, con = [], []
     vix = (vol[0] if vol else {}) or {}
     if vix.get("risk") == "high":
-        con.append("Volatility regime elevated — wider risk band")
+        con.append("vol_regime_elevated")
     if conflict_count >= 3:
-        con.append("Multiple cross-context conflicts — mixed risk picture"); state = "mixed_risk_context"
+        con.append("multiple_conflicts"); state = "mixed_risk_context"
     elif conflict_count <= 1 and vix.get("risk") == "low":
-        sup.append("Few conflicts and contained volatility — steadier risk context"); state = "favorable_risk_context"
+        sup.append("few_conflicts_contained_vol"); state = "favorable_risk_context"
     else:
         state = "mixed_risk_context"
     return state, sup, con
@@ -2060,7 +2042,7 @@ def build_tf_chart(ticker, interval, period, rule, dp, now, is_yield=False):
             return None
         chart["source"] = "yfinance"
         chart["source_ticker"] = ticker
-        chart["note"] = "Chart and indicators are market context only."
+        chart["note"] = "chart_context_only"
         return chart
     except Exception:
         return None
@@ -2129,8 +2111,8 @@ def _constituent_count(rows):
 
 def _equity_empty_charts():
     c = {"4h": build_empty_chart("4h"), "1d": build_empty_chart("1d"), "1w": build_empty_chart("1w")}
-    c["4h"]["note"] = "Equity 4h chart is deferred to avoid payload expansion."
-    c["1w"]["note"] = "Equity weekly chart is deferred to avoid payload expansion."
+    c["4h"]["note"] = "equity_4h_deferred"   # deferred to avoid payload expansion
+    c["1w"]["note"] = "equity_1w_deferred"
     return c
 
 
@@ -2169,9 +2151,9 @@ def _close_is_degraded(df):
         return False
 
 
-# UI(index.html CHART_MSG)が degraded を判別するためのマーカー文字列。
-DEGRADED_CHART_ERROR = ("degraded: yfinance returned rows but Close is NaN "
-                        "(transient fetch degradation; recovers on next refresh)")
+# UI(index.html CHART_MSG)が degraded を判別するためのコード（chart_error の値）。
+# 意味: yfinance は行を返したが Close が NaN（一時的な取得劣化。次回更新で回復見込み）。
+DEGRADED_CHART_ERROR = "degraded_close_nan"
 
 # バッチ部分劣化 heal の発動統計（build 全体で累積）。data.json の meta.equity_fetch_heal
 # に載せて health.json に surface する。発動頻度が分からないとバッチ方式の是非を後から
@@ -2187,7 +2169,7 @@ def build_equity_chart_1d(df, source_ticker, now, dp):
         return None
     chart["source"] = "yfinance"
     chart["source_ticker"] = source_ticker
-    chart["note"] = "Equity chart and indicators are market context only."
+    chart["note"] = "chart_context_only"
     return chart
 
 
@@ -2315,7 +2297,7 @@ def attach_signal_fields(row, df, chart=None, dp=2):
     for k in SIGNAL_FIELDS:
         row[k] = sm.get(k) if sm else None
     if sm is None:
-        row["chart_signal_note"] = f"日足が{ind.MIN_BARS}本未満のため判定なし"
+        row["chart_signal_note"] = "insufficient_daily_bars"   # 日足が ind.MIN_BARS(300) 本未満のため判定なし
     if chart is not None and sm is not None:
         n = len(chart.get("ohlc") or [])
         if n:
@@ -2379,10 +2361,10 @@ def attach_us_fundamentals(tabs, path=None):
             if str(r.get("symbol", "")).startswith("^"):
                 continue
             cr = calc.get(r.get("symbol"))
-            r["magic_rank"] = cr.get("魔法の公式順位") if cr else None
+            r["magic_rank"] = cr.get("magic_rank") if cr else None
             r["f_score"] = cr.get("f_score") if cr else None
             r["f_max"] = cr.get("f_max") if cr else None
-    ranked = sum(1 for v in calc.values() if v.get("魔法の公式順位"))
+    ranked = sum(1 for v in calc.values() if v.get("magic_rank"))
     rec = {"available": bool(fdmap), "as_of": j.get("as_of"), "with_fundamentals": len(calc), "ranked": ranked}
     print(f"[US fundamentals] {rec}")
     return rec
@@ -2459,7 +2441,7 @@ def attach_equity_charts(equity_markets, collect=None):
                 # equity の unavailable は必ず理由(chart_error)を持つ規約なのでここで刻む。
                 # NaN 劣化なら degraded マーカー、それ以外は汎用理由。
                 row["chart_error"] = (DEGRADED_CHART_ERROR if _close_is_degraded(df)
-                                      else "index chart build returned unavailable")
+                                      else "index_chart_unavailable")
             attach_signal_fields(row, df, c1d, dp)
             ec = _equity_empty_charts()
             row["charts"] = {"4h": ec["4h"], "1d": c1d or ec["1d"], "1w": ec["1w"]}
@@ -2470,7 +2452,7 @@ def attach_equity_charts(equity_markets, collect=None):
                 if cw.get("available") is True:
                     cw["source"] = "yfinance"
                     cw["source_ticker"] = idx_t
-                    cw["note"] = "Weekly (1d→1W resample). Market context only."
+                    cw["note"] = "weekly_resample_context_only"
                     row["charts"]["1w"] = cw
             equity_markets.setdefault(grp, []).insert(0, row)
             print(f"  {idx_t:9s} → {grp} (1d={bool(c1d)} "
@@ -2489,7 +2471,7 @@ def attach_equity_charts(equity_markets, collect=None):
             tab_of.setdefault(sym, []).append(grp)
             if r.get("error"):                               # table row already failed
                 r["chart_status"] = "unavailable"
-                r["chart_error"] = "table fetch error; chart skipped"
+                r["chart_error"] = "table_fetch_error"
                 for k in SIGNAL_FIELDS:
                     r[k] = None
                 continue
@@ -2503,7 +2485,7 @@ def attach_equity_charts(equity_markets, collect=None):
         try:
             if df is None or len(df) < 60:
                 r["chart_status"] = "unavailable"
-                r["chart_error"] = "no 2y daily data from yfinance"
+                r["chart_error"] = "no_2y_daily_data"
                 for k in SIGNAL_FIELDS:
                     r[k] = None
                 fail += 1
@@ -2519,7 +2501,7 @@ def attach_equity_charts(equity_markets, collect=None):
                 r["chart_status"] = "unavailable"
                 # 「取得したが劣化」と「指標が組めない」を区別（UI で別文言を出す）。
                 r["chart_error"] = (DEGRADED_CHART_ERROR if _close_is_degraded(df)
-                                    else "indicator/OHLC build returned unavailable")
+                                    else "indicator_build_unavailable")
                 fail += 1
                 continue
             ec = _equity_empty_charts()
@@ -2527,7 +2509,8 @@ def attach_equity_charts(equity_markets, collect=None):
             ok += 1
         except Exception as exc:
             r["chart_status"] = "unavailable"
-            r["chart_error"] = f"{type(exc).__name__}: {str(exc)[:80]}"
+            print(f"  {sym}: chart exception {type(exc).__name__}: {str(exc)[:80]}")
+            r["chart_error"] = "exception"
             fail += 1
     print(f"[Equity charts] constituents: {ok} charted / {fail} unavailable "
           f"/ {len(targets)} total")
@@ -2537,7 +2520,7 @@ def attach_equity_charts(equity_markets, collect=None):
 def build_summary(rows):
     counts = {}
     for r in rows:
-        sig = r.get("signal", "ERROR")
+        sig = r.get("signal", "error")
         counts[sig] = counts.get(sig, 0) + 1
     return counts
 
@@ -2672,16 +2655,16 @@ def _mf_fetch_us_tga():
             lag = _mf_days_since(as_of)
             status = "live" if (lag is not None and lag <= 4) else "stale"
             return {
-                "label": "Treasury General Account",
+                "label": "tga",
                 "value_usd_tn": tn, "as_of": as_of, "lag_days": lag,
                 "data_status": status,
                 "source": "fiscaldata:operating_cash_balance",
             }
-        return _mf_placeholder_series("Treasury General Account",
+        return _mf_placeholder_series("tga",
                                       "fiscaldata:operating_cash_balance")
     except Exception as exc:
         print(f"  [money_flow] TGA fetch failed ({type(exc).__name__})")
-        return _mf_placeholder_series("Treasury General Account",
+        return _mf_placeholder_series("tga",
                                       "fiscaldata:operating_cash_balance")
 
 
@@ -2698,7 +2681,7 @@ def _mf_fetch_us_debt():
         js = json.loads(body)
         rows = js.get("data") or []
         if not rows:
-            return _mf_placeholder_debt("US gross national debt", "USD_TN",
+            return _mf_placeholder_debt("us_gross_debt", "USD_TN",
                                         "fiscaldata:debt_to_penny")
         cur = rows[0]
         prev = rows[1] if len(rows) > 1 else None
@@ -2714,7 +2697,7 @@ def _mf_fetch_us_debt():
         lag = _mf_days_since(cur_d)
         status = "live" if (lag is not None and lag <= 3) else "stale"
         return {
-            "label": "US gross national debt",
+            "label": "us_gross_debt",
             "value_local_tn": round(cur_v / 1e12, 4),
             "unit": "USD_TN",
             "as_of": cur_d, "lag_days": lag, "data_status": status,
@@ -2723,7 +2706,7 @@ def _mf_fetch_us_debt():
         }
     except Exception as exc:
         print(f"  [money_flow] debt_to_penny fetch failed ({type(exc).__name__})")
-        return _mf_placeholder_debt("US gross national debt", "USD_TN",
+        return _mf_placeholder_debt("us_gross_debt", "USD_TN",
                                     "fiscaldata:debt_to_penny")
 
 
@@ -2732,7 +2715,7 @@ def _mf_build_us():
     if walcl_v is not None:
         lag = _mf_days_since(walcl_d)
         cb = {
-            "label": "Fed total assets",
+            "label": "fed_total_assets",
             "value_usd_tn": round(walcl_v / 1_000_000.0, 4),  # millions -> trillions
             "unit": "USD_TN",
             "as_of": walcl_d, "lag_days": lag,
@@ -2742,20 +2725,20 @@ def _mf_build_us():
                           if walcl_prev is not None else None,
         }
     else:
-        cb = _mf_placeholder_cb("Fed total assets", "USD_TN", "FRED:WALCL")
+        cb = _mf_placeholder_cb("fed_total_assets", "USD_TN", "FRED:WALCL")
 
     rrp_v, rrp_d, _, _ = _mf_fred_csv_latest("RRPONTSYD")
     if rrp_v is not None:
         lag = _mf_days_since(rrp_d)
         rrp = {
-            "label": "Reverse Repo",
+            "label": "reverse_repo",
             "value_usd_tn": round(rrp_v / 1_000.0, 4),   # billions -> trillions
             "as_of": rrp_d, "lag_days": lag,
             "data_status": _mf_status_from_lag(lag, 5, 14, "live"),
             "source": "FRED:RRPONTSYD",
         }
     else:
-        rrp = _mf_placeholder_series("Reverse Repo", "FRED:RRPONTSYD")
+        rrp = _mf_placeholder_series("reverse_repo", "FRED:RRPONTSYD")
 
     tga = _mf_fetch_us_tga()
 
@@ -2806,7 +2789,7 @@ def _mf_build_eu():
     if v is not None:
         lag = _mf_days_since(d)
         cb = {
-            "label": "ECB total assets",
+            "label": "ecb_total_assets",
             "value_usd_tn": round(v / 1_000_000.0, 4),    # millions EUR -> trillions EUR
             "unit": "EUR_TN",
             "as_of": d, "lag_days": lag,
@@ -2815,9 +2798,9 @@ def _mf_build_eu():
             "wow_change": round((v - prev) / 1_000_000.0, 5) if prev is not None else None,
         }
     else:
-        cb = _mf_placeholder_cb("ECB total assets", "EUR_TN", "FRED:ECBASSETSW")
-    debt = _mf_placeholder_debt("EU general govt debt", "EUR_TN",
-                                "placeholder (Eurostat quarterly not yet wired)")
+        cb = _mf_placeholder_cb("ecb_total_assets", "EUR_TN", "FRED:ECBASSETSW")
+    debt = _mf_placeholder_debt("eu_gov_debt", "EUR_TN",
+                                "eurostat_not_wired")
     debt["data_status"] = "quarterly"  # surface intent; value stays null
     badge = "stale" if cb["data_status"] == "placeholder" else (
         "weekly" if (cb.get("lag_days") or 99) <= 14 else "stale")
@@ -2840,7 +2823,7 @@ def _mf_build_jp():
         # 100M -> 1T means /10000 — verify FRED unit when wiring (most series for
         # JP central bank assets are in 100M JPY).
         cb = {
-            "label": "BoJ total assets",
+            "label": "boj_total_assets",
             "value_usd_tn": round(v / 10_000.0, 3),   # 100M JPY -> trillions JPY
             "unit": "JPY_TN",
             "as_of": d, "lag_days": lag,
@@ -2849,9 +2832,9 @@ def _mf_build_jp():
             "wow_change": round((v - prev) / 10_000.0, 4) if prev is not None else None,
         }
     else:
-        cb = _mf_placeholder_cb("BoJ total assets", "JPY_TN", "FRED:JPNASSETS")
-    debt = _mf_placeholder_debt("JP central govt debt", "JPY_TN",
-                                "placeholder (MoF quarterly not yet wired)")
+        cb = _mf_placeholder_cb("boj_total_assets", "JPY_TN", "FRED:JPNASSETS")
+    debt = _mf_placeholder_debt("jp_gov_debt", "JPY_TN",
+                                "mof_quarterly_not_wired")
     debt["data_status"] = "quarterly"
     badge = "stale" if cb["data_status"] == "placeholder" else (
         "monthly" if (cb.get("lag_days") or 999) <= 40 else "stale")
@@ -2888,19 +2871,20 @@ def _build_money_flow():
 # front-end a ready {"url","label","kind"} object. kind: "quote" (tradable /
 # indexable on Yahoo), "source" (primary source page), "none" (no external link).
 _LINK_SRC = {
-    "JP2Y":  ("https://www.mof.go.jp/jgbs/reference/interest_rate/", "財務省 国債金利"),
-    "JP10Y": ("https://www.mof.go.jp/jgbs/reference/interest_rate/", "財務省 国債金利"),
-    "JP30Y": ("https://www.mof.go.jp/jgbs/reference/interest_rate/", "財務省 国債金利"),
-    "EU2Y":  ("https://data.ecb.europa.eu/data/datasets/YC", "ECB Data Portal"),
-    "EU10Y": ("https://data.ecb.europa.eu/data/datasets/YC", "ECB Data Portal"),
-    "EU30Y": ("https://data.ecb.europa.eu/data/datasets/YC", "ECB Data Portal"),
+    # label はサイト名のコード（表示名は UI 辞書: mof_jgb=財務省 国債金利 / ecb_data_portal / fred …）。
+    "JP2Y":  ("https://www.mof.go.jp/jgbs/reference/interest_rate/", "mof_jgb"),
+    "JP10Y": ("https://www.mof.go.jp/jgbs/reference/interest_rate/", "mof_jgb"),
+    "JP30Y": ("https://www.mof.go.jp/jgbs/reference/interest_rate/", "mof_jgb"),
+    "EU2Y":  ("https://data.ecb.europa.eu/data/datasets/YC", "ecb_data_portal"),
+    "EU10Y": ("https://data.ecb.europa.eu/data/datasets/YC", "ecb_data_portal"),
+    "EU30Y": ("https://data.ecb.europa.eu/data/datasets/YC", "ecb_data_portal"),
     # US Treasury yields hedged to FRED (2026-07-29). When FRED is the live source the
     # row carries no Yahoo source_ticker, so build_link routes here (kind:"source").
-    "US2Y":  ("https://fred.stlouisfed.org/series/DGS2", "FRED (DGS2)"),
-    "US10Y": ("https://fred.stlouisfed.org/series/DGS10", "FRED (DGS10)"),
-    "US30Y": ("https://fred.stlouisfed.org/series/DGS30", "FRED (DGS30)"),
+    "US2Y":  ("https://fred.stlouisfed.org/series/DGS2", "fred"),
+    "US10Y": ("https://fred.stlouisfed.org/series/DGS10", "fred"),
+    "US30Y": ("https://fred.stlouisfed.org/series/DGS30", "fred"),
     "US_BUFFETT_INDICATOR": ("https://fred.stlouisfed.org/series/NCBEILQ027S",
-                             "FRED (NCBEILQ027S)"),
+                             "fred"),
     "JP_BUFFETT_INDICATOR": ("", ""),
 }
 
@@ -2921,33 +2905,33 @@ def build_link(rec, market):
     if market in ("dow30", "nasdaq100", "sp500"):
         t = st or sym
         return {"url": f"https://finance.yahoo.com/quote/{q(t)}/",
-                "label": "Yahoo Finance", "kind": "quote"}
+                "label": "yahoo_finance", "kind": "quote"}
     if market == "nikkei225":
         if sym.startswith("^"):            # index: no .T suffix, use yahoo.com
             return {"url": f"https://finance.yahoo.com/quote/{q(sym)}/",
-                    "label": "Yahoo Finance", "kind": "quote"}
+                    "label": "yahoo_finance", "kind": "quote"}
         code = sym.replace(".T", "")
         return {"url": f"https://finance.yahoo.co.jp/quote/{code}.T",
-                "label": "Yahoo!ファイナンス", "kind": "quote"}
+                "label": "yahoo_finance_jp", "kind": "quote"}
     if market in ("fx", "crypto"):
         return {"url": f"https://finance.yahoo.com/quote/{q(sym)}/",
-                "label": "Yahoo Finance", "kind": "quote"}
+                "label": "yahoo_finance", "kind": "quote"}
 
     # 2) US rates carry a real Yahoo source_ticker (^TNX / ^TYX / 2YY=F)
     if market == "rates" and st:
         return {"url": f"https://finance.yahoo.com/quote/{q(st)}/",
-                "label": f"Yahoo Finance ({st})", "kind": "quote"}
+                "label": "yahoo_finance", "kind": "quote"}
 
     # 3) Not on Yahoo → route to primary source
     if sym.endswith("_IMM"):
         return {"url": "https://www.cftc.gov/dea/futures/financial_lf.htm",
-                "label": "CFTC COT", "kind": "source"}
+                "label": "cftc_cot", "kind": "source"}
     # VIX / MOVE は Yahoo の正規クォートページなので quote 扱いにする
     QUOTE_ALIAS = {"VIX": "^VIX", "MOVE": "^MOVE"}
     if sym in QUOTE_ALIAS:
         t = QUOTE_ALIAS[sym]
         return {"url": f"https://finance.yahoo.com/quote/{q(t)}/",
-                "label": f"Yahoo Finance ({t})", "kind": "quote"}
+                "label": "yahoo_finance", "kind": "quote"}
     if sym in _LINK_SRC and _LINK_SRC[sym][0]:
         return {"url": _LINK_SRC[sym][0], "label": _LINK_SRC[sym][1], "kind": "source"}
     return {"url": "", "label": "", "kind": "none"}
@@ -3138,7 +3122,7 @@ def main():
                 "nasdaq100": set(nq_dict), "sp500": set(sp500_dict)}
     if len(sp500_dict) < 400:
         record_fallback("sp500_constituents",
-                        "constituent universe < 400 (full index not obtained)",
+                        "sp500_universe_below_400",   # constituent universe < 400 (full index not obtained)
                         fallback_size=len(sp500_dict))
 
     # sp500=動的取得(Wikipedia/datahub)。dow30=curated だが full(30/30)。
@@ -3256,11 +3240,8 @@ def main():
             "as_of": now_jst.isoformat(),
             "version": "1",
             "data_status": "placeholder",
-            "error": str(exc)[:120],
-            "notes": [
-                "survival_loop build failed; placeholder retained.",
-                "Market environment visualization only. Not investment advice.",
-            ],
+            "error": "exception",
+            "notes": ["survival_loop_build_failed", "disclaimer_not_advice"],
         }
 
     # Strict-JSON guard: Python's json writes NaN/Infinity, but the browser's

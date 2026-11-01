@@ -20,7 +20,7 @@ from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 GENESIS_HASH = "0" * 64
 EXIT_KINDS = ("EXIT_TP", "EXIT_SL", "EXIT_TIMEOUT")
-NOTICE = "事実記録 / not investment advice"
+NOTICE = "fact_record_not_advice"   # 事実記録 / not investment advice（公開 JSONL に載るのでコード）
 
 # Fields excluded from the hash input (they are the chain wrapper, not payload).
 _HASH_EXCLUDED = {"prev_hash", "curr_hash"}

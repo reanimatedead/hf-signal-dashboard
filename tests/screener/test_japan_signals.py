@@ -5,26 +5,26 @@ from screener.japan import backtest_tech, backtest_value, signals
 
 
 def test_overall_grade_rules():
-    assert signals.overall("買い", "長期候補") == "A"
-    assert signals.overall(ind.LONG_OVERSOLD_LABEL, "中期候補") == "A"
-    assert signals.overall("強い買い", "") == "B"
-    assert signals.overall("様子見", "長期候補・割安だが質に注意") == "B"
-    assert signals.overall("売り", "割安だが質に注意") == "C"
+    assert signals.overall("buy", "long_candidate") == "A"
+    assert signals.overall(ind.LONG_OVERSOLD_LABEL, "mid_candidate") == "A"
+    assert signals.overall("buy_strong", "") == "B"
+    assert signals.overall("neutral", "long_candidate|cheap_low_quality") == "B"
+    assert signals.overall("sell", "cheap_low_quality") == "C"
     assert signals.overall(None, None) == "C"
-    assert signals.overall("買い", "割安×質 上位50", signals.US_CANDIDATES) == "A"
+    assert signals.overall("buy", "value_quality_top50", signals.US_CANDIDATES) == "A"
 
 
 def test_run_on_fixture(cfg):
     doc = signals.run(cfg)
-    jp = {r["コード"]: r for r in doc["jp"]}
+    jp = {r["code"]: r for r in doc["jp"]}
     assert set(jp) == {"1001", "1002", "1003", "1004", "1005"}
-    assert jp["1001"]["チャート判定"] in ind.BUY_LABELS
-    assert jp["1002"]["チャート判定"] in ("売り", "強い売り")
-    assert jp["1004"]["チャート判定"] == ind.LONG_OVERSOLD_LABEL
-    assert all(r["総合判定"] in ("A", "B", "C") for r in doc["jp"] + doc["us"])
+    assert jp["1001"]["chart_signal"] in ind.BUY_LABELS
+    assert jp["1002"]["chart_signal"] in ("sell", "sell_strong")
+    assert jp["1004"]["chart_signal"] == ind.LONG_OVERSOLD_LABEL
+    assert all(r["grade"] in ("A", "B", "C") for r in doc["jp"] + doc["us"])
     for r in doc["jp"]:
-        assert r["総合判定"] == signals.overall(r["チャート判定"], r["財務判定"])
-    assert jp["1003"]["一時利益の目印"] == "決算短信で確認"
+        assert r["grade"] == signals.overall(r["chart_signal"], r["fin_tag"])
+    assert jp["1003"]["one_off_note"] == "check_earnings_release"
     assert {r["ticker"] for r in doc["us"]} == {"AAA", "BBB", "CCC"}
     v = doc["verify"]
     assert v["horizon_days"] == events.H == 20 and v["gap_days"] == events.GAP == 20

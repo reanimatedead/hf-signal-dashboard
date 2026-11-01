@@ -24,7 +24,7 @@ def test_make_value_tags(cfg):
 
     rows = make_value.build(cfg, dt.date(2026, 10, 31))
     by = {r["ticker"]: r for r in rows}
-    assert by["CCC"]["判定"] == ""  # 金融は候補にしない
+    assert by["CCC"]["fin_tag"] == ""  # 金融は候補にしない
     assert all(set(make_value.KEYS) <= set(r) for r in rows)
 
 

@@ -10,70 +10,9 @@
 
   const LOG_KEY = "hf_survival_log_v1";
 
-  // ── i18n minimal --------------------------------------------------
-  const I18N = {
-    ja: {
-      risk_gate: "本日の一文",
-      reasons: "根拠",
-      auto_risk: "自動リスク (人間入力ゼロ)",
-      per_trade: "1トレード許容",
-      max_concurrent: "同時保有上限",
-      dd_shrink: "DD 縮小",
-      dd_stop: "DD 全停止",
-      candidates: "妙味候補",
-      mode_a: "Mode A 仮想エントリ (機械)",
-      pattern_table: "パターン別利確テーブル",
-      take: "採用",
-      skip: "見送り",
-      log: "結果ログ (ローカルのみ)",
-      aggregate: "集計 (直近)",
-      hit_rate: "的中率",
-      roi: "平均 ROI",
-      brier: "Brier",
-      pattern_wr: "パターン別 勝率",
-      bankruptcy: "破産確率ヒートマップ (MC)",
-      ror_mc: "RoR (MC)",
-      ror_kf: "RoR (Kaufman)",
-      notes: "Phase 1 注意事項",
-      disc: "Macro environment visualization / not investment advice",
-      no_data: "—",
-      win: "勝", lose: "負", flat: "見送り",
-      win_btn: "勝", lose_btn: "負",
-    },
-    en: {
-      risk_gate: "Today's verdict",
-      reasons: "Reasons",
-      auto_risk: "Auto risk (zero human input)",
-      per_trade: "Per-trade risk",
-      max_concurrent: "Max concurrent",
-      dd_shrink: "DD shrink",
-      dd_stop: "DD stop",
-      candidates: "Edge candidates",
-      mode_a: "Mode A virtual entries (machine)",
-      pattern_table: "Pattern exit table",
-      take: "Take",
-      skip: "Skip",
-      log: "Result log (local only)",
-      aggregate: "Recent aggregates",
-      hit_rate: "Hit rate",
-      roi: "Avg ROI",
-      brier: "Brier",
-      pattern_wr: "Pattern win-rate",
-      bankruptcy: "Bankruptcy heatmap (MC)",
-      ror_mc: "RoR (MC)",
-      ror_kf: "RoR (Kaufman)",
-      notes: "Phase 1 caveats",
-      disc: "Macro environment visualization / not investment advice",
-      no_data: "—",
-      win: "win", lose: "loss", flat: "skip",
-      win_btn: "win", lose_btn: "loss",
-    },
-  };
-  function curLang(){
-    let l = localStorage.getItem("hf_lang") || "ja";
-    return I18N[l] ? l : "ja";
-  }
-  function t(k){ return (I18N[curLang()] && I18N[curLang()][k]) || k; }
+  // ── i18n: the single dictionary (assets/i18n/dict.js) ------------
+  function t(k, v){ return T("sv." + k, v); }
+  const code = (f, v) => I18.code(f, v);
 
   // ── localStorage helpers (公開リポに値を書かない) ----------------
   function loadLog(){
@@ -102,11 +41,11 @@
   // ── number formatting --------------------------------------------
   function fmtPct(v, d){
     if (v === null || v === undefined || !Number.isFinite(+v)) return t("no_data");
-    return Number(v).toFixed(d != null ? d : 2) + "%";
+    return I18.fmtNum(v, d != null ? d : 2) + "%";
   }
   function fmtNum(v, d){
     if (v === null || v === undefined || !Number.isFinite(+v)) return t("no_data");
-    return Number(v).toFixed(d != null ? d : 2);
+    return I18.fmtNum(v, d != null ? d : 2);
   }
   function esc(s){
     return String(s == null ? "" : s).replace(/[&<>"']/g, c => ({
@@ -119,8 +58,8 @@
     const el = document.getElementById("sv-risk-gate");
     if (!el || !rg) return;
     const color = rg.color || "yellow";
-    const label = (rg.label || "neutral").toUpperCase();
-    const reasons = (rg.reasons || []).slice(0, 4).map(esc).join(" · ") || "—";
+    const label = code("risk_gate_label", rg.label || "neutral");
+    const reasons = (rg.reasons || []).slice(0, 4).map(x => esc(x && typeof x === "object" ? T("code.risk_gate_reason." + x.code, x.vars || x) : code("risk_gate_reason", x))).join(" · ") || "—";
     el.dataset.color = color;
     el.innerHTML =
       '<div class="sv-rg-line">' +
@@ -141,10 +80,10 @@
         '<div><b>' + esc(t("max_concurrent")) + '</b><span>' + esc(ar.max_concurrent) + '</span></div>' +
         '<div><b>' + esc(t("dd_shrink")) + '</b><span>' + fmtPct(ar.dd_shrink_pct, 1) + '</span></div>' +
         '<div><b>' + esc(t("dd_stop")) + '</b><span>' + fmtPct(ar.dd_stop_pct, 1) + '</span></div>' +
-        '<div><b>target vol</b><span>' + fmtPct(ar.target_vol_pct, 2) + '</span></div>' +
-        '<div><b>realized vol</b><span>' + fmtPct(ar.realized_vol_pct, 2) + '</span></div>' +
+        '<div><b>' + esc(t("target_vol")) + '</b><span>' + fmtPct(ar.target_vol_pct, 2) + '</span></div>' +
+        '<div><b>' + esc(t("realized_vol")) + '</b><span>' + fmtPct(ar.realized_vol_pct, 2) + '</span></div>' +
       '</div>' +
-      '<div class="sv-card-src">' + esc(ar.source || "") + '</div>';
+      '<div class="sv-card-src">' + esc(ar.source ? code("auto_risk_source", ar.source) : "") + '</div>';
   }
 
   // ── Candidates table ---------------------------------------------
@@ -152,14 +91,14 @@
     const el = document.getElementById("sv-candidates");
     if (!el) return;
     if (!Array.isArray(list) || !list.length) {
-      el.innerHTML = '<div class="sv-empty">No candidates today.</div>';
+      el.innerHTML = '<div class="sv-empty">' + esc(t("no_candidates")) + '</div>';
       return;
     }
     const shown = list.slice(0, 8);
     let html =
       '<div class="sv-card-hd">' + esc(t("candidates")) + ' (' + shown.length + ')</div>' +
       '<table class="sv-table"><thead><tr>' +
-        '<th>Symbol</th><th>Edge</th><th>Dir</th><th>Stretch</th><th>Vol%</th><th>PF</th><th>Status</th><th></th>' +
+        ths(["symbol", "edge", "dir", "stretch", "vol_pct", "pf", "status"]) + '<th></th>' +
       '</tr></thead><tbody>';
     shown.forEach(c => {
       const id = "C-" + c.symbol + "-" + (c.as_of || "").slice(0, 10);
@@ -167,11 +106,11 @@
         '<tr data-cid="' + esc(id) + '" data-symbol="' + esc(c.symbol) + '">' +
           '<td>' + esc(c.symbol) + '<br><small>' + esc(c.name || "") + '</small></td>' +
           '<td class="sv-num">' + fmtNum(c.edge_score, 1) + '</td>' +
-          '<td>' + esc(c.direction_hint || "—") + '</td>' +
+          '<td>' + esc(c.direction_hint ? code("direction", c.direction_hint) : "—") + '</td>' +
           '<td class="sv-num">' + fmtNum(c.stretch, 2) + '</td>' +
           '<td class="sv-num">' + fmtPct(c.vol_context_pct, 2) + '</td>' +
           '<td class="sv-num">' + fmtNum(c.positioning_fuel, 2) + '</td>' +
-          '<td>' + esc(c.data_status || "") + '</td>' +
+          '<td>' + esc(c.data_status ? code("data_status", c.data_status) : "") + '</td>' +
           '<td>' +
             '<button class="sv-btn sv-btn-take">' + esc(t("take")) + '</button> ' +
             '<button class="sv-btn sv-btn-skip">' + esc(t("skip")) + '</button>' +
@@ -219,13 +158,13 @@
     }
     let html = '<div class="sv-card-hd">' + esc(t("mode_a")) + ' (' + list.length + ')</div>' +
       '<table class="sv-table"><thead><tr>' +
-        '<th>Symbol</th><th>Dir</th><th>Size%</th><th>TP</th><th>SL</th><th>Pattern</th><th>Edge</th>' +
+        ths(["symbol", "dir", "size_pct", "tp", "sl", "pattern", "edge"]) +
       '</tr></thead><tbody>';
     list.forEach(p => {
       html +=
         '<tr>' +
           '<td>' + esc(p.symbol) + '<br><small>' + esc(p.name || "") + '</small></td>' +
-          '<td>' + esc(p.direction) + '</td>' +
+          '<td>' + esc(code("direction", p.direction)) + '</td>' +
           '<td class="sv-num">' + fmtPct(p.size_pct, 3) + '</td>' +
           '<td class="sv-num sv-pos">' + fmtPct(p.exit && p.exit.take_profit_pct, 2) + '</td>' +
           '<td class="sv-num sv-neg">' + fmtPct(p.exit && p.exit.stop_loss_pct, 2) + '</td>' +
@@ -248,7 +187,7 @@
     }
     let html = '<div class="sv-card-hd">' + esc(t("pattern_table")) + '</div>' +
       '<table class="sv-table"><thead><tr>' +
-        '<th>Pattern</th><th>TP %</th><th>SL % (fixed)</th>' +
+        ths(["pattern", "tp_pct", "sl_fixed"]) +
       '</tr></thead><tbody>';
     Object.keys(pt).forEach(k => {
       const c = pt[k];
@@ -259,7 +198,7 @@
           '<td class="sv-num sv-neg sv-fixed">' + fmtPct(c.stop_loss_pct, 2) + '</td>' +
         '</tr>';
     });
-    html += '</tbody></table><div class="sv-card-src">SL は固定 (Phase 1 設計、daily_update で更新されない)。</div>';
+    html += '</tbody></table><div class="sv-card-src">' + esc(t("sl_fixed_note")) + '</div>';
     el.innerHTML = html;
   }
 
@@ -270,7 +209,7 @@
     const grid = bs.risk_grid || [];
     let html = '<div class="sv-card-hd">' + esc(t("bankruptcy")) + '</div>' +
       '<table class="sv-table"><thead><tr>' +
-        '<th>Risk %</th><th>' + esc(t("ror_mc")) + '</th><th>' + esc(t("ror_kf")) + '</th>' +
+        ths(["risk_pct", "ror_mc", "ror_kf"]) +
       '</tr></thead><tbody>';
     grid.forEach(g => {
       const ror = g.ror_mc;
@@ -284,8 +223,7 @@
     });
     html += '</tbody></table>' +
       '<div class="sv-card-src">' +
-        'trades=' + esc(bs.trades) + ' runs=' + esc(bs.runs) +
-        ' · p=' + esc(bs.win_prob_used) + ' b=' + esc(bs.win_loss_ratio_used) +
+        esc(t("mc_params", { trades: I18.fmtNum(bs.trades, 0), runs: I18.fmtNum(bs.runs, 0), p: bs.win_prob_used, b: bs.win_loss_ratio_used })) +
       '</div>';
     el.innerHTML = html;
   }
@@ -341,7 +279,7 @@
             (a.avg_roi_pct != null ? fmtPct(a.avg_roi_pct, 2) : '—') + '</span></div>' +
           '<div><b>' + esc(t("brier")) + '</b><span>' +
             (a.brier != null ? fmtNum(a.brier, 3) : '—') + '</span></div>' +
-          '<div><b>log</b><span>' + a.count + ' rows</span></div>' +
+          '<div><b>' + esc(t("log_short")) + '</b><span>' + esc(t("rows_n", { n: I18.fmtNum(a.count, 0) })) + '</span></div>' +
         '</div>';
     }
     const logEl = document.getElementById("sv-log");
@@ -353,19 +291,19 @@
       }
       let html = '<div class="sv-card-hd">' + esc(t("log")) + ' (' + arr.length + ')</div>' +
         '<table class="sv-table"><thead><tr>' +
-          '<th>date</th><th>sym</th><th>mode</th><th>act</th><th>p</th><th>out</th><th>roi%</th><th></th>' +
+          ths(["date", "sym", "mode", "act", "p", "out", "roi_pct"]) + '<th></th>' +
         '</tr></thead><tbody>';
       recent.forEach(e => {
         const d = e.entry_date || new Date(e.ts || Date.now()).toISOString().slice(0, 10);
         const outClass = e.outcome === 'win' ? 'sv-pos' : e.outcome === 'loss' ? 'sv-neg' : 'sv-flat';
         html +=
           '<tr data-id="' + esc(e.id || "") + '">' +
-            '<td>' + esc(d) + '</td>' +
+            '<td>' + esc(I18.fmtDate(d, "ymd")) + '</td>' +
             '<td>' + esc(e.symbol || '') + '</td>' +
             '<td>' + esc(e.mode || '') + '</td>' +
-            '<td>' + esc(e.action || '') + '</td>' +
+            '<td>' + esc(e.action ? t("act_" + e.action) : '') + '</td>' +
             '<td class="sv-num">' + (e.predicted_prob != null ? fmtNum(e.predicted_prob, 2) : '—') + '</td>' +
-            '<td class="' + outClass + '">' + esc(e.outcome || '—') + '</td>' +
+            '<td class="' + outClass + '">' + esc(e.outcome === 'win' ? t("win") : e.outcome === 'loss' ? t("lose") : '—') + '</td>' +
             '<td class="sv-num">' + (e.realized_pct != null ? fmtPct(e.realized_pct, 2) : '—') + '</td>' +
             '<td>' +
               '<button class="sv-mini sv-mini-win">' + esc(t("win_btn")) + '</button> ' +
@@ -425,7 +363,7 @@
     const nt = document.getElementById("sv-notes");
     if (nt && Array.isArray(sl.notes)) {
       nt.innerHTML = '<div class="sv-card-hd">' + esc(t("notes")) + '</div>' +
-        '<ul>' + sl.notes.map(n => '<li>' + esc(n) + '</li>').join('') + '</ul>';
+        '<ul>' + sl.notes.map(n => '<li>' + esc(code("survival_note", n)) + '</li>').join('') + '</ul>';
     }
     // Notify panel (Phase 1.6): refresh when survival is rendered.
     if (typeof window.__survivalNotifyRefresh === "function") {
@@ -459,4 +397,6 @@
     const tb = document.getElementById("toolbar"); if (tb) tb.style.display = "";
   };
   window.__survivalRefresh = renderAll;
+  // 表の見出し（辞書キー sv.th_*）
+  function ths(keys){ return keys.map(k => '<th>' + esc(t("th_" + k)) + '</th>').join(''); }
 })();

@@ -73,14 +73,16 @@ def _period_avg(roll, index_series, start, end):
 
 
 def regime_of(r):
+    """(regime, label)。label もコード（表示文は UI 辞書）:
+    unknown=相関を計算できません（データ不足） / growth_shock_dominant=成長ショック主導。債券が株のヘッジになる＝天秤が機能 /
+    inflation_policy_shock_dominant=インフレ/政策ショック主導。株と債券が同時に落ちる＝天秤が壊れる / transition=移行期。符号が不安定"""
     if r is None:
-        return ("unknown", "相関を計算できません（データ不足）。")
+        return ("unknown", "unknown")
     if r <= -0.20:
-        return ("growth_shock_dominant", "成長ショック主導。債券が株のヘッジになる＝天秤が機能")
+        return ("growth_shock_dominant", "growth_shock_dominant")
     if r >= 0.20:
-        return ("inflation_policy_shock_dominant",
-                "インフレ/政策ショック主導。株と債券が同時に落ちる＝天秤が壊れる")
-    return ("transition", "移行期。符号が不安定")
+        return ("inflation_policy_shock_dominant", "inflation_policy_shock_dominant")
+    return ("transition", "transition")
 
 
 def _beta(index_s, y10):
@@ -140,9 +142,7 @@ def main():
         "sp500": _beta(spx, dgs10) if (spx is not None and dgs10 is not None) else None,
         "lookback_days": BETA_LOOKBACK,
         "unit": "percent_per_10bp",
-        "note": ("10bp の利回り上昇に対する日次リターン%(直近250日 OLS 傾き)。Nasdaq が最も敏感なのは"
-                 "デュレーション(利益が遠い将来)で説明どおり。ただし Dow > SPX は教科書と逆。断定せず"
-                 "観測対象として置く。"),
+        "note": "beta_note",   # 10bp 上昇に対する日次リターン%(直近250日 OLS 傾き)。Nasdaq 最敏感=デュレーション。Dow > SPX は教科書と逆。断定せず観測対象
     }
 
     # ── part 4: quarter-end rebalance (duration-8 approx) ───────────────────
@@ -164,7 +164,7 @@ def main():
                 "bond_ret_pct": round(bond_ret * 100, 2),
                 "gap_pct": round(gap * 100, 2),
                 "pressure": "sell_equity_buy_bond" if gap > 0 else "buy_equity_sell_bond",
-                "note": "デュレーション8での近似。実際の年金比率と規模は非公開。",
+                "note": "rebalance_duration8_note",   # デュレーション8での近似。実際の年金比率と規模は非公開
             }
 
     # ── percentile context (reuse macro_v2.contextualize) ───────────────────
@@ -183,18 +183,18 @@ def main():
         "equity": "^GSPC", "equity_source": "FRED:SP500",
         "real_yield": "DFII10", "nominal": "DGS10", "term_premium": "THREEFYTP10",
         "yields": ["US2Y", "US10Y", "US30Y"],
-        "asymmetry": "full (real yield + term premium available)",
+        "asymmetry": "full_real_yield_term_premium",   # full (real yield + term premium available)
         "source": "FRED (public)",
         "data_status": "live" if len(us_cols) == 3 else "error",
         "series": _region_series(us_cols) if len(us_cols) == 3 else [],
     }
     eu_cols = {k: v for k, v in {"equity": sx5e, "nominal": eu10}.items() if v is not None}
     regions["eu"] = {
-        "equity": "^STOXX50E", "equity_source": "yfinance (personal-use ToS)",
+        "equity": "^STOXX50E", "equity_source": "yfinance",
         "real_yield": None, "nominal": "EU10Y", "term_premium": None,
         "yields": ["EU2Y", "EU10Y", "EU30Y"],
-        "asymmetry": "nominal only — no free daily real yield / term premium (US-asymmetric)",
-        "source": "equity yfinance (personal-use), yields ECB Data Portal",
+        "asymmetry": "nominal_only_us_asymmetric",   # nominal only — no free daily real yield / term premium
+        "source": "yfinance + ECB Data Portal",
         "data_status": "live" if len(eu_cols) == 2 else "error",
         "series": _region_series(eu_cols) if len(eu_cols) == 2 else [],
     }
@@ -203,8 +203,8 @@ def main():
         "equity": "^N225", "equity_source": "FRED:NIKKEI225",
         "real_yield": None, "nominal": "JP10Y", "term_premium": None,
         "yields": ["JP2Y", "JP10Y", "JP30Y"],
-        "asymmetry": "nominal only — no free daily real yield / term premium (US-asymmetric)",
-        "source": "equity FRED, yields MoF JGB",
+        "asymmetry": "nominal_only_us_asymmetric",
+        "source": "FRED + MoF JGB",
         "data_status": "live" if len(jp_cols) == 2 else "error",
         "series": _region_series(jp_cols) if len(jp_cols) == 2 else [],
     }
@@ -212,16 +212,14 @@ def main():
     payload = {
         "as_of": now.isoformat(),
         "align": "inner_join",
-        "align_note": ("株価と利回りを共通営業日で inner join（dropna, 前方補完なし）。build_corr.py と同方式。"
-                       "日米欧の祝日・TARGET 休業日が一致しないため共通日は各系列より少ない。"),
+        "align_note": "inner_join_no_ffill_note",   # 共通営業日で inner join（dropna, 前方補完なし）。祝日不一致で共通日は各系列より少ない
         "balance": {
             "erp": {"value": None, "data_status": "unavailable",
-                    "reason": "指数の日次EPSに無料の信頼ソースがない。Shillerミラーは2024-09で停止。"},
+                    "reason": "erp_no_free_daily_eps"},   # 指数の日次EPSに無料の信頼ソースがない。Shillerミラーは2024-09で停止
             "regime": {"r_120d": r120, "regime": reg_key, "label": reg_label,
                        "n_obs": n_corr, "history": history,
-                       "note": ("株価の日次対数リターン × 利回りの日次変化(bp) の120日ローリング相関。"
-                                "必ずリターン×変化で取る（水準同士はトレンドで見かけ上高く出る）。"
-                                "60/40 の前提はこの符号に依存する。")},
+                       # 株価の日次対数リターン × 利回りの日次変化(bp) の120日ローリング相関。60/40 の前提はこの符号に依存
+                       "note": "regime_corr_method_note"},
             "beta": beta,
             "rebalance": rebalance,
             "context": ctx,
@@ -229,11 +227,10 @@ def main():
         "regions": regions,
         "source_asymmetry": {
             "us": "FRED (public)", "jp": "FRED (public)",
-            "eu": "equity yfinance (personal-use ToS) — FRED に STOXX50E/SX5E が存在しないため",
-            "note": ("米国・日本の株価は FRED（公的）、欧州株価は yfinance（個人利用想定）という"
-                     "ソース非対称。実質金利・ターム・プレミアムは米国のみ（EU/JP は無料日次系列なし）。"),
+            "eu": "yfinance",   # equity yfinance (personal-use ToS) — FRED に STOXX50E/SX5E が存在しないため
+            "note": "source_asymmetry_note",   # 米日株価は FRED、欧州株価は yfinance。実質金利・TP は米国のみ
         },
-        "disclaimer": "For data visualization purposes only. Not investment advice.",
+        "disclaimer": "disclaimer_data_viz_not_advice",   # For data visualization purposes only. Not investment advice.
     }
 
     OUT.parent.mkdir(parents=True, exist_ok=True)

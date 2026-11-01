@@ -178,13 +178,13 @@ def subperiod_verdict(table: Sequence[Dict[str, Any]]) -> Dict[str, Any]:
     share = abs(biggest["sum_net_pct"]) / total
     if share > 0.50:
         return {"pass": False,
-                "reason": f"single year {biggest['year']} dominates ({share:.0%})",
+                "reason": "single_year_dominates", "year": biggest["year"], "share": round(share, 4),
                 "table": list(table)}
     # 負期間チェック
     neg = [r for r in table if r["mean_net_pct"] < 0]
     if neg:
         return {"pass": False,
-                "reason": f"negative year(s): {[r['year'] for r in neg]}",
+                "reason": "negative_years", "years": [r["year"] for r in neg],
                 "table": list(table)}
     return {"pass": True, "reason": None, "table": list(table)}
 
@@ -283,11 +283,11 @@ def fade_verdict(summary: Dict[str, Any]) -> Dict[str, Any]:
     reason = None
     if not passed:
         if not ok_skew and not ok_worst:
-            reason = f"neg-skew {skew:.2f} AND worst-day {worst:.2f}%"
+            reason = "neg_skew_and_worst_day"      # 値は summary.skew / worst_day_loss_pct
         elif not ok_skew:
-            reason = f"neg-skew {skew:.2f} (< -0.5)"
+            reason = "neg_skew"                    # skew < -0.5
         else:
-            reason = f"worst-day {worst:.2f}% < -5%"
+            reason = "worst_day_below_minus5"      # worst-day < -5%
     return {"pass": passed, "reason": reason, "summary": summary,
             "ok_skew": ok_skew, "ok_worst": ok_worst}
 
@@ -299,8 +299,9 @@ def combine_verdict(flags: Dict[str, Dict[str, Any]]) -> Dict[str, Any]:
     crit = {k: bool((flags.get(k) or {}).get("pass")) for k in
              ("cost", "outlier", "subperiod", "fade")}
     all_pass = all(crit.values())
-    overall = ("Stage2-conditioners-justified" if all_pass
-               else "raw-cross-asset-not-tradeable → Completion-B候補")
+    # stage2_conditioners_justified / raw_cross_asset_not_tradeable（旧: "raw-cross-asset-not-tradeable → Completion-B候補"）
+    overall = ("stage2_conditioners_justified" if all_pass
+               else "raw_cross_asset_not_tradeable")
     return {"overall": overall, "criteria": crit}
 
 
@@ -350,6 +351,5 @@ def run_robustness(trades_with_raw: Sequence[Dict[str, Any]],
         "subperiod": {"table": sub_table, "verdict": sub_v},
         "fade": {"summary": fade_s, "verdict": fade_v},
         "verdict": verdict,
-        "note": "頑健性検証. 想定 + 取引可能性検証 / not investment advice. "
-                "Phase 2 (学習) 未実装.",
+        "note": "robustness_check_note",   # 頑健性検証. 想定 + 取引可能性検証 / not investment advice. Phase 2 (学習) 未実装.
     }

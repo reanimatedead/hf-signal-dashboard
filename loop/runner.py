@@ -169,7 +169,7 @@ def run_loop(*, bars_by_symbol: Dict[str, Sequence[dict]],
         trial = {
             "name": h["name"],
             "params": dict(h.get("params") or {}),
-            "rationale": h.get("rationale"),
+            "rationale": f"rationale_{h['name']}",   # 理論根拠の本文は loop/registry.py（公開 JSON はコード）
             "n_trades": len(all_trades),
             "hit_rate": gates_res["fade"]["summary"].get("hit_rate"),  # fade は逆だが
             # hit_rate は元 trades 由来で再計算 (直値)
@@ -238,10 +238,10 @@ def run_loop(*, bars_by_symbol: Dict[str, Sequence[dict]],
 
     survivors = [tr["name"] for tr in trials if tr["verdict"] == "survives"]
     if survivors:
-        verdict = f"transfer-candidate-survived: {','.join(survivors)} (要・一発ホールドアウト確認)"
+        # 生き残り = survivors（要・一発ホールドアウト確認）
+        verdict = "transfer_candidate_survived"
     else:
-        verdict = ("empty-set under current gate → 指数転用は防御止まり / "
-                    "転用Completion-B")
+        verdict = "empty_set_under_gate"   # 指数転用は防御止まり / 転用Completion-B
 
     return {
         "ok": True,
@@ -255,8 +255,7 @@ def run_loop(*, bars_by_symbol: Dict[str, Sequence[dict]],
         "trials": trials,
         "frontier": frontier,
         "verdict": verdict,
-        "note": "Phase 1.9.2 anti-overfit loop. Single-hypothesis raw predictive "
-                "power tested. Each hypothesis runs ONCE with fixed params. "
-                "Holdout (last 2y) physically blocked. Not investment advice. "
-                "Phase 2 (learning) not implemented.",
+        "survivors": survivors,
+        # Phase 1.9.2 anti-overfit loop. Each hypothesis runs ONCE with fixed params. Holdout blocked. Not advice.
+        "note": "loop_anti_overfit_note",
     }

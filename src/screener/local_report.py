@@ -1,7 +1,7 @@
 """日本株の一覧を Mac mini のローカル（<data_dir>/out/）にだけ書き出す。リポジトリ・Pages には出さない（ADR-002）。
 
-out/japan_list.csv    日本株の一覧（総合判定 A/B/C・チャート判定・理論株価・一時利益の目印 など）
-out/japan_list.html   同じ内容の簡単な表（ブラウザで開くだけ。外部の読み込みなし）
+out/japan_list.csv    日本株の一覧（列名・値はコード: grade A/B/C・chart_signal・fair_price・one_off_note など）
+out/japan_list.html   同じ内容の簡単な表（言葉は screener.labels で付ける。ブラウザで開くだけ。外部の読み込みなし）
 out/us_list.csv       米国株の一覧
 out/verify_local.json 検証（20営業日後 vs 基準）
 out/counts.json       件数（前回の件数 previous と、日本株の件数のずれ % も入れる）
@@ -18,12 +18,13 @@ import os
 from pathlib import Path
 from typing import Any
 
+from . import labels
 from .config import PACKAGE_REPO, Config, _inside
 
 GRADE_ORDER = {"A": 0, "B": 1, "C": 2}
 HTML_COLS = [
-    "総合判定", "コード", "会社名", "市場", "業種", "チャート判定", "株価", "理論株価", "上値余地%", "PBR",
-    "F", "F満点", "魔法の公式順位", "財務判定", "時価総額(億円)", "一時利益の目印", "一時利益の理由",
+    "grade", "code", "company_name", "market", "sector", "chart_signal", "price", "fair_price", "upside_pct", "PBR",
+    "F", "f_max", "magic_rank", "fin_tag", "mcap_oku_jpy", "one_off_note", "one_off_reasons",
 ]  # fmt: skip
 
 
@@ -60,15 +61,16 @@ def _write_csv(p: Path, rows: list[dict[str, Any]]) -> None:
 
 
 def _sort_key(r: dict[str, Any]) -> tuple[int, float]:
-    return GRADE_ORDER.get(r.get("総合判定", "C"), 9), -(r.get("上値余地%") or -1e9)
+    return GRADE_ORDER.get(r.get("grade", "C"), 9), -(r.get("upside_pct") or -1e9)
 
 
 def render_html(rows: list[dict[str, Any]], asof: str) -> str:
-    head = "".join(f"<th>{html.escape(c)}</th>" for c in HTML_COLS)
+    """HTML の表。データはコードのまま渡し、列名・値の言葉はここで screener.labels から付ける。"""
+    head = "".join(f"<th>{html.escape(labels.col(c))}</th>" for c in HTML_COLS)
     body = []
     for r in rows:
-        tds = "".join(f"<td>{html.escape('' if r.get(c) is None else str(r.get(c)))}</td>" for c in HTML_COLS)
-        body.append(f'<tr class="g{html.escape(str(r.get("総合判定", "")))}">{tds}</tr>')
+        tds = "".join(f"<td>{html.escape(labels.value(r.get(c)))}</td>" for c in HTML_COLS)
+        body.append(f'<tr class="g{html.escape(str(r.get("grade", "")))}">{tds}</tr>')
     return (
         '<!DOCTYPE html>\n<html lang="ja"><head><meta charset="utf-8">'
         f"<title>日本株の一覧 {html.escape(asof)}</title>"
@@ -88,8 +90,8 @@ def counts(doc: dict[str, Any], previous: dict[str, Any] | None) -> dict[str, An
         "asof": doc.get("asof"),
         "japan_rows": len(jp),
         "us_rows": len(us),
-        "japan_grades": dict(sorted(collections.Counter(r.get("総合判定") for r in jp).items())),
-        "us_grades": dict(sorted(collections.Counter(r.get("総合判定") for r in us).items())),
+        "japan_grades": dict(sorted(collections.Counter(r.get("grade") for r in jp).items())),
+        "us_grades": dict(sorted(collections.Counter(r.get("grade") for r in us).items())),
     }
     if previous:
         prev = {k: v for k, v in previous.items() if k not in ("previous", "japan_diff_pct")}

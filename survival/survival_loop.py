@@ -40,9 +40,9 @@ def _build_risk_gate(data: dict) -> dict:
     wow = _safe_num(us_cb.get("wow_change"))
     if wow is not None:
         if wow > 0:
-            score += 1; reasons.append("Fed assets expanding")
+            score += 1; reasons.append("fed_assets_expanding")
         elif wow < 0:
-            score -= 1; reasons.append("Fed assets contracting")
+            score -= 1; reasons.append("fed_assets_contracting")
 
     vix_row = next(
         (r for r in (data.get("markets") or {}).get("volatility", [])
@@ -52,16 +52,16 @@ def _build_risk_gate(data: dict) -> dict:
     vix = _safe_num(vix_row.get("price")) if vix_row else None
     if vix is not None:
         if vix >= 30:
-            score -= 2; reasons.append(f"VIX {vix:.1f} high")
+            score -= 2; reasons.append("vix_high")   # 値は inputs.vix
         elif vix >= 20:
-            score -= 1; reasons.append(f"VIX {vix:.1f} elevated")
+            score -= 1; reasons.append("vix_elevated")
         elif vix < 15:
-            score += 1; reasons.append(f"VIX {vix:.1f} calm")
+            score += 1; reasons.append("vix_calm")
 
     yc = (data.get("meta") or {}).get("yield_curve") or {}
     state = ((yc.get("us_10y_2y_spread") or {}).get("state") or "")
     if state == "inverted":
-        score -= 1; reasons.append("US curve inverted")
+        score -= 1; reasons.append("us_curve_inverted")
     elif state == "normal_or_steepening":
         score += 0  # neutral fact
 
@@ -82,7 +82,7 @@ def _build_risk_gate(data: dict) -> dict:
             "vix": vix,
             "yield_curve_state": state or None,
         },
-        "note": "Macro environment indicator. Not investment advice.",
+        "note": "macro_indicator_not_advice",   # reasons[] / note はコード（表示文は UI 辞書）
     }
 
 
@@ -152,7 +152,7 @@ def _build_mode_a(candidates: List[dict], table, per_trade_pct: float,
             },
             "size_pct": re.clamp_risk(per_trade_pct),
             "data_status": c.get("data_status"),
-            "note": "Mode A virtual entry (machine). Macro environment context only — not investment advice.",
+            "note": "mode_a_virtual_entry_not_advice",
         })
     return positions
 
@@ -195,13 +195,13 @@ def build(data: dict) -> dict:
         # 候補は edge_score>=55 上位 20 件 (Phase 1 spec §4.1 のチューニング点)
         "candidates": [c for c in candidates if (c.get("edge_score") or 0) >= 55][:20],
         "mode_a_positions": mode_a,
-        "mode_b_note": "Mode B = discretionary. Recorded client-side (localStorage).",
-        "mode_c_note": "Mode C = A/B comparison ledger. Verdict in Phase 3.",
+        "mode_b_note": "mode_b_discretionary_local",
+        "mode_c_note": "mode_c_comparison_ledger",
         "bankruptcy_simulation": hm,
         "notes": [
-            "Hard caps in survival.risk_engine.HARD_CAPS (no learning).",
-            "Stop loss / margin call / DD ceilings are fixed. Not adjusted by daily_update.",
-            "Phase 1: no model learning, no regime auto-switch.",
-            "Market environment visualization only. Not investment advice.",
+            "hard_caps_no_learning",       # Hard caps in survival.risk_engine.HARD_CAPS (no learning).
+            "risk_ceilings_fixed",         # Stop loss / margin call / DD ceilings are fixed. Not adjusted by daily_update.
+            "phase1_no_learning",          # Phase 1: no model learning, no regime auto-switch.
+            "disclaimer_not_advice",       # Market environment visualization only. Not investment advice.
         ],
     }
