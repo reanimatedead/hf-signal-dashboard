@@ -33,7 +33,7 @@ def git_pull(cfg: Config, runner: Runner = subprocess.run) -> None:
         raise RuntimeError(f"git pull --ff-only が失敗（{cfg.repo_dir}）: {str(r.stderr).strip()[:300]}")
 
 
-def update_us_prices(cfg: Config) -> None:
+def update_us(cfg: Config, today: dt.date) -> None:
     from .us import fetch as us_fetch
 
     p = cfg.us("universe.json")
@@ -42,6 +42,10 @@ def update_us_prices(cfg: Config) -> None:
         if not rec["ok"]:
             raise RuntimeError("米国の構成銘柄の件数が想定から外れています: " + " / ".join(rec["messages"]))
     tickers = list(json.loads(p.read_text()))
+    if today.weekday() == 0 or not any(cfg.us("facts").glob("*.json")):
+        got, err = us_fetch.fetch_edgar(cfg, tickers)
+        if err > len(tickers) * 0.1:
+            raise RuntimeError(f"EDGAR の決算が {err}/{len(tickers)} 件取れない")
     got, err = us_fetch.fetch_prices(cfg, tickers)
     if err > len(tickers) * 0.1:
         raise RuntimeError(f"米国株の株価が {err}/{len(tickers)} 件取れない")
@@ -52,7 +56,7 @@ def pipeline(
     today: dt.date,
     get: Getter | None = None,
     runner: Runner = subprocess.run,
-    us_prices: Callable[[Config], None] = update_us_prices,
+    us_update: Callable[[Config, dt.date], None] = update_us,
 ) -> dict[str, Any]:
     from .japan import fetch as jp_fetch
     from .japan import signals
@@ -63,7 +67,7 @@ def pipeline(
         get = default_client(int(cfg.get("jquants.rate_per_min", 50)), str(cfg.get("jquants.keychain_service"))).get
     print(contract.check(today, get), flush=True)
     print("japan fetch", jp_fetch.run(cfg, today, get=get), flush=True)
-    us_prices(cfg)
+    us_update(cfg, today)
     doc = signals.run(cfg)
     c = local_report.write(cfg, doc)
     print("counts", json.dumps(c, ensure_ascii=False), flush=True)  # 件数だけ

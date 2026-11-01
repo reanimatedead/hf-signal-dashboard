@@ -72,20 +72,20 @@ def test_pipeline_end_to_end_on_fixture(cfg):
     """架空データの最終日（既にファイルがある日）で全段を通す。git・J-Quants・Yahoo は差し替え。"""
     git = Git()
     last = dt.date(2026, 10, 30)
-    c = daily.pipeline(cfg, last, get=fake_get(), runner=git, us_prices=lambda c: None)
+    c = daily.pipeline(cfg, last, get=fake_get(), runner=git, us_update=lambda c, d: None)
     assert git.calls == [["git", "-C", str(cfg.repo_dir), "pull", "--ff-only"]]
     assert c["japan_rows"] == 5 and (cfg.out_dir / "japan_list.html").exists()
 
 
 def test_git_pull_failure_stops(cfg):
     with pytest.raises(RuntimeError, match="ff-only"):
-        daily.pipeline(cfg, TUE, get=fake_get(), runner=Git(rc=1), us_prices=lambda c: None)
+        daily.pipeline(cfg, TUE, get=fake_get(), runner=Git(rc=1), us_update=lambda c, d: None)
 
 
 @pytest.mark.parametrize("kw", [{"daily_rows": 1200}, {"drop_col": "NxFEPS"}])
 def test_contract_failure_stops_before_fetch(cfg, kw):
     with pytest.raises(contract.ContractError):
-        daily.pipeline(cfg, TUE, get=fake_get(**kw), runner=Git(), us_prices=lambda c: None)
+        daily.pipeline(cfg, TUE, get=fake_get(**kw), runner=Git(), us_update=lambda c, d: None)
     assert not cfg.jp("daily", f"{TUE}.json").exists()
 
 
