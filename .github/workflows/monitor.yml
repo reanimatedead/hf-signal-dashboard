@@ -20,7 +20,6 @@ on:
 
 permissions:
   contents: read
-  issues: write
   actions: read
 
 concurrency:
@@ -52,25 +51,17 @@ jobs:
           # 0=OK, 1=soft fail (retry-able / stale), 2=hard fail (404/403/410)
           exit $ec
 
-      # ハード失敗（exit 2）は 1 回で Issue 起票。ファイル消失は待つ理由がない。
-      - name: Open issue immediately on hard failure (exit 2)
+      # ハード失敗（exit 2）は 1 回で通知（ntfy だけ。Issue は作らない）。ファイル消失は待つ理由がない。
+      - name: Notify ntfy immediately on hard failure (exit 2)
         if: failure() && steps.probe.outputs.exit_code == '2'
         env:
-          GH_TOKEN: ${{ github.token }}
+          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
         run: |
-          TITLE="🔴 Live monitor: 公開サイトの配信異常"
-          RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-          EXISTING=$(gh issue list --state open --search "$TITLE in:title" --json number -q '.[0].number' || true)
-          BODY="verify_live.py が公開 Pages のハード異常 (exit 2 = 404/403/410 相当) を検知しました。ファイル消失または権限異常。この失敗は単発でも即 Issue します（待っても直らないため）。run: $RUN_URL"
-          if [ -z "$EXISTING" ]; then
-            gh issue create --title "$TITLE" --body "$BODY" --label monitor 2>/dev/null \
-              || gh issue create --title "$TITLE" --body "$BODY"
-          else
-            gh issue comment "$EXISTING" --body "$BODY"
-          fi
+          [ -n "$NTFY_TOPIC" ] || { echo "::warning::NTFY_TOPIC が未設定のため、失敗の通知を送れませんでした（Settings → Secrets → Actions に NTFY_TOPIC を登録）"; exit 0; }
+          curl -fsS -m 20 -d "hf-signal-dashboard monitor $(TZ=Asia/Tokyo date +%F) 失敗" "https://ntfy.sh/$NTFY_TOPIC" >/dev/null || echo "ntfy 送信失敗"
 
       # ソフト失敗（exit 1）は「直前の scheduled run も failure だった」場合のみ
-      # Issue 起票（N=2 連続で発火）。単発 5xx でオオカミ少年にならない。
+      # ntfy で通知（N=2 連続で発火。Issue は作らない）。単発 5xx でオオカミ少年にならない。
       # 前回状態の永続化方式: GitHub Actions API（gh run list）で直前の同一
       # workflow の scheduled 実行結果を読む。
       #   選んだ理由:
@@ -82,10 +73,11 @@ jobs:
       #       単発扱いになる
       #     - GitHub の run 履歴は既に真理値であり、workflow_dispatch と
       #       schedule を区別できて追加権限も要らない
-      - name: Check previous scheduled run and gate Issue creation (soft failure)
+      - name: Check previous scheduled run and gate notification (soft failure)
         if: failure() && steps.probe.outputs.exit_code == '1'
         env:
           GH_TOKEN: ${{ github.token }}
+          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
         run: |
           # 直前の SCHEDULED 実行のみ対象にする (workflow_dispatch でのテスト実行が
           # 誤って「連続失敗」を成立させないため)。この run 自身は除外して 1 件取得。
@@ -100,19 +92,10 @@ jobs:
           PREV_CONCL=$(echo "$PREV" | python3 -c "import sys,json; d=json.load(sys.stdin) if sys.stdin.readable() else None; print(d['conclusion'] if d else '')" 2>/dev/null || true)
           echo "previous scheduled run: id=$PREV_ID conclusion=$PREV_CONCL"
 
-          TITLE="🟡 Live monitor: 公開サイトの一時的失敗が連続"
-          RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-
           if [ "$PREV_CONCL" = "failure" ]; then
-            EXISTING=$(gh issue list --state open --search "$TITLE in:title" --json number -q '.[0].number' || true)
-            BODY="verify_live.py が exit 1 (5xx リトライ後失敗 / 鮮度切れ / 429 等) を 2 サイクル連続で検知しました。単発の 5xx はリトライで吸収する仕様のため、これは持続的な状態です。213h サイレント停止のような症状の初期兆候の可能性があります。run: $RUN_URL / 直前 run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/$PREV_ID"
-            if [ -z "$EXISTING" ]; then
-              gh issue create --title "$TITLE" --body "$BODY" --label monitor 2>/dev/null \
-                || gh issue create --title "$TITLE" --body "$BODY"
-            else
-              gh issue comment "$EXISTING" --body "$BODY"
-            fi
+            [ -n "$NTFY_TOPIC" ] || { echo "::warning::NTFY_TOPIC が未設定のため、失敗の通知を送れませんでした（Settings → Secrets → Actions に NTFY_TOPIC を登録）"; exit 0; }
+            curl -fsS -m 20 -d "hf-signal-dashboard monitor $(TZ=Asia/Tokyo date +%F) 失敗" "https://ntfy.sh/$NTFY_TOPIC" >/dev/null || echo "ntfy 送信失敗"
           else
-            echo "single soft failure — suppressing Issue creation (previous conclusion was '$PREV_CONCL', not 'failure')"
-            echo "次回 scheduled run も failure なら Issue を起票します。"
+            echo "single soft failure — suppressing notification (previous conclusion was '$PREV_CONCL', not 'failure')"
+            echo "次回 scheduled run も failure なら ntfy で通知します。"
           fi

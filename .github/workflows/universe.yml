@@ -2,10 +2,10 @@ name: Weekly universe + US fundamentals
 
 # 毎週月曜 2:00 JST（= 日曜 17:00 UTC）:
 #   1. tools/update_universe.py — 構成銘柄（S&P500 / Nasdaq-100 / Dow30）を取り直し、件数 ±5% を検査。
-#      外れたら前週の一覧のまま（Issue をタイトル固定で1件だけ）。差分は data/universe/changes.json。
+#      外れたら前週の一覧のまま。差分は data/universe/changes.json。
 #      日経225 は DATA_CONTRACT §19 に従い既定では取得しない（リポジトリ変数 NIKKEI_DYNAMIC=true のときだけ）。
 #   2. tools/build_us_fundamentals.py — EDGAR を1社ずつ → data/us_fundamentals.json（最初に主要20社のタグ契約テスト）。
-#      失敗したら前回のファイルのまま（Issue 1件）。
+#      失敗したら前回のファイルのまま。
 #   3. 変更をコミット（tools/git_push_retry.sh）。
 # SEC は User-Agent に連絡先を求めるので、リポジトリ変数 SEC_USER_AGENT を設定すること。
 
@@ -16,7 +16,6 @@ on:
 
 permissions:
   contents: write
-  issues: write
 
 concurrency:
   group: universe
@@ -39,16 +38,7 @@ jobs:
         id: uni
         env:
           NIKKEI_DYNAMIC: ${{ vars.NIKKEI_DYNAMIC }}
-        run: python3 tools/update_universe.py --issue-body /tmp/universe_issue.md
-
-      - name: Issue (once) if a universe was kept
-        if: steps.uni.outputs.bad != ''
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          echo "" >> /tmp/universe_issue.md
-          echo "run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" >> /tmp/universe_issue.md
-          python3 tools/issue_once.py --title "🟠 universe.yml: 構成銘柄の件数が想定外（前週の一覧のまま）" --body-file /tmp/universe_issue.md
+        run: python3 tools/update_universe.py
 
       - name: Build US fundamentals (EDGAR, one company at a time)
         id: fund
@@ -57,14 +47,6 @@ jobs:
           SEC_USER_AGENT: ${{ vars.SEC_USER_AGENT }}
         run: python3 tools/build_us_fundamentals.py
 
-      - name: Issue (once) if US fundamentals failed
-        if: steps.fund.outcome == 'failure'
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          python3 tools/issue_once.py --title "🟠 universe.yml: 米国決算（EDGAR）の更新が失敗（前回のまま）" \
-            --body "build_us_fundamentals が止まりました（契約テスト or 取得率不足）。data/us_fundamentals.json は前回のままです。run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-
       - name: Offline tests for the changed files
         run: python -m pytest tests/test_universe_lists.py tests/test_update_universe.py tests/test_us_fundamentals.py tests/screener/calc -q
 
@@ -72,10 +54,12 @@ jobs:
         run: |
           tools/git_push_retry.sh "chore(universe): weekly $(date -u '+%Y-%m-%d')" data/universe data/us_fundamentals.json
 
-      - name: Open issue on failure (universe)
+      # 失敗の通知は ntfy だけ（Issue は作らない）。本文は「ジョブ名・日付・失敗」だけ。
+      # リポジトリの Secret NTFY_TOPIC が無ければ ::warning:: をログに出す（通知は送れない）。
+      - name: Notify ntfy on failure (universe)
         if: failure()
         env:
-          GH_TOKEN: ${{ github.token }}
+          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
         run: |
-          python3 tools/issue_once.py --title "🔴 universe.yml: 週次更新ジョブが失敗" \
-            --body "run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          [ -n "$NTFY_TOPIC" ] || { echo "::warning::NTFY_TOPIC が未設定のため、失敗の通知を送れませんでした（Settings → Secrets → Actions に NTFY_TOPIC を登録）"; exit 0; }
+          curl -fsS -m 20 -d "hf-signal-dashboard universe $(TZ=Asia/Tokyo date +%F) 失敗" "https://ntfy.sh/$NTFY_TOPIC" >/dev/null || echo "ntfy 送信失敗"
