@@ -78,11 +78,21 @@ jobs:
           python-version: "3.11"
           cache: "pip"
 
-      - name: Install dependencies
+      # 2026-11: 版を固定した requirements.lock を使う（requirements.txt は下限指定として残す）。
+      # 最新版での確認は毎月1日の deps_latest.yml（自動では上げない）。
+      - name: Install dependencies (requirements.lock)
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
-          pip install pytest
+          pip install -r requirements.lock
+
+      # 2026-11 (M2): 外部データの契約テストを最初に。Yahoo 主要20×2の終値（欠け>10%）と
+      # 構成銘柄件数 ±5%。失敗したら以降を止める（= Pages は前日のデプロイのまま）。
+      # Issue はタイトル固定で1件だけ（既存なら comment）。下の汎用 Issue とは重複させない。
+      - name: Contract check (external data)
+        id: contract
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 tools/contract_check.py --issue --run-url "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
 
       # Generate → correlations → macro. build_macro is full-only (index.html does
       # not read docs/data/macro.json, but external consumers may; 3s / 13 FRED
@@ -146,7 +156,7 @@ jobs:
       # monitor.yml の外形検知は 2h 間隔で遅延するため、更新ジョブ自身が
       # 失敗した瞬間に通知する。同題 open Issue があればコメント追加のみ。
       - name: Open issue on failure (full)
-        if: failure()
+        if: failure() && steps.contract.outcome != 'failure'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -192,11 +202,12 @@ jobs:
           python-version: "3.11"
           cache: "pip"
 
-      - name: Install dependencies
+      # 2026-11: 版を固定した requirements.lock を使う（requirements.txt は下限指定として残す）。
+      # 最新版での確認は毎月1日の deps_latest.yml（自動では上げない）。
+      - name: Install dependencies (requirements.lock)
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
-          pip install pytest
+          pip install -r requirements.lock
 
       # Pull docs/data.json + required charts/*.json from the live site (chart
       # tabs derived from data.json), then guard the base (fail closed): stale

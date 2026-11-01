@@ -1,0 +1,55 @@
+name: Deps latest check (monthly)
+
+# 毎月1日: requirements.txt の最新版でオフラインのテストを回し、結果を data/ops/deps_latest.json に
+# コミットする。requirements.lock は自動では上げない（結果を見て人が更新する）。
+on:
+  schedule:
+    - cron: "47 2 1 * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  issues: write
+
+jobs:
+  latest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install latest (not the lock)
+        run: pip install --upgrade -r requirements.txt pytest
+      - name: Offline tests with latest versions
+        id: t
+        continue-on-error: true
+        run: |
+          python -m pytest marketcalc/tests tests/test_universe_lists.py tests/test_signal_columns.py \
+            tests/test_build_verify.py tests/test_contract_check.py tests/test_update_universe.py \
+            tests/test_us_fundamentals.py tests/test_index_html_contract.py -q 2>&1 | tee /tmp/pytest.txt
+          exit "${PIPESTATUS[0]}"
+      - name: Record result
+        run: |
+          mkdir -p data/ops
+          python3 - "${{ steps.t.outcome }}" <<'PY'
+          import json, sys, subprocess, datetime
+          frz = subprocess.run([sys.executable, "-m", "pip", "freeze"], capture_output=True, text=True).stdout.split()
+          lock = [l.strip() for l in open("requirements.lock") if l.strip() and not l.startswith("#")]
+          tail = open("/tmp/pytest.txt").read().strip().splitlines()[-1:]
+          json.dump({"date": datetime.date.today().isoformat(), "python": sys.version.split()[0],
+                     "result": sys.argv[1], "pytest_summary": tail, "latest": frz,
+                     "differs_from_lock": sorted(set(frz) - set(lock))},
+                    open("data/ops/deps_latest.json", "w"), ensure_ascii=False, indent=1)
+          PY
+      - name: Commit
+        run: |
+          tools/git_push_retry.sh "chore(deps): latest check $(date -u '+%Y-%m-%d')" data/ops/deps_latest.json
+      - name: Issue (once) if latest versions break tests
+        if: steps.t.outcome == 'failure'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python3 tools/issue_once.py --title "🟠 deps_latest: 最新版の依存でテストが失敗（lock は据え置き）" \
+            --body "data/ops/deps_latest.json を確認。run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
