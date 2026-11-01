@@ -7,7 +7,7 @@
      （universe.yml ではリポジトリ変数 NIKKEI_DYNAMIC=true のとき）だけ Wikipedia から取る。
   2. 件数検査: marketcalc.contracts.count_within（想定 ±5%）。
   3. 外れた / 取れなかった → 前週の一覧（data/universe/{name}.json、無ければ内蔵 dict）のまま。
-     GITHUB_OUTPUT に bad=... を書き、workflow が Issue を1件だけ起票する（tools/issue_once.py）。
+     GITHUB_OUTPUT に bad=... を書く（前週の一覧のまま続ける。Issue は作らない・通知は ntfy だけ）。
   4. 通った → data/universe/{name}.json を更新し、前週との差分を data/universe/changes.json に追記。
      コミットは workflow が行う。
 

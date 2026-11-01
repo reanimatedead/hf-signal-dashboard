@@ -30,9 +30,7 @@ permissions:
   contents: read
   pages: write
   id-token: write
-  # 2026-08-19 追加: 失敗時に自動 Issue 起票するため（`Open issue on failure`
-  # ステップで gh CLI を使う）。読取専用の contents と併存。
-  issues: write
+  # 2026-11: 失敗時の Issue 自動起票はやめた（通知は ntfy だけ）。Issue の書き込み権限は外した。
 
 # One live Pages deployment at a time.
 # 2026-08-19 変更: cancel-in-progress を false → true に反転。
@@ -85,14 +83,11 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.lock
 
-      # 2026-11 (M2): 外部データの契約テストを最初に。Yahoo 主要20×2の終値（欠け>10%）と
-      # 構成銘柄件数 ±5%。失敗したら以降を止める（= Pages は前日のデプロイのまま）。
-      # Issue はタイトル固定で1件だけ（既存なら comment）。下の汎用 Issue とは重複させない。
+      # 2026-11 (M2): 外部データの事前確認。構成銘柄件数 ±5% が外れたら止める。
+      # Yahoo 主要20×2 は「警告だけ」（HTTP 429 は「取れない」ではなく「確認できない」。公開は止めない）。
+      # 本当の欠損チェックは生成後の nan_report（下の "Missing-data check" ステップ）。
       - name: Contract check (external data)
-        id: contract
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: python3 tools/contract_check.py --issue --run-url "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+        run: python3 tools/contract_check.py
 
       # Generate → correlations → macro. build_macro is full-only (index.html does
       # not read docs/data/macro.json, but external consumers may; 3s / 13 FRED
@@ -135,6 +130,10 @@ jobs:
       - name: Assert generated payload health (freshness + completeness)
         run: PYTHONPATH=tools python3 tools/assert_gen_health.py
 
+      # 生成後の欠損チェック: data.json の meta.nan_report で、株式4タブの price=None が 10% 超なら止める。
+      - name: Missing-data check (nan_report)
+        run: python3 tools/contract_check.py --post docs/data.json
+
       # 生成物（docs/data.json など）が必要なテスト（marker needs_data_json）。オフライン（ci.yml）では
       # skip されるので、生成済みのここでスキップ禁止で回す。欠けていれば失敗 → upload/deploy は走らず前日のまま。
       - name: Data tests (data.json 必須・スキップ禁止)
@@ -157,23 +156,15 @@ jobs:
         id: deploy
         uses: actions/deploy-pages@v5
 
-      # 2026-08-19 追加: full ジョブ失敗時の自動 Issue 起票。
-      # monitor.yml の外形検知は 2h 間隔で遅延するため、更新ジョブ自身が
-      # 失敗した瞬間に通知する。同題 open Issue があればコメント追加のみ。
-      - name: Open issue on failure (full)
-        if: failure() && steps.contract.outcome != 'failure'
+      # 失敗の通知は ntfy だけ（Issue は作らない）。本文は「ジョブ名・日付・失敗」だけ。
+      # リポジトリの Secret NTFY_TOPIC が無ければ何もしない。
+      - name: Notify ntfy on failure (deploy-full)
+        if: failure()
         env:
-          GH_TOKEN: ${{ github.token }}
+          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
         run: |
-          TITLE="🔴 deploy.yml full: 更新ジョブが失敗"
-          EXISTING=$(gh issue list --state open --search "$TITLE in:title" --json number -q '.[0].number' || true)
-          BODY="deploy.yml (full) run が失敗。run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}。data.json が更新されず、外形監視 verify_live が freshness で FAIL になる前段。ログを確認してください。"
-          if [ -z "$EXISTING" ]; then
-            gh issue create --title "$TITLE" --body "$BODY" --label monitor 2>/dev/null \
-              || gh issue create --title "$TITLE" --body "$BODY"
-          else
-            gh issue comment "$EXISTING" --body "$BODY"
-          fi
+          [ -n "$NTFY_TOPIC" ] || { echo "NTFY_TOPIC 未設定: 通知なし"; exit 0; }
+          curl -fsS -m 20 -d "hf-signal-dashboard deploy-full $(TZ=Asia/Tokyo date +%F) 失敗" "https://ntfy.sh/$NTFY_TOPIC" >/dev/null || echo "ntfy 送信失敗"
 
   # ── CORR_REFRESH: 07:30 / 11:00 JST Mon-Fri (or manual `job=corr_refresh`) ─
   corr_refresh:
@@ -242,18 +233,12 @@ jobs:
         id: deploy
         uses: actions/deploy-pages@v5
 
-      # 2026-08-19 追加: corr_refresh 失敗時の自動 Issue 起票。
-      - name: Open issue on failure (corr_refresh)
+      # 失敗の通知は ntfy だけ（Issue は作らない）。本文は「ジョブ名・日付・失敗」だけ。
+      # リポジトリの Secret NTFY_TOPIC が無ければ何もしない。
+      - name: Notify ntfy on failure (deploy-corr_refresh)
         if: failure()
         env:
-          GH_TOKEN: ${{ github.token }}
+          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
         run: |
-          TITLE="🔴 deploy.yml corr_refresh: 相関パネル更新が失敗"
-          EXISTING=$(gh issue list --state open --search "$TITLE in:title" --json number -q '.[0].number' || true)
-          BODY="deploy.yml (corr_refresh) run が失敗。run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}。相関パネル/被覆低下の疑い。"
-          if [ -z "$EXISTING" ]; then
-            gh issue create --title "$TITLE" --body "$BODY" --label monitor 2>/dev/null \
-              || gh issue create --title "$TITLE" --body "$BODY"
-          else
-            gh issue comment "$EXISTING" --body "$BODY"
-          fi
+          [ -n "$NTFY_TOPIC" ] || { echo "NTFY_TOPIC 未設定: 通知なし"; exit 0; }
+          curl -fsS -m 20 -d "hf-signal-dashboard deploy-corr_refresh $(TZ=Asia/Tokyo date +%F) 失敗" "https://ntfy.sh/$NTFY_TOPIC" >/dev/null || echo "ntfy 送信失敗"

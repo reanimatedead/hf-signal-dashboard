@@ -15,7 +15,6 @@ on:
 permissions:
   contents: write
   # 2026-08-19 追加: 失敗時 Issue 自動起票のため（同型盲点の横展開修正）。
-  issues: write
 
 jobs:
   collect:
@@ -96,19 +95,12 @@ jobs:
           echo "::error::Push failed after 3 retries"
           exit 1
 
-      # 2026-08-19 追加: collect ジョブ失敗時の自動 Issue 起票（同型盲点の横展開）。
-      # deploy.yml / monitor.yml と対称。同題の open Issue があればコメント追加。
-      - name: Open issue on failure (collect)
+      # 失敗の通知は ntfy だけ（Issue は作らない）。本文は「ジョブ名・日付・失敗」だけ。
+      # リポジトリの Secret NTFY_TOPIC が無ければ何もしない。
+      - name: Notify ntfy on failure (collect)
         if: failure()
         env:
-          GH_TOKEN: ${{ github.token }}
+          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
         run: |
-          TITLE="🔴 collect.yml: 週末 autocollect が失敗"
-          EXISTING=$(gh issue list --state open --search "$TITLE in:title" --json number -q '.[0].number' || true)
-          BODY="collect.yml run が失敗。run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}。data/history / collect_log の更新が止まっている可能性。"
-          if [ -z "$EXISTING" ]; then
-            gh issue create --title "$TITLE" --body "$BODY" --label monitor 2>/dev/null \
-              || gh issue create --title "$TITLE" --body "$BODY"
-          else
-            gh issue comment "$EXISTING" --body "$BODY"
-          fi
+          [ -n "$NTFY_TOPIC" ] || { echo "NTFY_TOPIC 未設定: 通知なし"; exit 0; }
+          curl -fsS -m 20 -d "hf-signal-dashboard collect $(TZ=Asia/Tokyo date +%F) 失敗" "https://ntfy.sh/$NTFY_TOPIC" >/dev/null || echo "ntfy 送信失敗"

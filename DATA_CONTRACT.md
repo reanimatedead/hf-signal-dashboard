@@ -1659,7 +1659,7 @@ Stats = {n, mean, median, up_pct}
 
 - `{as_of, source, count, members:{ticker:name}}`。`fetch_signals.load_universe` が件数 ±5%（`marketcalc.contracts.count_within`）
   を満たすときだけ使い、満たさなければ内蔵 dict。内蔵: NIKKEI225=225、NASDAQ100=101（2026-11 時点の知識の初期値）。
-- `tools/update_universe.py`（universe.yml・月曜 2:00 JST）: 取得 → ±5% → 外れたら前週のまま + Issue 1件。差分は `changes.json`。
+- `tools/update_universe.py`（universe.yml・月曜 2:00 JST）: 取得 → ±5% → 外れたら前週のまま（Issue は作らない）。差分は `changes.json`。
 - **日経225 は §19 の判断を維持**: 既定では機械取得しない（内蔵一覧の件数検査のみ）。リポジトリ変数 `NIKKEI_DYNAMIC=true`
   のときだけ Wikipedia から取る（判断を変えるのはオーナー）。
 
@@ -1671,7 +1671,11 @@ Stats = {n, mean, median, up_pct}
 
 ### 契約テスト（M2）とゲート
 
-- `tools/contract_check.py` を deploy.yml full の**最初**に実行: Yahoo 主要 20×2 の終値（欠け>10% で止める）・
-  構成銘柄件数 ±5%。失敗 → 以降のステップは走らず Pages は前日のまま。Issue はタイトル固定で 1 件（`tools/issue_once.py`）。
+- `tools/contract_check.py` を deploy.yml full の**最初**に実行: 構成銘柄件数 ±5%（外れたら止める）。
+  Yahoo 主要 20×2 の終値は**警告だけ**（HTTP 429 は「取れない」ではなく「確認できない」。2026-11-01 の deploy #260 で
+  この事前確認だけが 429 を 100% 受けて公開を止めたため）。
+- 本当の欠損チェックは**生成後**: `tools/contract_check.py --post docs/data.json` が `meta.nan_report` を読み、
+  株式4タブのどれかで price=None が 10% を超えたら止める（upload / deploy-pages は走らず Pages は前日のまま）。
+- 失敗時の Issue 自動起票はしない。通知は各 workflow の ntfy ステップだけ（Secret `NTFY_TOPIC`、本文はジョブ名・日付・失敗のみ）。
 - `assert_gen_health` / `verify_live` / `health_gate` の判定は**変更なし**。
 - 依存は `requirements.lock`（Python 3.11・deploy.yml）と `uv.lock`（ci.yml・Mac mini）で固定。自動では上げない。
