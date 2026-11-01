@@ -39,3 +39,7 @@ docs/link_check.json
 
 # Task 5-3: decisions.jsonl は「生成物ではなく記録」。追跡下に置く（無視しない）。
 !docs/decisions.jsonl
+# §21: 検証層（fetch_signals が毎日生成・git 非追跡）。月次の控えは data/verify_history/ にコミット。
+docs/verify.json
+# PR プレビュー（tools/build_preview.py の出力）
+_preview_site/

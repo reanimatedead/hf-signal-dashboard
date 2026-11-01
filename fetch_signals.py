@@ -66,60 +66,86 @@ BB_PERIOD   = 288
 
 # ─── SYMBOLS ─────────────────────────────────────────────
 
+# 2026-11-01: 日経225 を全225銘柄に拡充（コード順）。2026 年時点の知識で書いた初期値。
+# DATA_CONTRACT §19 により指数提供元からの機械取得はしない（既定）。data/universe/nikkei225.json
+# があればそちらを優先する（load_universe）。件数は tests/test_universe_lists.py で 225±5% を検査。
+# 入替・上場廃止は meta.universe.nikkei225.fetch_failures に出るので、それを見て手で直す。
 NIKKEI225 = {
-    "9984.T":"SoftBank Group","8035.T":"Tokyo Electron","6857.T":"Advantest",
-    "6920.T":"Lasertec","6954.T":"Fanuc","6861.T":"Keyence",
-    "6981.T":"Murata Manufacturing","6762.T":"TDK","6976.T":"Taiyo Yuden",
-    "6971.T":"Kyocera","6963.T":"Rohm","6806.T":"Hirose Electric",
-    "6724.T":"Seiko Epson","6479.T":"Minebea Mitsumi","6645.T":"Omron",
-    "6869.T":"Sysmex","6841.T":"Yokogawa Electric","4704.T":"Trend Micro",
-    "9613.T":"NTT Data Group","6702.T":"Fujitsu","6701.T":"NEC",
-    "6752.T":"Panasonic Holdings","6501.T":"Hitachi","7751.T":"Canon",
-    "7741.T":"HOYA","7733.T":"Olympus","4901.T":"Fujifilm Holdings",
-    "4902.T":"Konica Minolta","7203.T":"Toyota Motor","7267.T":"Honda Motor",
-    "7270.T":"Subaru","7201.T":"Nissan Motor","7261.T":"Mazda Motor",
-    "7269.T":"Suzuki Motor","7272.T":"Yamaha Motor","6902.T":"DENSO",
-    "5108.T":"Bridgestone","7011.T":"Mitsubishi Heavy Ind.","7013.T":"IHI",
-    "7012.T":"Kawasaki Heavy Ind.","9983.T":"Fast Retailing","7974.T":"Nintendo",
-    "7832.T":"Bandai Namco","9766.T":"Konami Group","4661.T":"Oriental Land",
-    "3382.T":"Seven & i Holdings","8267.T":"Aeon","7532.T":"Pan Pacific Intl",
-    "4519.T":"Chugai Pharmaceutical","4568.T":"Daiichi Sankyo",
-    "4502.T":"Takeda Pharmaceutical","4503.T":"Astellas Pharma",
-    "4507.T":"Shionogi","4523.T":"Eisai","4578.T":"Otsuka Holdings",
-    "4543.T":"Terumo","4151.T":"Kyowa Kirin","4063.T":"Shin-Etsu Chemical",
-    "4188.T":"Mitsubishi Chemical","4005.T":"Sumitomo Chemical",
-    "4183.T":"Mitsui Chemicals","3407.T":"Asahi Kasei","3402.T":"Toray Industries",
-    "3401.T":"Teijin","4452.T":"Kao","2802.T":"Ajinomoto",
-    "4042.T":"Tosoh","4021.T":"Nissan Chemical","5401.T":"Nippon Steel",
-    "5411.T":"JFE Holdings","5713.T":"Sumitomo Metal Mining",
-    "5802.T":"Sumitomo Electric","5801.T":"Furukawa Electric","5803.T":"Fujikura",
-    "8306.T":"Mitsubishi UFJ FG","8316.T":"Sumitomo Mitsui FG",
-    "8411.T":"Mizuho Financial","8309.T":"SMTH Holdings",
-    "8604.T":"Nomura Holdings","8601.T":"Daiwa Securities",
-    "8697.T":"Japan Exchange Group","8766.T":"Tokio Marine",
-    "8725.T":"MS&AD Insurance","8750.T":"Dai-ichi Life","8795.T":"T&D Holdings",
+    "1332.T":"Nissui","1605.T":"INPEX","1721.T":"COMSYS Holdings",
+    "1801.T":"Taisei","1802.T":"Obayashi","1803.T":"Shimizu",
+    "1808.T":"Haseko","1812.T":"Kajima","1925.T":"Daiwa House",
+    "1928.T":"Sekisui House","1963.T":"JGC Holdings","2002.T":"Nisshin Seifun",
+    "2269.T":"Meiji Holdings","2282.T":"NH Foods","2413.T":"M3",
+    "2432.T":"DeNA","2501.T":"Sapporo Holdings","2502.T":"Asahi Group",
+    "2503.T":"Kirin Holdings","2768.T":"Sojitz","2801.T":"Kikkoman",
+    "2802.T":"Ajinomoto","2871.T":"Nichirei","2914.T":"Japan Tobacco",
+    "3086.T":"J.Front Retailing","3092.T":"ZOZO","3099.T":"Isetan Mitsukoshi",
+    "3289.T":"Tokyu Fudosan","3382.T":"Seven & i Holdings","3401.T":"Teijin",
+    "3402.T":"Toray Industries","3405.T":"Kuraray","3407.T":"Asahi Kasei",
+    "3436.T":"SUMCO","3659.T":"Nexon","3861.T":"Oji Holdings",
+    "4004.T":"Resonac Holdings","4005.T":"Sumitomo Chemical","4021.T":"Nissan Chemical",
+    "4042.T":"Tosoh","4043.T":"Tokuyama","4061.T":"Denka",
+    "4062.T":"Ibiden","4063.T":"Shin-Etsu Chemical","4151.T":"Kyowa Kirin",
+    "4183.T":"Mitsui Chemicals","4188.T":"Mitsubishi Chemical","4208.T":"UBE",
+    "4307.T":"Nomura Research Institute","4324.T":"Dentsu Group","4452.T":"Kao",
+    "4502.T":"Takeda Pharmaceutical","4503.T":"Astellas Pharma","4507.T":"Shionogi",
+    "4519.T":"Chugai Pharmaceutical","4523.T":"Eisai","4543.T":"Terumo",
+    "4568.T":"Daiichi Sankyo","4578.T":"Otsuka Holdings","4661.T":"Oriental Land",
+    "4689.T":"LY Corp","4704.T":"Trend Micro","4751.T":"CyberAgent",
+    "4755.T":"Rakuten Group","4901.T":"Fujifilm Holdings","4902.T":"Konica Minolta",
+    "4911.T":"Shiseido","5019.T":"Idemitsu Kosan","5020.T":"ENEOS Holdings",
+    "5101.T":"Yokohama Rubber","5108.T":"Bridgestone","5201.T":"AGC",
+    "5214.T":"Nippon Electric Glass","5233.T":"Taiheiyo Cement","5301.T":"Tokai Carbon",
+    "5332.T":"TOTO","5333.T":"NGK Insulators","5401.T":"Nippon Steel",
+    "5406.T":"Kobe Steel","5411.T":"JFE Holdings","5631.T":"Japan Steel Works",
+    "5706.T":"Mitsui Kinzoku","5711.T":"Mitsubishi Materials","5713.T":"Sumitomo Metal Mining",
+    "5714.T":"DOWA Holdings","5801.T":"Furukawa Electric","5802.T":"Sumitomo Electric",
+    "5803.T":"Fujikura","5831.T":"Shizuoka Financial Group","6098.T":"Recruit Holdings",
+    "6103.T":"Okuma","6113.T":"Amada","6146.T":"Disco",
+    "6178.T":"Japan Post Holdings","6273.T":"SMC","6301.T":"Komatsu",
+    "6302.T":"Sumitomo Heavy Ind.","6305.T":"Hitachi Construction Machinery","6326.T":"Kubota",
+    "6361.T":"Ebara","6367.T":"Daikin Industries","6471.T":"NSK",
+    "6472.T":"NTN","6473.T":"JTEKT","6479.T":"Minebea Mitsumi",
+    "6501.T":"Hitachi","6503.T":"Mitsubishi Electric","6504.T":"Fuji Electric",
+    "6506.T":"Yaskawa Electric","6526.T":"Socionext","6532.T":"BayCurrent",
+    "6594.T":"Nidec","6645.T":"Omron","6674.T":"GS Yuasa",
+    "6701.T":"NEC","6702.T":"Fujitsu","6723.T":"Renesas Electronics",
+    "6724.T":"Seiko Epson","6752.T":"Panasonic Holdings","6753.T":"Sharp",
+    "6758.T":"Sony Group","6762.T":"TDK","6770.T":"Alps Alpine",
+    "6841.T":"Yokogawa Electric","6857.T":"Advantest","6861.T":"Keyence",
+    "6869.T":"Sysmex","6902.T":"DENSO","6920.T":"Lasertec",
+    "6952.T":"Casio Computer","6954.T":"Fanuc","6963.T":"Rohm",
+    "6971.T":"Kyocera","6976.T":"Taiyo Yuden","6981.T":"Murata Manufacturing",
+    "6988.T":"Nitto Denko","7004.T":"Kanadevia","7011.T":"Mitsubishi Heavy Ind.",
+    "7012.T":"Kawasaki Heavy Ind.","7013.T":"IHI","7182.T":"Japan Post Bank",
+    "7186.T":"Yokohama Financial Group","7201.T":"Nissan Motor","7202.T":"Isuzu Motors",
+    "7203.T":"Toyota Motor","7211.T":"Mitsubishi Motors","7261.T":"Mazda Motor",
+    "7267.T":"Honda Motor","7269.T":"Suzuki Motor","7270.T":"Subaru",
+    "7272.T":"Yamaha Motor","7532.T":"Pan Pacific Intl","7731.T":"Nikon",
+    "7733.T":"Olympus","7735.T":"SCREEN Holdings","7741.T":"HOYA",
+    "7751.T":"Canon","7752.T":"Ricoh","7762.T":"Citizen Watch",
+    "7832.T":"Bandai Namco","7911.T":"Toppan Holdings","7912.T":"Dai Nippon Printing",
+    "7951.T":"Yamaha","7974.T":"Nintendo","8001.T":"Itochu",
+    "8002.T":"Marubeni","8015.T":"Toyota Tsusho","8031.T":"Mitsui & Co",
+    "8035.T":"Tokyo Electron","8053.T":"Sumitomo Corp","8058.T":"Mitsubishi Corp",
+    "8233.T":"Takashimaya","8252.T":"Marui Group","8267.T":"Aeon",
+    "8306.T":"Mitsubishi UFJ FG","8308.T":"Resona Holdings","8309.T":"SMTH Holdings",
+    "8316.T":"Sumitomo Mitsui FG","8331.T":"Chiba Bank","8354.T":"Fukuoka Financial Group",
+    "8411.T":"Mizuho Financial","8591.T":"ORIX","8601.T":"Daiwa Securities",
+    "8604.T":"Nomura Holdings","8630.T":"Sompo Holdings","8697.T":"Japan Exchange Group",
+    "8725.T":"MS&AD Insurance","8750.T":"Dai-ichi Life","8766.T":"Tokio Marine",
+    "8795.T":"T&D Holdings","8801.T":"Mitsui Fudosan","8802.T":"Mitsubishi Estate",
+    "8804.T":"Tokyo Tatemono","8830.T":"Sumitomo Realty","9001.T":"Tobu Railway",
+    "9005.T":"Tokyu Corp","9007.T":"Odakyu Electric Railway","9008.T":"Keio",
+    "9009.T":"Keisei Electric Railway","9020.T":"JR East","9021.T":"JR West",
+    "9022.T":"JR Central","9064.T":"Yamato Holdings","9101.T":"Nippon Yusen",
+    "9104.T":"Mitsui OSK Lines","9107.T":"Kawasaki Kisen","9147.T":"Nippon Express",
+    "9201.T":"Japan Airlines","9202.T":"ANA Holdings","9301.T":"Mitsubishi Logistics",
     "9432.T":"NTT","9433.T":"KDDI","9434.T":"SoftBank Corp",
-    "8058.T":"Mitsubishi Corp","8031.T":"Mitsui & Co",
-    "8053.T":"Sumitomo Corp","8001.T":"Itochu","8002.T":"Marubeni",
-    "8015.T":"Toyota Tsusho","2768.T":"Sojitz",
-    "8802.T":"Mitsubishi Estate","8830.T":"Sumitomo Realty",
-    "1928.T":"Sekisui House","1925.T":"Daiwa House",
-    "1605.T":"INPEX","5020.T":"ENEOS Holdings",
-    "5019.T":"Idemitsu Kosan","9531.T":"Tokyo Gas","9532.T":"Osaka Gas",
-    "9501.T":"Tokyo Electric Power","9502.T":"Chubu Electric",
-    "9503.T":"Kansai Electric","9022.T":"JR Central","9020.T":"JR East",
-    "9021.T":"JR West","9201.T":"Japan Airlines","9202.T":"ANA Holdings",
-    "9064.T":"Yamato Holdings","9147.T":"Nippon Express",
-    "9101.T":"Nippon Yusen","9104.T":"Mitsui OSK Lines","9107.T":"Kawasaki Kisen",
-    "1812.T":"Kajima","1803.T":"Shimizu","1963.T":"JGC Holdings",
-    "2914.T":"Japan Tobacco","2502.T":"Asahi Group","2503.T":"Kirin Holdings",
-    "2801.T":"Kikkoman","2269.T":"Meiji Holdings","2002.T":"Nisshin Seifun",
-    "2501.T":"Sapporo Holdings","9735.T":"Secom","4324.T":"Dentsu Group",
-    "6301.T":"Komatsu","6326.T":"Kubota","6506.T":"Yaskawa Electric",
-    "6367.T":"Daikin Industries","7911.T":"Toppan Holdings",
-    "7912.T":"Dai Nippon Printing","8233.T":"Takashimaya","1332.T":"Nissui",
-    "5201.T":"AGC","5332.T":"TOTO","6103.T":"Okuma","6113.T":"Amada",
-    "6471.T":"NSK","6473.T":"JTEKT",
+    "9501.T":"Tokyo Electric Power","9502.T":"Chubu Electric","9503.T":"Kansai Electric",
+    "9531.T":"Tokyo Gas","9532.T":"Osaka Gas","9602.T":"Toho",
+    "9697.T":"Capcom","9735.T":"Secom","9766.T":"Konami Group",
+    "9843.T":"Nitori Holdings","9983.T":"Fast Retailing","9984.T":"SoftBank Group",
 }
 
 DOW30 = {
@@ -132,41 +158,38 @@ DOW30 = {
     "VZ":"Verizon","WMT":"Walmart","AMZN":"Amazon","NVDA":"NVIDIA","SHW":"Sherwin-Williams",
 }
 
+# 2026-11-01: Nasdaq-100 を全構成（~101、GOOG/GOOGL の2クラス込み）に拡充。2026 年時点の知識で
+# 書いた初期値。毎週 universe.yml（tools/update_universe.py）が Wikipedia から取り直して
+# data/universe/nasdaq100.json に保存し、fetch_signals はそちらを優先する（load_universe）。
+# 旧 curated subset からの除外: ANSS（SNPS が買収）/ EA（買収で上場廃止）/ ILMN・MRNA・SIRI・LCID・ZM・ENPH・
+# ALGN・EBAY・DLTR・SWKS・FSLR・SNOW・NET・EXPE・BMRN（指数から外れた）。件数は tests/test_universe_lists.py。
 NASDAQ100 = {
-    "AAPL":"Apple","MSFT":"Microsoft","NVDA":"NVIDIA","AMZN":"Amazon",
-    "META":"Meta Platforms","GOOGL":"Alphabet (A)","GOOG":"Alphabet (C)",
-    "TSLA":"Tesla","AVGO":"Broadcom","COST":"Costco","NFLX":"Netflix",
-    "AMD":"AMD","ADBE":"Adobe","QCOM":"Qualcomm","INTC":"Intel","INTU":"Intuit",
-    "CSCO":"Cisco","AMAT":"Applied Materials","TXN":"Texas Instruments",
-    "MU":"Micron Technology","ISRG":"Intuitive Surgical","LRCX":"Lam Research",
-    "KLAC":"KLA Corp","PANW":"Palo Alto Networks","SNPS":"Synopsys",
-    "CDNS":"Cadence Design","MRVL":"Marvell Technology","ADP":"ADP",
-    "FTNT":"Fortinet","MELI":"MercadoLibre","REGN":"Regeneron","MDLZ":"Mondelez",
-    "GILD":"Gilead Sciences","PYPL":"PayPal","SBUX":"Starbucks",
-    "BKNG":"Booking Holdings","ORLY":"O'Reilly Automotive","MNST":"Monster Beverage",
-    "PAYX":"Paychex","IDXX":"IDEXX Laboratories","CTAS":"Cintas","ROST":"Ross Stores",
-    "DXCM":"Dexcom","CHTR":"Charter Communications","ILMN":"Illumina",
-    "NXPI":"NXP Semiconductors","CRWD":"CrowdStrike","PCAR":"PACCAR",
-    "BIIB":"Biogen","ZS":"Zscaler","ODFL":"Old Dominion Freight","FAST":"Fastenal",
-    "TTD":"The Trade Desk","ON":"ON Semiconductor","GEHC":"GE HealthCare",
-    "CEG":"Constellation Energy","KHC":"Kraft Heinz","FANG":"Diamondback Energy",
-    "VRSK":"Verisk Analytics","MCHP":"Microchip Technology","CPRT":"Copart",
-    "XEL":"Xcel Energy","ALGN":"Align Technology","DDOG":"Datadog",
-    "WDAY":"Workday","TMUS":"T-Mobile","MRNA":"Moderna",
-    "VRTX":"Vertex Pharmaceuticals","ASML":"ASML","LULU":"Lululemon",
-    "FSLR":"First Solar","SNOW":"Snowflake","NET":"Cloudflare","TEAM":"Atlassian",
-    "DLTR":"Dollar Tree","EBAY":"eBay","PDD":"PDD Holdings",
-    "TTWO":"Take-Two Interactive","SWKS":"Skyworks",
-    "CTSH":"Cognizant","EXPE":"Expedia","ENPH":"Enphase Energy","ZM":"Zoom Video",
-    "BMRN":"BioMarin","AEP":"American Electric Power","CSX":"CSX Corp",
-    "HON":"Honeywell","SIRI":"Sirius XM","LCID":"Lucid Group",
-    # 2026-08-20 追加: NASDAQ100 の curated dict 更新。
-    # 除外: "ANSS"(ANSYS, 2026-3Q に SNPS が買収完了→上場廃止),
-    #       "EA"(Electronic Arts, 民営化コンソーシアム買収で上場廃止)。
-    #       2026-08-19 の deploy heal ログで chart_api でも取得不可を実測確認済み。
-    # 追加: 近年 NASDAQ100 に採入された高時価銘柄。curated size を >=91 維持し
-    #       min=90 の buffer を確保する。tickers は Yahoo が返す実在シンボル。
-    "PLTR":"Palantir Technologies","APP":"AppLovin","ARM":"ARM Holdings",
+    "AAPL":"Apple","ABNB":"Airbnb","ADBE":"Adobe","ADI":"Analog Devices",
+    "ADP":"ADP","ADSK":"Autodesk","AEP":"American Electric Power","AMAT":"Applied Materials",
+    "AMD":"AMD","AMGN":"Amgen","AMZN":"Amazon","APP":"AppLovin",
+    "ARM":"ARM Holdings","ASML":"ASML","AVGO":"Broadcom","AXON":"Axon Enterprise",
+    "AZN":"AstraZeneca","BIIB":"Biogen","BKNG":"Booking Holdings","BKR":"Baker Hughes",
+    "CCEP":"Coca-Cola Europacific","CDNS":"Cadence Design","CDW":"CDW","CEG":"Constellation Energy",
+    "CHTR":"Charter Communications","CMCSA":"Comcast","COST":"Costco","CPRT":"Copart",
+    "CRWD":"CrowdStrike","CSCO":"Cisco","CSGP":"CoStar Group","CSX":"CSX Corp",
+    "CTAS":"Cintas","CTSH":"Cognizant","DASH":"DoorDash","DDOG":"Datadog",
+    "DXCM":"Dexcom","EXC":"Exelon","FANG":"Diamondback Energy","FAST":"Fastenal",
+    "FTNT":"Fortinet","GEHC":"GE HealthCare","GFS":"GlobalFoundries","GILD":"Gilead Sciences",
+    "GOOG":"Alphabet (C)","GOOGL":"Alphabet (A)","HON":"Honeywell","IDXX":"IDEXX Laboratories",
+    "INTC":"Intel","INTU":"Intuit","ISRG":"Intuitive Surgical","KDP":"Keurig Dr Pepper",
+    "KHC":"Kraft Heinz","KLAC":"KLA Corp","LIN":"Linde","LRCX":"Lam Research",
+    "LULU":"Lululemon","MAR":"Marriott","MCHP":"Microchip Technology","MDB":"MongoDB",
+    "MDLZ":"Mondelez","MELI":"MercadoLibre","META":"Meta Platforms","MNST":"Monster Beverage",
+    "MRVL":"Marvell Technology","MSFT":"Microsoft","MSTR":"Strategy","MU":"Micron Technology",
+    "NFLX":"Netflix","NVDA":"NVIDIA","NXPI":"NXP Semiconductors","ODFL":"Old Dominion Freight",
+    "ON":"ON Semiconductor","ORLY":"O'Reilly Automotive","PANW":"Palo Alto Networks","PAYX":"Paychex",
+    "PCAR":"PACCAR","PDD":"PDD Holdings","PEP":"PepsiCo","PLTR":"Palantir Technologies",
+    "PYPL":"PayPal","QCOM":"Qualcomm","REGN":"Regeneron","ROP":"Roper Technologies",
+    "ROST":"Ross Stores","SBUX":"Starbucks","SHOP":"Shopify","SNPS":"Synopsys",
+    "TEAM":"Atlassian","TMUS":"T-Mobile","TRI":"Thomson Reuters","TSLA":"Tesla",
+    "TTD":"The Trade Desk","TTWO":"Take-Two Interactive","TXN":"Texas Instruments","VRSK":"Verisk Analytics",
+    "VRTX":"Vertex Pharmaceuticals","WBD":"Warner Bros. Discovery","WDAY":"Workday","XEL":"Xcel Energy",
+    "ZS":"Zscaler",
 }
 
 FX_PAIRS = {
@@ -2233,7 +2256,170 @@ def _batched_2y_ohlc(symbols, batch_size=BATCH_SIZE, pause=2.0):
     return out
 
 
-def attach_equity_charts(equity_markets):
+
+# ─── UNIVERSE FILES / CHART SIGNAL / US FUNDAMENTALS (marketcalc) ─────────
+# 計算式は marketcalc/ だけにある（ここは配線のみ）。DATA_CONTRACT §21。
+ROOT_DIR = Path(__file__).parent
+UNIVERSE_DIR = ROOT_DIR / "data" / "universe"
+US_FUND_FILE = ROOT_DIR / "data" / "us_fundamentals.json"
+VERIFY_FILE = OUTPUT_DIR / "verify.json"
+SIGNAL_FIELDS = ("chart_signal", "chart_signal_code", "long_oversold", "trend",
+                 "cci288", "cci48", "bb48_z", "bb288_z")
+US_FUND_FIELDS = ("magic_rank", "f_score", "f_max")
+
+
+def load_universe(name, default, udir=None):
+    """data/universe/{name}.json（週次 universe.yml が更新）があればそれを、無ければ内蔵 dict を返す。
+    ファイルの件数が想定 ±5% から外れていたら使わない（内蔵 dict に戻す・ログに出す）。
+    戻り値: ({ticker: name}, "file" | "builtin")"""
+    from marketcalc.contracts import count_within
+    p = Path(udir or UNIVERSE_DIR) / f"{name}.json"
+    if p.exists():
+        try:
+            j = json.loads(p.read_text(encoding="utf-8"))
+            mem = j.get("members") or {}
+            if isinstance(mem, list):
+                mem = {t: t for t in mem}
+            ok, msg = count_within(name, len(mem))
+            if mem and ok:
+                print(f"✓ universe {name}: {len(mem)} from {p.name}")
+                return dict(mem), "file"
+            print(f"  [universe] {p.name} ignored ({msg}); using builtin")
+        except Exception as e:  # noqa: BLE001
+            print(f"  [universe] {p.name} unreadable ({type(e).__name__}); using builtin")
+    return dict(default), "builtin"
+
+
+def _finite_hlc(df):
+    """Close が有限な行だけの (dates, high, low, close)。build_1d_chart_from_ohlc と同じ行選択。"""
+    c = pd.to_numeric(df["Close"].squeeze(), errors="coerce")
+    fin = df[np.isfinite(c.to_numpy())]
+    col = lambda k: pd.to_numeric(fin[k].squeeze(), errors="coerce").to_numpy(dtype=float) \
+        if k in fin.columns else pd.to_numeric(fin["Close"].squeeze(), errors="coerce").to_numpy(dtype=float)
+    dates = [ts.strftime("%Y-%m-%d") if hasattr(ts, "strftime") else str(ts)[:10] for ts in fin.index]
+    return dates, col("High"), col("Low"), col("Close")
+
+
+def attach_signal_fields(row, df, chart=None, dp=2):
+    """行に chart_signal / cci288 / cci48 / bb48_z / bb288_z（marketcalc.ind.summary）を付け、
+    chart（charts.1d）があれば詳細チャート用の系列（marketcalc.ind.chart_series）を chart["series"] に入れる。
+    本数不足（300本未満）なら値は None（作らない・ごまかさない）。"""
+    from marketcalc import ind
+    try:
+        _, h, l, c = _finite_hlc(df)
+        sm = ind.summary(h, l, c)
+    except Exception as exc:  # noqa: BLE001
+        sm = None
+        print(f"  [signal] {row.get('symbol')}: {type(exc).__name__}")
+    for k in SIGNAL_FIELDS:
+        row[k] = sm.get(k) if sm else None
+    if sm is None:
+        row["chart_signal_note"] = f"日足が{ind.MIN_BARS}本未満のため判定なし"
+    if chart is not None and sm is not None:
+        n = len(chart.get("ohlc") or [])
+        if n:
+            ser = ind.chart_series(h, l, c, tail=n, nd=dp)
+            ser.pop("index_map", None)
+            chart["series"] = ser
+    return row
+
+
+def composite_label_series(close):
+    """既存 composite_score（compute_signal）の BUY/WATCH/AVOID を日ごとに出す（検証用）。
+    process_ticker と同じ指標・同じ compute_signal を、2y 日足の各日について使う。"""
+    close = pd.Series(np.asarray(close, dtype=float))
+    rsi = calc_rsi(close).fillna(50.0).to_numpy()
+    _, _, hist = calc_macd(close)
+    hist = hist.fillna(0.0).to_numpy()
+    e20 = close.ewm(span=20, adjust=False).mean().to_numpy()
+    e50 = close.ewm(span=50, adjust=False).mean().to_numpy()
+    e200 = close.ewm(span=200, adjust=False).mean().to_numpy()
+    _, _, _, bbp = calc_bollinger(close)
+    bbp = bbp.fillna(0.5).clip(0.0, 1.0).to_numpy()
+    c = close.to_numpy()
+    out = []
+    for i in range(len(c)):
+        e2 = e200[i] if i + 1 >= 40 else e50[i]
+        out.append(compute_signal(rsi[i], hist[i], e20[i], e50[i], e2, bbp[i], c[i])[1])
+    return out
+
+
+def attach_us_fundamentals(tabs, path=None):
+    """米国3タブの行に magic_rank / f_score / f_max を付ける。
+    決算部分は週次 tools/build_us_fundamentals.py が作る data/us_fundamentals.json、
+    価格は今日の株価。magic_rank は Dow/NDX/S&P の和集合（重複は1回）で順位付け（marketcalc.fund_us）。"""
+    from marketcalc import fund_us
+    p = Path(path or US_FUND_FILE)
+    try:
+        j = json.loads(p.read_text(encoding="utf-8"))
+        fdmap = j.get("rows") or {}
+    except FileNotFoundError:
+        j, fdmap = {}, None
+    except Exception as exc:  # noqa: BLE001
+        print(f"  [us_fund] {p.name} unreadable ({type(exc).__name__})")
+        j, fdmap = {}, None
+    calc = {}
+    if fdmap:
+        for rows in tabs:
+            for r in rows:
+                sym = r.get("symbol", "")
+                if sym in calc or sym.startswith("^") or r.get("error"):
+                    continue
+                fd, px = fdmap.get(sym), r.get("price")
+                if not fd or not px:
+                    continue
+                try:
+                    m = fund_us.metrics(fd, float(px))
+                except Exception:  # noqa: BLE001
+                    continue
+                calc[sym] = {**m, "fin": bool(fd.get("fin")), "f_score": fd.get("f_score"), "f_max": fd.get("f_max")}
+        fund_us.rank(list(calc.values()))
+    for rows in tabs:
+        for r in rows:
+            if str(r.get("symbol", "")).startswith("^"):
+                continue
+            cr = calc.get(r.get("symbol"))
+            r["magic_rank"] = cr.get("魔法の公式順位") if cr else None
+            r["f_score"] = cr.get("f_score") if cr else None
+            r["f_max"] = cr.get("f_max") if cr else None
+    ranked = sum(1 for v in calc.values() if v.get("魔法の公式順位"))
+    rec = {"available": bool(fdmap), "as_of": j.get("as_of"), "with_fundamentals": len(calc), "ranked": ranked}
+    print(f"[US fundamentals] {rec}")
+    return rec
+
+
+def build_and_write_verify(collect, path=None):
+    """attach_equity_charts が集めた 2y 日足フレームから docs/verify.json を書く（再取得しない）。
+    失敗しても本体（data.json）は止めない: meta.verify に失敗理由を残す（サイレントにしない）。"""
+    path = Path(path or VERIFY_FILE)
+    try:
+        if str(ROOT_DIR / "pipeline") not in sys.path:
+            sys.path.insert(0, str(ROOT_DIR / "pipeline"))
+        import build_verify as _bv
+        markets = {"nikkei225": [], "us": []}
+        seen_us = set()
+        for tab, frames in (collect or {}).items():
+            key = "nikkei225" if tab == "nikkei225" else "us"
+            for sym, df in frames.items():
+                if key == "us":
+                    if sym in seen_us:
+                        continue                     # Dow/NDX/S&P の重複は1回だけ数える
+                    seen_us.add(sym)
+                dates, h, l, c = _finite_hlc(df)
+                markets[key].append((dates, h, l, c, composite_label_series(c)))
+        obj = _bv.build(markets, generated_at=datetime.now(JST).isoformat())
+        obj = _json_safe(obj)
+        _bv.write(obj, path)
+        rec = {"available": True, "file": path.name, "as_of": obj.get("as_of"),
+               "weakened": obj.get("weakened"),
+               "symbols": {k: v.get("symbols") for k, v in obj["markets"].items()}}
+    except Exception as exc:  # noqa: BLE001
+        rec = {"available": False, "error": f"{type(exc).__name__}: {str(exc)[:120]}"}
+    print(f"[verify] {rec}")
+    return rec
+
+
+def attach_equity_charts(equity_markets, collect=None):
     """v6.1 full-coverage equity charting (DATA_CONTRACT §10, policy P0/P2).
 
     P0: index proxy rows (^N225/^DJI/^NDX/^GSPC) are scored + charted with 1d and
@@ -2244,7 +2430,12 @@ def attach_equity_charts(equity_markets):
 
     Fetching is batched (50 symbols / request, 2 s between requests) to respect
     Yahoo's rate limit. Failures are isolated per A'-2: a symbol with no data gets
-    chart_status='unavailable' + a chart_error reason; the rest still render."""
+    chart_status='unavailable' + a chart_error reason; the rest still render.
+
+    2026-11 (§21): the SAME 2y daily frame also feeds marketcalc.ind.summary (row
+    columns chart_signal / cci288 / cci48 / bb48_z / bb288_z) and chart_series
+    (charts.1d.series). If `collect` is a dict, constituent frames are stored as
+    collect[tab][symbol] = frame for the verification layer (no extra fetch)."""
     now = datetime.now(JST).isoformat()
 
     # ── P0: index proxy rows (1d + 1w) ──────────────────────────────────────
@@ -2269,6 +2460,7 @@ def attach_equity_charts(equity_markets):
                 # NaN 劣化なら degraded マーカー、それ以外は汎用理由。
                 row["chart_error"] = (DEGRADED_CHART_ERROR if _close_is_degraded(df)
                                       else "index chart build returned unavailable")
+            attach_signal_fields(row, df, c1d, dp)
             ec = _equity_empty_charts()
             row["charts"] = {"4h": ec["4h"], "1d": c1d or ec["1d"], "1w": ec["1w"]}
             # P0 weekly: resample the 2y daily frame (0 extra fetch).
@@ -2288,14 +2480,18 @@ def attach_equity_charts(equity_markets):
 
     # ── P2: every constituent gets a full-length 1d chart ───────────────────
     targets = []            # [(row, dp)] to chart, in fetch order
+    tab_of = {}             # symbol -> [tabs]（検証用に市場ごとのフレームを集める）
     for grp in ("nikkei225", "dow30", "nasdaq100", "sp500"):
         for r in equity_markets.get(grp, []):
             sym = r.get("symbol", "")
             if sym.startswith("^"):
                 continue                                     # index proxy: done above
+            tab_of.setdefault(sym, []).append(grp)
             if r.get("error"):                               # table row already failed
                 r["chart_status"] = "unavailable"
                 r["chart_error"] = "table fetch error; chart skipped"
+                for k in SIGNAL_FIELDS:
+                    r[k] = None
                 continue
             targets.append(r)
     print(f"[Equity charts] P2 constituents: charting {len(targets)} rows, batched 2y…")
@@ -2308,11 +2504,17 @@ def attach_equity_charts(equity_markets):
             if df is None or len(df) < 60:
                 r["chart_status"] = "unavailable"
                 r["chart_error"] = "no 2y daily data from yfinance"
+                for k in SIGNAL_FIELDS:
+                    r[k] = None
                 fail += 1
                 continue
             price = r.get("price") or float(df["Close"].squeeze().iloc[-1])
             dp = 2 if (price or 0) >= 100 else 3 if (price or 0) >= 1 else 5
             chart = build_equity_chart_1d(df, sym, now, dp)
+            attach_signal_fields(r, df, chart, dp)
+            if collect is not None:
+                for g in tab_of.get(sym, []):
+                    collect.setdefault(g, {})[sym] = df
             if not chart:
                 r["chart_status"] = "unavailable"
                 # 「取得したが劣化」と「指標が組めない」を区別（UI で別文言を出す）。
@@ -2855,6 +3057,17 @@ def record_payload_size(payload, out_dir=OUTPUT_DIR):
     return meta["payload_size"]
 
 
+def _stale_hours():
+    """tools/gate_thresholds.STALE_HOURS（verify_live / assert_gen_health と同じ正本）。"""
+    try:
+        if str(ROOT_DIR / "tools") not in sys.path:
+            sys.path.insert(0, str(ROOT_DIR / "tools"))
+        from gate_thresholds import STALE_HOURS
+        return float(STALE_HOURS)
+    except Exception:  # noqa: BLE001
+        return 48.0
+
+
 def main():
     t0      = time.time()
     now_jst = datetime.now(JST)
@@ -2863,12 +3076,20 @@ def main():
 
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
-    sp500_tickers, sp500_names = get_sp500_tickers()
-    sp500_dict = {t: sp500_names.get(t, t) for t in sp500_tickers}
+    # 構成銘柄: data/universe/*.json（週次 universe.yml）があればそれを優先、無ければ内蔵 dict。
+    nk_dict, nk_src = load_universe("nikkei225", NIKKEI225)
+    dj_dict, dj_src = load_universe("dow30", DOW30)
+    nq_dict, nq_src = load_universe("nasdaq100", NASDAQ100)
+    sp_file, sp_src = load_universe("sp500", {})
+    if sp_src == "file":
+        sp500_dict = sp_file
+    else:
+        sp500_tickers, sp500_names = get_sp500_tickers()
+        sp500_dict = {t: sp500_names.get(t, t) for t in sp500_tickers}
 
-    nk_results  = process_market(NIKKEI225,  "Nikkei225")
-    dj_results  = process_market(DOW30,      "Dow30")
-    nq_results  = process_market(NASDAQ100,  "Nasdaq100")
+    nk_results  = process_market(nk_dict,    "Nikkei225")
+    dj_results  = process_market(dj_dict,    "Dow30")
+    nq_results  = process_market(nq_dict,    "Nasdaq100")
     sp_results  = process_market(sp500_dict, "S&P500")
     fx_results  = process_fx_advanced(FX_PAIRS)
 
@@ -2896,16 +3117,25 @@ def main():
     attach_mtf_for_allowlist((fx_results, vol_results, crypto_results, rates_results))
 
     # v3.5: equity charts — index proxies + selected constituents (1d only)
+    _verify_frames = {}
     attach_equity_charts({"nikkei225": nk_results, "dow30": dj_results,
-                          "nasdaq100": nq_results, "sp500": sp_results})
+                          "nasdaq100": nq_results, "sp500": sp_results},
+                         collect=_verify_frames)
+
+    # §21: 判定の検証（docs/verify.json）— 上の 2y フレームを再利用（追加取得なし）。
+    verify_meta = build_and_write_verify(_verify_frames)
+    del _verify_frames
+
+    # §21: 米国3タブに magic_rank / f_score / f_max（決算は data/us_fundamentals.json・週次）。
+    us_fund_meta = attach_us_fundamentals((dj_results, nq_results, sp_results))
 
     next_run = (now_jst + timedelta(days=1)).replace(
         hour=8, minute=0, second=0, microsecond=0)
 
     # ── Part 3: 上場廃止/入替の検知（定義済みだが取得できなかった銘柄）を meta に記録。
     #    黙って件数だけ減らさない。nikkei/nasdaq のハードコード subset は full 未達を明示。
-    _defined = {"nikkei225": set(NIKKEI225), "dow30": set(DOW30),
-                "nasdaq100": set(NASDAQ100), "sp500": set(sp500_dict)}
+    _defined = {"nikkei225": set(nk_dict), "dow30": set(dj_dict),
+                "nasdaq100": set(nq_dict), "sp500": set(sp500_dict)}
     if len(sp500_dict) < 400:
         record_fallback("sp500_constituents",
                         "constituent universe < 400 (full index not obtained)",
@@ -2913,8 +3143,17 @@ def main():
 
     # sp500=動的取得(Wikipedia/datahub)。dow30=curated だが full(30/30)。
     # nikkei/nasdaq=curated subset（無料の動的 full-membership 源が未確認・§18/§19）。
-    _source_mode = {"nikkei225": "curated_subset", "dow30": "curated_full",
-                    "nasdaq100": "curated_subset", "sp500": "dynamic"}
+    # 2026-11: universe ファイル（週次取得）由来なら dynamic、内蔵 dict が全件なら curated_full。
+    def _mode(src, d, tab, builtin_mode):
+        if src == "file":
+            return "dynamic"
+        return "curated_full" if len(d) >= EQUITY_TARGETS[tab] else builtin_mode
+    _source_mode = {"nikkei225": _mode(nk_src, nk_dict, "nikkei225", "curated_subset"),
+                    "dow30": "dynamic" if dj_src == "file" else "curated_full",
+                    "nasdaq100": _mode(nq_src, nq_dict, "nasdaq100", "curated_subset"),
+                    "sp500": "dynamic"}
+    _universe_src = {"nikkei225": nk_src, "dow30": dj_src, "nasdaq100": nq_src,
+                     "sp500": sp_src if sp_src == "file" else "web"}
 
     def _universe_rec(tab, rows):
         got = set(r.get("symbol") for r in rows if isinstance(r, dict))
@@ -2925,6 +3164,7 @@ def main():
             "capture_pct": round(cnt / EQUITY_TARGETS[tab] * 100, 1),
             "defined": len(_defined[tab]),
             "source_mode": _source_mode[tab],
+            "universe_source": _universe_src[tab],
             "fetch_failures": failures,                  # 上場廃止/入替候補
         }
 
@@ -2958,6 +3198,10 @@ def main():
                 "crypto": len(crypto_results), "valuation": len(valuation_results),
             },
             "yield_curve": yield_curve,
+            # §21: 画面上部の「データが○時間前のまま」警告のしきい値（tools/gate_thresholds.py と同じ値）。
+            "stale_hours": _stale_hours(),
+            "verify": verify_meta,
+            "us_fundamentals": us_fund_meta,
             # 銘柄ユニバースの取得率＋上場廃止/入替候補。劣化を隠さず可視化する。
             "universe": universe_meta,
             # サイレント fallback 禁止: 発動した fallback を全て記録（0件なら健全）。
