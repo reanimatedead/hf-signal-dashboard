@@ -70,81 +70,78 @@ jobs:
       - name: Configure Pages (pin build_type=workflow)
         uses: actions/configure-pages@v6
 
-      - name: Set up Python 3.11
-        uses: actions/setup-python@v7
+      - name: Set up uv (Python 3.11)
+        uses: astral-sh/setup-uv@v6
         with:
           python-version: "3.11"
-          cache: "pip"
+          enable-cache: true
 
-      # 2026-11: 版を固定した requirements.lock を使う（requirements.txt は下限指定として残す）。
-      # 自動では上げない。
-      - name: Install dependencies (requirements.lock)
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.lock
+      # 依存の版は uv.lock の 1 か所だけ（CI・公開・収集すべて uv sync --locked）。自動では上げない。
+      - name: Install dependencies (uv.lock)
+        run: uv sync --locked
 
       # 2026-11 (M2): 事前の確認は構成銘柄件数 ±5% だけ（外れたら止める）。Yahoo には問い合わせない
       # （本体の取得と同じ IP の回数制限枠を使ってしまうため）。欠損は生成後の nan_report（"Missing-data check"）で見る。
       - name: Contract check (external data)
-        run: python3 tools/contract_check.py
+        run: uv run python tools/contract_check.py
 
       # Generate → correlations → macro. build_macro is full-only (index.html does
       # not read docs/data/macro.json, but external consumers may; 3s / 13 FRED
       # calls buys removing that unknown risk). corr_refresh does NOT run it.
       - name: Generate signals
-        run: python3 fetch_signals.py
+        run: uv run python fetch_signals.py
 
       - name: Re-merge correlations
-        run: python3 pipeline/build_corr.py
+        run: uv run python pipeline/build_corr.py
 
       - name: Generate macro layer (legacy docs/data/macro.json)
         env:
           FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
-        run: python3 pipeline/build_macro.py
+        run: uv run python pipeline/build_macro.py
 
       # v2 macro layer (docs/macro_v2.json) — FRED 16-series decomposition/credit/
       # funding + percentile context. Distinct from the legacy docs/data/macro.json.
       - name: Generate macro_v2 layer
-        run: python3 pipeline/build_macro_v2.py
+        run: uv run python pipeline/build_macro_v2.py
 
       # Dealer gamma layer (docs/gamma.json) — CBOE public SPX chain; live API in
       # CI (no ~/taka-data archive). Reads docs/data.json for MOVE/VIX, so it runs
       # after fetch_signals.
       - name: Generate gamma layer
-        run: python3 pipeline/build_gamma.py
+        run: uv run python pipeline/build_gamma.py
 
       # Yield×equity balance layer (docs/relations.json) — US/JP equities from FRED,
       # EU equity from yfinance (no FRED STOXX50E). Real-yield-based (US).
       - name: Generate relations layer
-        run: python3 pipeline/build_relations.py
+        run: uv run python pipeline/build_relations.py
 
       # Fail-closed gates: any failure below stops the job BEFORE upload, so the
       # previous good Pages deploy stays live.
       - name: Health gate
-        run: python3 tools/health_gate.py
+        run: uv run python tools/health_gate.py
 
       # 2026-08-19 追加: 生成直後の freshness<48h & completeness>=90% 二条件
       # ハード assert。しきい値は tools/gate_thresholds.py。probe(verify_live)
       # は外形監視で 2h 遅延あり、生成ジョブ内で自壊させる方が発覚が早い。
       - name: Assert generated payload health (freshness + completeness)
-        run: PYTHONPATH=tools python3 tools/assert_gen_health.py
+        run: PYTHONPATH=tools uv run python tools/assert_gen_health.py
 
       # 生成後の欠損チェック: data.json の meta.nan_report で、株式4タブの price=None が 10% 超なら止める。
       - name: Missing-data check (nan_report)
-        run: python3 tools/contract_check.py --post docs/data.json
+        run: uv run python tools/contract_check.py --post docs/data.json
 
       # 生成物（docs/data.json など）が必要なテスト（marker needs_data_json）。オフライン（ci.yml）では
       # skip されるので、生成済みのここでスキップ禁止で回す。欠けていれば失敗 → upload/deploy は走らず前日のまま。
       - name: Data tests (data.json 必須・スキップ禁止)
-        run: REQUIRE_DATA_JSON=1 python3 -m pytest tests/ -q -m needs_data_json
+        run: REQUIRE_DATA_JSON=1 uv run pytest tests/ -q -m needs_data_json
 
       - name: Contract tests
-        run: python3 -m pytest tests/ -q
+        run: uv run pytest tests/ -q
 
       # Link liveness (Task 5-4) — 警告のみ。Yahoo 429 等の誤検知で job を落とさない
       # ため、常に成功扱い（|| true は不要：スクリプト自身が exit 0 を返す）。
       - name: Check links (warn only)
-        run: python3 tools/check_links.py
+        run: uv run python tools/check_links.py
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v5
@@ -209,37 +206,34 @@ jobs:
       - name: Configure Pages (pin build_type=workflow)
         uses: actions/configure-pages@v6
 
-      - name: Set up Python 3.11
-        uses: actions/setup-python@v7
+      - name: Set up uv (Python 3.11)
+        uses: astral-sh/setup-uv@v6
         with:
           python-version: "3.11"
-          cache: "pip"
+          enable-cache: true
 
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
-          pip install pytest
+      - name: Install dependencies (uv.lock)
+        run: uv sync --locked
 
       # Pull docs/data.json + required charts/*.json from the live site (chart
       # tabs derived from data.json), then guard the base (fail closed): stale
       # (>48h), missing keys, missing chart_status, or equity ready < 90% → exit 1.
       - name: Pull live site as deploy base + guard
-        run: python3 tools/pull_live_base.py
+        run: uv run python tools/pull_live_base.py
 
       - name: Re-merge correlations
-        run: python3 pipeline/build_corr.py
+        run: uv run python pipeline/build_corr.py
 
       - name: Health gate
-        run: python3 tools/health_gate.py
+        run: uv run python tools/health_gate.py
 
       # 2026-08-19 追加: corr_refresh も生成後 assert（freshness は pull_live_base
       # が持ってきた base の updated_at が 48h 以内である事を再確認する意味）。
       - name: Assert generated payload health (freshness + completeness)
-        run: PYTHONPATH=tools python3 tools/assert_gen_health.py
+        run: PYTHONPATH=tools uv run python tools/assert_gen_health.py
 
       - name: Contract tests
-        run: python3 -m pytest tests/ -q
+        run: uv run pytest tests/ -q
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v5

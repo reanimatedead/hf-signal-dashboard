@@ -10,3 +10,4 @@
 - `workflows/corr.yml` — 廃止済み（deploy.yml の corr_refresh に統合）。手動実行で docs/data.json を
   コミットしようとする唯一の workflow だったため移した（data.json はコミットしない・ADR-003）
 - `tests/test_collect_workflow.py` — workflow ファイルの形を調べるテスト（ci_only）。方針により廃止
+- `requirements.lock` / `requirements.txt` — 依存の指定は uv.lock（pyproject.toml）の 1 か所にした。全 workflow は `uv sync --locked`

@@ -438,11 +438,9 @@ The Valuation tab adds long-term equity market valuation context through the Buf
 ## Quick start (local)
 
 ```bash
-python -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
-python fetch_signals.py            # generates docs/data.json + docs/charts/ (Yahoo rate limits)
-python pipeline/build_corr.py      # merges correlations back into docs/data.json
+uv sync --locked                   # dependencies: uv.lock is the single source (pyproject.toml)
+uv run python fetch_signals.py     # generates docs/data.json + docs/charts/ (Yahoo rate limits)
+uv run python pipeline/build_corr.py   # merges correlations back into docs/data.json
 cd docs && python -m http.server 8080
 # open http://localhost:8080
 ```
@@ -519,7 +517,7 @@ hf-signal-dashboard/
 │   └── sample-signals.json     # Sample data in the integration-contract format
 ├── fetch_signals.py            # Data pipeline: fetch → score → indicators → data.json
 ├── DATA_CONTRACT.md            # Schema + version history (single source of truth)
-├── requirements.txt
+├── pyproject.toml / uv.lock   # Dependencies (uv.lock is the single source)
 └── README.md
 ```
 
@@ -527,6 +525,6 @@ hf-signal-dashboard/
 
 ## Troubleshooting
 
-- **Actions fail:** check `requirements.txt` pinning; `yfinance` timeouts are usually transient — re-run.
+- **Actions fail:** check `uv.lock` pinning (`uv sync --locked`); `yfinance` timeouts are usually transient — re-run.
 - **No signals displayed:** run the workflow manually; locally use `python -m http.server` (avoid `file://` CORS).
 - **Symbol not found:** Japanese stocks use the `.T` suffix (e.g. `7203.T`); tickers can change on delisting.

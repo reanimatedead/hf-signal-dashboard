@@ -4,7 +4,7 @@ version = "0.1.0"
 description = "公開ダッシュボード（GitHub Pages）の計算式と、Mac mini でだけ動く日本株・米国株のスクリーニング"
 readme = "README.md"
 requires-python = ">=3.11"
-# requirements.txt（公開ダッシュボードの生成・deploy.yml）と同じ下限 + src/screener が使うもの（numpy）
+# 公開ダッシュボードの生成（全 workflow）と src/screener の依存。版は uv.lock で固定（唯一の指定）
 dependencies = [
     "yfinance>=0.2.36",
     "pandas>=2.0.0",

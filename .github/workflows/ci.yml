@@ -24,9 +24,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up uv
+      # deploy.yml などと同じ Python 3.11（pyproject の requires-python の下限）。
+      - name: Set up uv (Python 3.11)
         uses: astral-sh/setup-uv@v6
         with:
+          python-version: "3.11"
           enable-cache: true
 
       - name: uv sync (uv.lock)
@@ -43,16 +45,3 @@ jobs:
 
       - name: pytest
         run: uv run pytest -q
-
-      # 2026-11: deploy.yml の full は requirements.lock（pip・Python 3.11）で pytest を回す。uv.lock とは入る物が違う
-      # （deploy #265 は uv.lock にだけある pyyaml を import したテストで失敗した）。同じ環境でも一度回して先に気づく。
-      - name: Set up Python 3.11 (deploy と同じ)
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-
-      - name: pytest (requirements.lock = deploy と同じ環境)
-        run: |
-          python -m venv /tmp/lockenv
-          /tmp/lockenv/bin/pip install -q -r requirements.lock pytest
-          /tmp/lockenv/bin/python -m pytest tests/ -q

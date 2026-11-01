@@ -8,7 +8,7 @@
 ```
 hf-signal-dashboard/
 ├── fetch_signals.py              # 既存ピプライン (1864行)。docs/data.json を生成。
-├── requirements.txt              # numpy pandas yfinance requests
+├── pyproject.toml / uv.lock      # 依存（uv.lock が唯一の版の指定。旧 requirements.txt は廃止）
 ├── data/
 │   └── valuation_metrics.csv     # 既存（Buffett Indicator US/JP, 多日付）
 ├── docs/                         # ★ Cloudflare 公開ディレクトリ（root: ./docs）
