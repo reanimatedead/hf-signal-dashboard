@@ -151,6 +151,7 @@ tbody tr.detail-row,tbody tr.detail-row:hover{background:var(--bg2)}
 .detail-row td{padding:0 12px 12px;border-right:none}
 .dt-wrap{background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:12px 14px;margin:2px 0 6px}
 .dt-hd{font-family:var(--cond);font-size:14px;color:var(--sym-color);margin-bottom:8px}
+.dt-judge{font-size:11px;color:var(--text-dim);margin:-4px 0 8px;cursor:help;white-space:normal}
 .dt-tabs{display:flex;gap:6px;margin-bottom:8px}
 .dt-tab{font-size:10px;color:var(--text-dim);border:1px solid var(--border);border-radius:4px;padding:2px 8px;cursor:pointer}
 .dt-tab:hover{color:var(--text)}
@@ -733,6 +734,7 @@ tbody tr.mrow-normal:hover{opacity:1}
 
 <script src="assets/i18n/dict.js"></script>
 <script src="assets/i18n/i18n.js"></script>
+<script src="assets/signal/names.js"></script>
 <script src="assets/signal/signal_ui.js"></script>
 <script>
 // ══ State ══════════════════════════════════════════
@@ -1026,6 +1028,16 @@ const PC={
 };
 function sigCode(v){ return v==null?null:String(v).trim().toLowerCase().replace(/\s+/g,"_"); }
 function sigLabel(v){ const c=sigCode(v); return c?I18.code("signal",c):"—"; }
+// 会社名の表示は assets/signal/names.js の 1 つの関数だけ（取得元ごとの "Class A Common Stock" などを外す）
+function companyName(n){ return window.NAMES ? NAMES.companyName(n) : String(n||""); }
+// 銘柄詳細の見出しの下に 1 行: 一覧の「判定（チャート）」（チャート判定）と、見出しの HOLD・スコア（総合スコア）の違い
+function judgeLine(r, score){
+  if(r.chart_signal===undefined && r.chart_signal_note===undefined) return "";
+  const c=I18.norm("chart_signal", r.chart_signal);
+  const chart=c?I18.code("chart_signal",c):"—";
+  const sc=(typeof score==="number")?I18.fmtNum(score,0):"—";
+  return `<div class="dt-judge" title="${esc(T("dt.judge_help"))}">${T("dt.judge_line",{chart:esc(chart),signal:sigLabel(r.signal),score:sc})}</div>`;
+}
 function sumCount(c,code){ return c[code]||c[code.toUpperCase().replace(/_/g," ")]||0; }
 
 function renderSum(){
@@ -1132,7 +1144,11 @@ function renderUniverseBadge(){
   const count=(typeof rec.count==="number")?rec.count
     :rows.filter(r=>!String((r&&r.symbol)||"").startsWith("^")).length;
   const target=rec.target||UNIVERSE_TARGETS[tab];
-  const pct=target?Math.round(count/target*100):0;
+  // 社数: 同じ会社の2種類の株（GOOG/GOOGL など）を 1 社と数える（名前を揃えて数える・表示だけ。assets/signal/names.js）。
+  // 取得率は社数 / 対象の社数（Nasdaq 100 の 101 銘柄が 101% にならないように）。
+  const cc=window.NAMES?NAMES.companyCount(rows.filter(r=>!String((r&&r.symbol)||"").startsWith("^"))):{symbols:count,companies:count,shared:[]};
+  const companies=Math.max(0,count-(cc.symbols-cc.companies));
+  const pct=target?Math.round(companies/target*100):0;
   const warn=pct<50;
   const col=warn?"#e5484d":"var(--text-dim,#9aa)";
   const bg=warn?"rgba(229,72,77,0.12)":"transparent";
@@ -1140,10 +1156,12 @@ function renderUniverseBadge(){
   el.innerHTML=
     `<span style="display:inline-block;padding:3px 10px;border-radius:4px;font-size:12px;`
     +`background:${bg};color:${col};border:1px solid ${col}">`
-    +T("uni.badge",{label:T("tab."+tab),count:I18.fmtNum(count,0),target:I18.fmtNum(target,0),pct})
+    +T("uni.badge",{label:T("tab."+tab),count:I18.fmtNum(count,0),companies:I18.fmtNum(companies,0),target:I18.fmtNum(target,0),pct})
     +(warn?" "+T("uni.warn"):"")+`</span>`
     +`<span style="font-size:11px;color:var(--text-faint,#666);margin-left:8px">`
-    +T("uni.note")+`</span>`;
+    +T("uni.note")
+    +(cc.shared.length?" "+T("uni.shared_note",{pairs:esc(cc.shared.map(g=>g.join("/")).join(T("common.sep_list")))}):"")
+    +`</span>`;
 }
 
 function getRows(){
@@ -1488,7 +1506,8 @@ function detailHTML(r){
   const sym = r.symbol || "";
   const tab = (tf,active)=> `<span class="dt-tab${active?" dt-tab-on":""}" onclick="showTF('${sym}','${tf}',this)">${T("tf.short_"+tf)}</span>`;
   return `<div class="dt-wrap">
-    <div class="dt-hd"><b>${esc(r.symbol||"—")}</b> &nbsp;${esc(r.name||"")}&nbsp;&middot;&nbsp;${sigLabel(r.signal)}&nbsp;&middot;&nbsp;${T("dt.score",{v:f(score,0)})}&nbsp;&middot;&nbsp;${r.error?`<span style="color:var(--red)">${T("dt.data_error")}</span>`:T("dt.ok")}</div>
+    <div class="dt-hd"><b>${esc(r.symbol||"—")}</b> &nbsp;${esc(companyName(r.name))}&nbsp;&middot;&nbsp;${sigLabel(r.signal)}&nbsp;&middot;&nbsp;${T("dt.score",{v:f(score,0)})}&nbsp;&middot;&nbsp;${r.error?`<span style="color:var(--red)">${T("dt.data_error")}</span>`:T("dt.ok")}</div>
+    ${judgeLine(r, score)}
     <div class="dt-tabs">${tab("4h",false)}${tab("1d",true)}${tab("1w",false)}</div>
     <div class="dt-grid">
       <span><b>RSI(14)</b> ${f(r.rsi,1)}</span>
@@ -1519,7 +1538,7 @@ function valuationDetailHTML(r, f){
        <div class="dt-tfwrap">${chart1dHTML(c1d, f, T("val.series_tf"))}</div>`
     : `<div class="dt-note" style="margin-top:8px">${T("val.chart_na",{note:(c1d&&c1d.note)?esc(I18.code("chart_note",c1d.note)):T("val.not_available")})}</div>`;
   return `<div class="dt-wrap">
-    <div class="dt-hd"><b>${esc(r.symbol||"—")}</b> &nbsp;${esc(r.name||"")}&nbsp;&middot;&nbsp;${esc(r.region?I18.code("region",r.region):"")}&nbsp;&middot;&nbsp;${T(ph?"val.placeholder":"val.manual_csv")}</div>
+    <div class="dt-hd"><b>${esc(r.symbol||"—")}</b> &nbsp;${esc(companyName(r.name))}&nbsp;&middot;&nbsp;${esc(r.region?I18.code("region",r.region):"")}&nbsp;&middot;&nbsp;${T(ph?"val.placeholder":"val.manual_csv")}</div>
     <div class="dt-note" style="margin-top:8px">${T("val.explain")}</div>
     <div class="dt-grid" style="margin-top:8px">
       <span><b>${T("col.value")}</b> ${val}</span>
@@ -1664,7 +1683,7 @@ function cell(c,r){
       </div>`;
       break;
     }
-    case"name": h=`<span class="cname" title="${esc(r.name||"")}">${esc(r.name||"—")}</span>`; break;
+    case"name": { const n=companyName(r.name); h=`<span class="cname" title="${esc(n)}">${esc(n||"—")}</span>`; break; }
     case"price": h=`<span class="price">${fmt(r.price)}</span>`; break;
     case"change_pct":{
       const v=r.change_pct,cl=v>0?"cp":v<0?"cn":"cz";

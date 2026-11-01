@@ -26,6 +26,7 @@
   const pct = (v, d = 1) => (num(v) == null ? "—" : I18.fmtSigned(v, d) + "%");
   const sig = (v) => I18.norm("chart_signal", v);                  // 旧形式（和文）→ コード
   const sigText = (c) => I18.code("chart_signal", c);
+  const cname = (n) => (window.NAMES ? NAMES.companyName(n) : String(n || ""));   // 会社名の表示（assets/signal/names.js）
   // verify.json のキーがコードでも旧形式（和文）でも引けるように
   function byCode(obj, code, prefix) {
     if (!obj) return undefined;
@@ -175,7 +176,7 @@
     const open = (sym, src) => `data-sym="${esc(sym)}" data-src-tab="${src}" tabindex="0" style="cursor:pointer"`
       + ` onclick="toggleDetail(event,'${esc(sym)}','${src}')"`
       + ` onkeydown="if(event.key==='Enter'){event.preventDefault();toggleDetail(event,'${esc(sym)}','${src}')}"`;
-    const body = rows.map(({ r, idx, src }) => `<tr class="ub-row" ${open(r.symbol, src)}><td>${judgeCell(r, "us")}</td><td><b>${esc(r.symbol)}</b></td><td>${esc(r.name || "")}</td>`
+    const body = rows.map(({ r, idx, src }) => `<tr class="ub-row" ${open(r.symbol, src)}><td>${judgeCell(r, "us")}</td><td><b>${esc(r.symbol)}</b></td><td>${esc(cname(r.name))}</td>`
       + `<td>${esc(idx.join(T("common.sep_list")))}</td><td style="text-align:right">${num(r.price) == null ? "—" : I18.fmtNum(r.price, 2)}</td>`
       + `<td style="text-align:right">${cell({ k: "cci288" }, r)}</td><td style="text-align:right">${cell({ k: "bb48_z" }, r)}</td></tr>`).join("");
     const th = ["ub.th_judge", "col.symbol", "col.name", "ub.th_index", "col.price", "col.cci288", "col.bb48_z"]

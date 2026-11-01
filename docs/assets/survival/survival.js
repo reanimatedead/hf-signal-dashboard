@@ -106,7 +106,7 @@
       const id = "C-" + c.symbol + "-" + (c.as_of || "").slice(0, 10);
       html +=
         '<tr data-cid="' + esc(id) + '" data-symbol="' + esc(c.symbol) + '">' +
-          '<td>' + esc(c.symbol) + '<br><small>' + esc(c.name || "") + '</small></td>' +
+          '<td>' + esc(c.symbol) + '<br><small>' + esc(window.NAMES ? NAMES.companyName(c.name) : (c.name || "")) + '</small></td>' +
           '<td class="sv-num">' + fmtNum(c.edge_score, 1) + '</td>' +
           '<td>' + esc(c.direction_hint ? code("direction", c.direction_hint) : "—") + '</td>' +
           '<td class="sv-num">' + fmtNum(c.stretch, 2) + '</td>' +
@@ -165,7 +165,7 @@
     list.forEach(p => {
       html +=
         '<tr>' +
-          '<td>' + esc(p.symbol) + '<br><small>' + esc(p.name || "") + '</small></td>' +
+          '<td>' + esc(p.symbol) + '<br><small>' + esc(window.NAMES ? NAMES.companyName(p.name) : (p.name || "")) + '</small></td>' +
           '<td>' + esc(code("direction", p.direction)) + '</td>' +
           '<td class="sv-num">' + fmtPct(p.size_pct, 3) + '</td>' +
           '<td class="sv-num sv-pos">' + fmtPct(p.exit && p.exit.take_profit_pct, 2) + '</td>' +
