@@ -43,6 +43,27 @@ URLS = {
     "nikkei225": "https://en.wikipedia.org/wiki/Nikkei_225",
 }
 NAMES = ("nikkei225", "nasdaq100", "sp500", "dow30")
+# 2026-11: Wikipedia の Nasdaq-100 / Dow 30 の本ページから構成銘柄の表が無くなった（実物の表の形を
+# ログで確認: 構成銘柄は navbox だけ・ティッカー無し）。候補を順に試し、件数 ±5% に入った最初の出典を使う。
+CANDIDATES = {
+    "nasdaq100": [
+        ("wikipedia_list", "https://en.wikipedia.org/wiki/List_of_Nasdaq-100_companies"),
+        ("nasdaq_api", "https://api.nasdaq.com/api/quote/list-type/nasdaq100"),
+        ("wikipedia_index", "https://en.wikipedia.org/wiki/Nasdaq-100"),
+    ],
+    "dow30": [
+        ("wikipedia_list", "https://en.wikipedia.org/wiki/List_of_Dow_Jones_Industrial_Average_components"),
+        ("wikipedia_index", "https://en.wikipedia.org/wiki/Dow_Jones_Industrial_Average"),
+    ],
+}
+
+
+def parse_nasdaq_api(text):
+    """Nasdaq 公式 API（list-type/nasdaq100）の JSON → {ticker: name}。"""
+    j = json.loads(text)
+    rows = (((j.get("data") or {}).get("data") or {}).get("rows")) or []
+    return {str(r["symbol"]).strip().replace(".", "-"): str(r.get("companyName") or r["symbol"]).strip()
+            for r in rows if r.get("symbol")}
 
 
 def http_get(url):
@@ -143,13 +164,27 @@ def fetch_one(name, fetch, nikkei_dynamic=False):
             if len(d) < 400:
                 d = parse_sp500_csv(fetch(URLS["sp500_csv"]))
             return d, "wikipedia/datahub"
-        if name in ("nasdaq100", "dow30"):
-            html = fetch(URLS[name])
+        if name in CANDIDATES:
             kw = {} if name == "nasdaq100" else {"sym_cols": ("Symbol",), "name_cols": ("Company",)}
-            d = parse_table(html, **kw)
-            if not d:   # 0 件: 表の形が想定と違う。原因を見られるよう列名と先頭行をログに出す
-                print(f"[{name}] 0 件。表の形:", *describe_tables(html), sep="\n")
-            return d, "wikipedia"
+            tried = []
+            best, best_src = {}, None      # どれも ±5% に入らなければ一番多く取れたものを返す（件数検査が実数で外れを示す）
+            for src, url in CANDIDATES[name]:
+                try:
+                    body = fetch(url)
+                    d = parse_nasdaq_api(body) if src == "nasdaq_api" else parse_table(body, **kw)
+                except Exception as exc:  # noqa: BLE001
+                    tried.append(f"{src}: 取得失敗 {type(exc).__name__}: {str(exc)[:60]}")
+                    continue
+                if d and count_within(name, len(d))[0]:
+                    if tried:
+                        print(f"[{name}] 使った出典: {src}（先に試して外れた: {tried}）")
+                    return d, src
+                tried.append(f"{src}: {len(d)} 件")
+                if len(d) > len(best):
+                    best, best_src = d, src
+                if not d and src != "nasdaq_api":   # 0 件: 原因を見られるよう表の形をログに出す
+                    print(f"[{name}] {src} 0 件。表の形:", *describe_tables(body), sep="\n")
+            return best, (best_src or "none") + "（" + " / ".join(tried) + "）"
         if name == "nikkei225":
             if not nikkei_dynamic:
                 return None, "DATA_CONTRACT §19: 機械取得しない（内蔵一覧を件数検査のみ）"

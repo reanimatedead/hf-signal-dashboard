@@ -84,3 +84,28 @@ def test_parse_table_handles_exchange_prefix_footnotes_and_multiindex():
     ndx = """<table><thead><tr><th colspan="2">Constituents</th></tr><tr><th>Ticker</th><th>Company</th></tr></thead>
       <tr><td>AAPL</td><td>Apple Inc.</td></tr><tr><td>BRK.B</td><td>Berkshire</td></tr></table>"""
     assert uu.parse_table(ndx) == {"AAPL": "Apple Inc.", "BRK-B": "Berkshire"}
+
+
+def test_candidates_fall_through_to_first_source_within_tolerance():
+    """本ページに表が無い（2026-11 の Wikipedia の実物）→ 次の候補へ。件数 ±5% に入った最初の出典を使う。"""
+    nav_only = "<table><tr><th>vteList of NASDAQ-100 companies</th></tr><tr><td>Adobe ADP AMD</td></tr></table>"
+    rows = "".join(f"<tr><td>T{i:03d}</td><td>Co {i}</td></tr>".replace("T", "Q") for i in range(101))
+    good = "<table><tr><th>Ticker</th><th>Company</th></tr>" + rows + "</table>"
+    pages = {uu.CANDIDATES["nasdaq100"][0][1]: nav_only, uu.CANDIDATES["nasdaq100"][1][1]: "{}",
+             uu.CANDIDATES["nasdaq100"][2][1]: good}
+
+    def fetch(url):
+        return pages[url]
+    d, src = uu.fetch_one("nasdaq100", fetch)
+    assert len(d) == 101 and src == "wikipedia_index"
+
+
+def test_nasdaq_api_parser_and_no_source_reason():
+    api = json.dumps({"data": {"data": {"rows": [{"symbol": "AAPL", "companyName": "Apple Inc."},
+                                                 {"symbol": "BRK.B", "companyName": "Berkshire"}]}}})
+    assert uu.parse_nasdaq_api(api) == {"AAPL": "Apple Inc.", "BRK-B": "Berkshire"}
+
+    def boom(url):
+        raise OSError("blocked")
+    d, src = uu.fetch_one("dow30", boom)
+    assert d == {} and src.startswith("none") and "取得失敗" in src
