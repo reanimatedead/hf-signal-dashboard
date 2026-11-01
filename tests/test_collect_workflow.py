@@ -7,6 +7,10 @@
 """
 import pathlib
 import re
+import pytest
+
+# workflow ファイルの形を調べるテスト: 通常の CI だけで動かす（公開では動かさない）
+pytestmark = pytest.mark.ci_only
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 COLLECT_YML = ROOT / ".github" / "workflows" / "collect.yml"

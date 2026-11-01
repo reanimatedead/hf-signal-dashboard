@@ -15,6 +15,7 @@
   6. CCI の基準線（±100）を説明する辞書の文言は ja / en とも ±200 も含む（±200 は表示用の線のみ）。
      売買判定の閾値は ind.P["cci_th"] == 100 のまま（表示の変更で判定を変えていない）。
 """
+import pytest
 import json
 import pathlib
 import re
@@ -300,6 +301,7 @@ def test_codes_only_seen_in_production_are_translated():
 
 
 # 2026-11: 公開後の訳し漏れ確認は deploy.yml full の「Deploy to Pages の後」で、警告だけ（公開を止めない）。
+@pytest.mark.ci_only   # workflow ファイルを読む: 通常の CI だけ
 def test_post_deploy_i18n_check_is_after_deploy_and_warn_only():
     # yaml は使わない（deploy.yml の full ジョブは requirements.lock で動き、pyyaml が入っていない。
     # 2026-11-01 の deploy #265 はこのテストの `import yaml` で失敗した）。テキストで順番と設定を確かめる。
@@ -312,6 +314,7 @@ def test_post_deploy_i18n_check_is_after_deploy_and_warn_only():
     assert "continue-on-error: true" in step and "--warn-only" in step
 
 
+@pytest.mark.ci_only   # workflow ファイルを読む: 通常の CI だけ
 def test_tests_do_not_import_packages_missing_from_requirements_lock():
     """deploy.yml の full は requirements.lock で pytest を回す。テストが lock に無いパッケージを import しないこと。"""
     root = pathlib.Path(__file__).resolve().parents[1]
@@ -325,3 +328,11 @@ def test_tests_do_not_import_packages_missing_from_requirements_lock():
             if dist[m.group(1)] not in lock:
                 bad.append(f"{f.name}: {m.group(1)}")
     assert not bad, bad
+
+
+@pytest.mark.ci_only   # workflow ファイルを読む: 通常の CI だけ
+def test_deploy_pytest_steps_exclude_ci_only():
+    """公開（deploy.yml）で回す pytest は、データと画面のテストだけ（workflow の形を調べる ci_only は除く）。"""
+    text = (pathlib.Path(__file__).resolve().parents[1] / ".github/workflows/deploy.yml").read_text(encoding="utf-8")
+    runs = [l for l in text.splitlines() if "pytest tests/" in l and "needs_data_json" not in l]
+    assert runs and all('not ci_only' in l for l in runs), runs
