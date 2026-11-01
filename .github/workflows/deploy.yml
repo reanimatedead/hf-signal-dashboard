@@ -155,6 +155,24 @@ jobs:
         id: deploy
         uses: actions/deploy-pages@v5
 
+      # 2026-11: 公開後の訳し漏れ確認。生成した本物の data.json で全タブ×ja/en（＋銘柄詳細）を開き、
+      # 見えている文字に snake_case（辞書を通っていないコード）が残っていたら ::warning:: を出す。
+      # 公開は止めない（公開の後に走り、continue-on-error で失敗しても job を落とさない）。
+      - name: Set up Node (post-deploy i18n check)
+        continue-on-error: true
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Post-deploy i18n check (snake_case on real data, warn only)
+        continue-on-error: true
+        run: |
+          npm install --no-save playwright@1
+          npx playwright install --with-deps chromium
+          python3 -m http.server -d docs 8770 >/dev/null 2>&1 &
+          sleep 2
+          node tools/preview_screens.mjs http://127.0.0.1:8770 _postdeploy_screens --warn-only
+
       # 失敗の通知は ntfy だけ（Issue は作らない）。本文は「ジョブ名・日付・失敗」だけ。
       # リポジトリの Secret NTFY_TOPIC が無ければ ::warning:: をログに出す（通知は送れない）。
       - name: Notify ntfy on failure (deploy-full)
