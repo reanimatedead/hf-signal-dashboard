@@ -14,6 +14,9 @@ import numpy as np
 import pandas as pd
 import yfinance as yf
 
+# 計算式は marketcalc/ だけ（DATA_CONTRACT §21）。import はここ1か所。
+from marketcalc import contracts, fund_us, ind  # noqa: E402
+
 warnings.filterwarnings("ignore")
 
 # Browser-like UA for keyless HTTP GETs (Wikipedia/gov sites 403 the default
@@ -2272,7 +2275,6 @@ def load_universe(name, default, udir=None):
     """data/universe/{name}.json（週次 universe.yml が更新）があればそれを、無ければ内蔵 dict を返す。
     ファイルの件数が想定 ±5% から外れていたら使わない（内蔵 dict に戻す・ログに出す）。
     戻り値: ({ticker: name}, "file" | "builtin")"""
-    from marketcalc.contracts import count_within
     p = Path(udir or UNIVERSE_DIR) / f"{name}.json"
     if p.exists():
         try:
@@ -2280,7 +2282,7 @@ def load_universe(name, default, udir=None):
             mem = j.get("members") or {}
             if isinstance(mem, list):
                 mem = {t: t for t in mem}
-            ok, msg = count_within(name, len(mem))
+            ok, msg = contracts.count_within(name, len(mem))
             if mem and ok:
                 print(f"✓ universe {name}: {len(mem)} from {p.name}")
                 return dict(mem), "file"
@@ -2304,7 +2306,6 @@ def attach_signal_fields(row, df, chart=None, dp=2):
     """行に chart_signal / cci288 / cci48 / bb48_z / bb288_z（marketcalc.ind.summary）を付け、
     chart（charts.1d）があれば詳細チャート用の系列（marketcalc.ind.chart_series）を chart["series"] に入れる。
     本数不足（300本未満）なら値は None（作らない・ごまかさない）。"""
-    from marketcalc import ind
     try:
         _, h, l, c = _finite_hlc(df)
         sm = ind.summary(h, l, c)
@@ -2348,7 +2349,6 @@ def attach_us_fundamentals(tabs, path=None):
     """米国3タブの行に magic_rank / f_score / f_max を付ける。
     決算部分は週次 tools/build_us_fundamentals.py が作る data/us_fundamentals.json、
     価格は今日の株価。magic_rank は Dow/NDX/S&P の和集合（重複は1回）で順位付け（marketcalc.fund_us）。"""
-    from marketcalc import fund_us
     p = Path(path or US_FUND_FILE)
     try:
         j = json.loads(p.read_text(encoding="utf-8"))

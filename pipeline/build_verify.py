@@ -30,7 +30,7 @@ ROOT = pathlib.Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from marketcalc import events, ind  # noqa: E402
+from marketcalc import events, fund_us, ind  # noqa: E402
 
 SCHEMA = "verify/1"
 RECENT_MONTHS = 6
@@ -130,7 +130,6 @@ def write(obj, path):
 
 def items_from_fixture(fixdir):
     """marketcalc/tests/fixtures の px_*.json（架空データ）→ items。composite は無し。"""
-    from marketcalc import fund_us
     items = []
     for p in sorted(pathlib.Path(fixdir).glob("px_*.json")):
         px = fund_us.parse_yahoo_chart(json.loads(p.read_text()))
