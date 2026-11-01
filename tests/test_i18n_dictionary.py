@@ -278,3 +278,22 @@ def test_dictionary_values_have_no_snake_case():
             if hits:
                 bad.append(f"{lang} {k}: {hits}")
     assert not bad, "辞書の値に内部名（snake_case）が残っている:\n" + "\n".join(bad)
+
+
+# 2026-11: 架空データに出てこない値（本番だけで出る値）も辞書にあることを確かめる。
+# 本番 data.json での画面確認（pr_preview の snake_case 検査）で見つかった net_long_context 等の再発防止。
+def test_codes_only_seen_in_production_are_translated():
+    import sys
+    root = pathlib.Path(__file__).resolve().parents[1]
+    sys.path.insert(0, str(root))
+    import fetch_signals as fs
+    d = load_dict()["d"]
+    need = set()
+    for net in (20000, -20000, 0, None):
+        state, crowd = fs.classify_imm_positioning(net)
+        need.add(f"code.positioning_state.{state}")
+    src = (root / "pipeline" / "build_gamma.py").read_text(encoding="utf-8")
+    for a in set(re.findall(r'"assumption":\s*"(\w+)"', src)):
+        need.add(f"code.gamma_assumption.{a}")
+    missing = [f"{lang} {k}" for lang in ("ja", "en") for k in sorted(need) if k not in d[lang]]
+    assert not missing, missing
