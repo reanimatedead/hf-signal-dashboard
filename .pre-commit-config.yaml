@@ -1,0 +1,24 @@
+# ruff（lint + format）と mypy は src/screener・tests/screener だけ。pytest は CI（ci.yml）でだけ回す。
+# 入れ方: uv sync && uv run pre-commit install
+repos:
+  - repo: local
+    hooks:
+      - id: ruff
+        name: ruff check
+        entry: uv run ruff check --force-exclude
+        language: system
+        types: [python]
+        files: ^(src|tests/screener)/
+      - id: ruff-format
+        name: ruff format
+        entry: uv run ruff format --force-exclude
+        language: system
+        types: [python]
+        files: ^(src|tests/screener)/
+      - id: mypy
+        name: mypy (src/screener)
+        entry: uv run mypy src/screener
+        language: system
+        types: [python]
+        files: ^src/screener/
+        pass_filenames: false

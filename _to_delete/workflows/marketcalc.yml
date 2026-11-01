@@ -1,0 +1,28 @@
+name: marketcalc tests
+
+# 計算式パッケージ marketcalc/ のテスト。データもキーも不要（架空データのみ）。
+on:
+  push:
+    paths:
+      - "marketcalc/**"
+      - ".github/workflows/marketcalc.yml"
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+      - name: Install (lock)
+        run: pip install -r requirements.lock
+      - name: pytest marketcalc/tests
+        run: python -m pytest marketcalc/tests -q

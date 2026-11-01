@@ -1,0 +1,53 @@
+name: Monthly verify snapshot
+
+# 毎月1日（10:37 JST。同日 0:00 JST の deploy.yml full が作った verify.json を使う）:
+# 公開中の verify.json を data/verify_history/YYYY-MM.json として日付付きでコミットする。
+# 判定ロジックは変えない（表示と記録だけ）。weakened=true なら Issue を1件だけ。
+on:
+  schedule:
+    - cron: "37 1 1 * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  issues: write
+
+jobs:
+  snapshot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      PAGES_BASE: "https://reanimatedead.github.io/hf-signal-dashboard"
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download live verify.json and validate
+        run: |
+          mkdir -p data/verify_history
+          M=$(TZ=Asia/Tokyo date '+%Y-%m')
+          curl -fsSL --retry 3 "$PAGES_BASE/verify.json?t=$(date +%s)" -o "/tmp/verify.json"
+          python3 - "$M" <<'PY'
+          import json, sys
+          v = json.load(open("/tmp/verify.json"))
+          assert v.get("schema") == "verify/1" and v.get("markets"), "verify.json の形が違う"
+          json.dump(v, open(f"data/verify_history/{sys.argv[1]}.json", "w"), ensure_ascii=False, indent=1)
+          open("/tmp/weak", "w").write("1" if v.get("weakened") else "")
+          print("as_of", v.get("as_of"), "weakened", v.get("weakened"), v.get("weakened_items"))
+          PY
+      - name: Commit
+        run: |
+          tools/git_push_retry.sh "chore(verify): monthly snapshot $(TZ=Asia/Tokyo date '+%Y-%m')" data/verify_history
+      - name: Issue (once) if weakened
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [ -s /tmp/weak ]; then
+            python3 tools/issue_once.py --title "🟠 検証: 根拠が弱まっています（verify.json weakened）" \
+              --body "直近6か月で買い系の判定後の中央値が基準を下回りました。data/verify_history/$(TZ=Asia/Tokyo date '+%Y-%m').json を確認してください（判定ロジックは自動では変えません）。"
+          fi
+      - name: Open issue on failure
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python3 tools/issue_once.py --title "🔴 verify_monthly.yml: 月次の検証控えが失敗" \
+            --body "run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"

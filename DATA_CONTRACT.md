@@ -1593,3 +1593,85 @@ pixel-reference 辞書の「不明 N 件」と同方針で、欠損を隠さず�
   deploy.yml が `actions/upload-pages-artifact@v5` → `actions/deploy-pages@v5` で配信し、
   毎回 `actions/configure-pages@v6` が build_type=workflow を再固定する（§11 v6.2 のまま）。
   生成物は git 非追跡（.gitignore 済）。移行作業は不要であった。
+
+## 21. v8.0 — チャート判定・検証層・全構成銘柄・米国決算（2026-11-01）
+
+計算式は **`src/screener/calc/`（データを持たない共通パッケージ。旧 `marketcalc/`、今は互換の再エクスポートだけ）だけ**にあり、ここに書く値はすべてその関数の出力。
+`fetch_signals.py` は配線のみ（式を複製しない）。
+
+### 株式4タブの行（`markets.{nikkei225,dow30,nasdaq100,sp500}[]`）に追加
+
+| キー | 型 | 由来 |
+|---|---|---|
+| `chart_signal` | str \| null | `marketcalc.ind.summary`。`強い買い` / `買い` / `買い（長期の売られすぎ）` / `様子見` / `売り` / `強い売り` |
+| `chart_signal_code` | int \| null | +2 / +1 / 0 / −1 / −2（長期の売られすぎは 0 で `long_oversold=true`） |
+| `long_oversold` | bool \| null | 終値 ≦ BB288 −2σ |
+| `trend` | str \| null | `長期は上向き` / `長期は下向き`（CCI288 の符号） |
+| `cci288` `cci48` | number \| null | CCI（日足 288 / 48） |
+| `bb48_z` `bb288_z` | number \| null | (終値 − 中心) / σ（母標準偏差） |
+| `chart_signal_note` | str（任意） | 日足が 300 本未満で判定を作らなかった理由 |
+
+- 入力は `attach_equity_charts` が取得済みの **2y 日足（同じフレーム）**。本数不足は null（作らない・ごまかさない）。
+- 判定規則: 買い = CCI288>0 かつ 終値≦BB48−2σ かつ CCI48<−100（−3σ で強い買い）。売り = その逆。
+  **売り系は「空売りの根拠なし。新しく買わない・利益を確定する目安」**（画面に必ず併記）。
+- 既存の `signal` / `composite_score`（BUY/WATCH/AVOID…）は**変更しない**。
+
+米国3タブのみ: `magic_rank`（int \| null・魔法の公式順位、Dow/NDX/S&P の**和集合**で順位付け、金融・不動産・公益は null）、
+`f_score` / `f_max`（Piotroski F。判定できない項目は満点にも数えない）。決算は週次の `data/us_fundamentals.json`、
+価格は当日の `price`（`marketcalc.fund_us.metrics` → `rank`）。
+
+日経225 の行には**理論株価・割安度・総合判定・一時利益の目印などを出さない**（決算データは公開版に置かない）。
+画面ではそれらの列を「Mac mini のローカル版のみ」と表示する。
+
+### `charts/{tab}.json` の `1d.series`（株式のみ・data.json には入れない）
+
+`marketcalc.ind.chart_series(h,l,c, tail=len(ohlc), nd=dp)` から `index_map` を除いたもの:
+`close[]`、`bb48` / `bb288` = `{mid,p2,m2,p3,m3}[]`、`cci48[]`、`cci288[]`、`marks[] = {i, type: buy|sell|long_oversold, code}`。
+配列は `ohlc`（最大 120 本）と同じ長さで末尾がそろう。容量: 1 銘柄 ≈ +10 KB（charts のみ。初回ロードは不変）。
+
+### `meta` に追加
+
+- `stale_hours`: `tools/gate_thresholds.STALE_HOURS`（48）。画面最上部の「データが○時間前のまま」警告のしきい値。
+- `verify`: `{available, file, as_of, weakened, symbols}` または `{available:false, error}`。
+- `us_fundamentals`: `{available, as_of, with_fundamentals, ranked}`。
+- `universe[tab].universe_source`: `file`（data/universe/*.json）/ `builtin`（内蔵 dict）/ `web`（S&P500 の当日取得）。
+  `source_mode` は file → `dynamic`、内蔵が全件 → `curated_full`。
+
+### `docs/verify.json`（新規・git 非追跡・毎日 full で生成）
+
+```
+{schema:"verify/1", generated_at, as_of(データ最終日), method:{horizon_days:20, gap_days:20, warmup_bars:288, recent_months:6, base, ...},
+ markets:{ nikkei225|us: {label, symbols, last_date,
+   full:{base:Stats, chart:{ラベル:Stats}, composite:{STRONG BUY|BUY|HOLD|WATCH|AVOID:Stats}},
+   recent6m:{since, base, chart, composite},
+   weakened:{"chart:強い買い"|"chart:買い"|"chart:買い（長期の売られすぎ）"|"composite:BUY"|...: bool|null}}},
+ weakened: bool, weakened_items: [str]}
+Stats = {n, mean, median, up_pct}
+```
+- 方法（`marketcalc.events`）: 判定日の終値 → 20 営業日後の騰落率。同じ銘柄の連続判定は 20 日に 1 回。
+  基準 = 同じ銘柄・同じ期間の全営業日（全期間平均）。新判定と既存 composite を**同じ方法**で数える。
+  composite の過去分は `fetch_signals.composite_label_series`（同じ `compute_signal` を 2y の各日に適用。
+  表の composite は 6mo 窓で計算するため EMA の初期化だけ異なる＝近似）。
+- `weakened`: 直近 6 か月で**買い系**の判定後の中央値 < 基準の中央値（件数 5 未満は null）。判定ロジックは自動で変えない
+  （表示と Issue のみ）。
+
+### 構成銘柄（`data/universe/*.json`・週次）
+
+- `{as_of, source, count, members:{ticker:name}}`。`fetch_signals.load_universe` が件数 ±5%（`marketcalc.contracts.count_within`）
+  を満たすときだけ使い、満たさなければ内蔵 dict。内蔵: NIKKEI225=225、NASDAQ100=101（2026-11 時点の知識の初期値）。
+- `tools/update_universe.py`（universe.yml・月曜 2:00 JST）: 取得 → ±5% → 外れたら前週のまま + Issue 1件。差分は `changes.json`。
+- **日経225 は §19 の判断を維持**: 既定では機械取得しない（内蔵一覧の件数検査のみ）。リポジトリ変数 `NIKKEI_DYNAMIC=true`
+  のときだけ Wikipedia から取る（判断を変えるのはオーナー）。
+
+### `data/us_fundamentals.json`（週次・小さい）
+
+`{as_of, source, count, missing[], rows:{ticker:{fy,ni,eq,ebit,sh,debt,cash,cap,roe,f_score,f_max,sic,fin}}}`。
+`tools/build_us_fundamentals.py` が EDGAR companyfacts を 1 社ずつ読み `marketcalc.fund_us.fundamentals` で計算。
+最初に主要 20 社のタグ契約テスト（欠け>10% で止める）。取得率 50% 未満なら書かない（前回のまま）。
+
+### 契約テスト（M2）とゲート
+
+- `tools/contract_check.py` を deploy.yml full の**最初**に実行: Yahoo 主要 20×2 の終値（欠け>10% で止める）・
+  構成銘柄件数 ±5%。失敗 → 以降のステップは走らず Pages は前日のまま。Issue はタイトル固定で 1 件（`tools/issue_once.py`）。
+- `assert_gen_health` / `verify_live` / `health_gate` の判定は**変更なし**。
+- 依存は `requirements.lock`（Python 3.11・deploy.yml）と `uv.lock`（ci.yml・Mac mini）で固定。自動では上げない。

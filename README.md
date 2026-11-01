@@ -1,3 +1,48 @@
+<!-- REPORT: 日米株スクリーナーの統合（2026-11） -->
+## 最終報告：日米株スクリーナーの統合（まずここを読む）
+
+**ひとことで**：日本株と米国株の「買い・売りの目安」と「会社の成績」を計算する仕組みを、このリポジトリ1つにまとめた。
+公開ページには、誰でも使える Yahoo と EDGAR のデータから作った値だけを出す。J-Quants の値（日本株の理論株価など）は Mac mini の中にだけ出す。
+
+### できたこと
+- 計算式を1か所にまとめた（`src/screener/calc/`）。式を直すのはここだけ。
+- 公開ページ：日経225 を全225銘柄、Nasdaq 100 を全101銘柄にした。各行に判定（買い・売りなど）と CCI・BB の値を出す。米国株には F と魔法の公式の順位も出す。
+- 公開ページ：行を押すと銘柄の詳細チャートが開く。Nasdaq 100 の上に米国の買い判定一覧を出す。「検証」タブを1つ追加した。
+- 判定の横には必ず検証の結果を並べる。売りには「空売りの根拠なし。新しく買わない・利益を確定する目安」と書く。
+- Mac mini 用の導入スクリプトは1本だけ（`scripts/install_macmini.sh`）。毎日19:00に、その日の差分だけを取りに行く。スマホへの通知は「失敗したとき」と「月曜の週次 OK」だけで、送る中身は OK か失敗かと日付だけ。
+- 公開の前に、作ったデータでテスト35件を必ず実行する。1件でも落ちたら公開しない（前の日の画面が残る）。
+
+### 確認の結果（このクラウドで実際に実行した）
+- テスト：通過330／スキップ63／**失敗0**。
+  - main では35件が失敗していた。理由は `docs/data.json` が無いため（このファイルは毎日の公開の処理で作られ、コミットはしない）。
+  - この35件は、ファイルが無いときだけスキップする。公開の処理では、スキップを禁止して実行する。
+- ruff（書き方のチェック）・mypy（型のチェック）・shellcheck（シェルのチェック）：すべて OK。
+- CCI・BB を別に手で計算して照合した：差は 0.0000000002 以下。判定の条件も一致した。
+- 画面：架空のデータで表示して、スクリーンショットで確認した。タブは11個で、エラーは無かった。
+
+### やらなかったこと・理由
+| やらなかったこと | 理由 |
+|---|---|
+| 本物のデータでの確認 | このクラウドは Yahoo・EDGAR・J-Quants に通信できない。Mac mini で初めて動かしたときに確かめる（下の3行の手順） |
+| 日経225 の一覧の自動更新 | DATA_CONTRACT §19 の権利の判断のため。一覧の初期値は知識をもとに作ったので、ずれている銘柄があり得る |
+| 別の非公開リポジトリ・AWS・毎月の再検証・Dependabot | 最終方針で「作らない」と決めた（ADR-001） |
+| 使わなくなったワークフローの削除 | `_to_delete/` に移しただけ。削除は本人が承認してから |
+
+### 本人が Mac mini でやること（2つだけ）
+すでに `~/hf-signal-dashboard` に clone してある（main・手元の変更なし）ので、最新にするだけ。無ければ `git clone https://github.com/reanimatedead/hf-signal-dashboard ~/hf-signal-dashboard`。
+```bash
+git -C ~/hf-signal-dashboard pull --ff-only
+```
+```bash
+bash ~/hf-signal-dashboard/scripts/install_macmini.sh
+```
+- 途中で J-Quants のキーを聞かれる。画面には出ず、キーチェーンにだけ保存される。
+- 最後に ntfy のトピック名が1回だけ表示される。スマホの ntfy アプリでそのトピックを購読する。
+- 初回は過去5年分を取りに行くので、数時間かかる（J-Quants は1分50回まで）。
+- 本物のデータの件数確認は、下の「日米株スクリーナー」の節の3行の手順に従う。
+
+---
+
 # HF Signal Scanner Pro
 
 A public, auto-updating **cross-asset market dashboard** — equities, FX, commodities, rates,
@@ -333,6 +378,21 @@ label sets). Labels are a **scoring output for context**, not a recommendation t
 - forbidden fields (no API keys, no account or execution data, and no directional signal values).
 
 Sample data: [docs/sample-signals.json](docs/sample-signals.json).
+
+**v8.0（2026-11, DATA_CONTRACT §21）**: 株式4タブにチャート判定（`chart_signal`・CCI288/48・BB48/288 z）と、
+その横に検証結果（`docs/verify.json`: 20営業日後の中央値・上昇割合・件数 vs 基準）。「検証」タブ、
+Nasdaq 100 タブ上の「米国の買い判定一覧」、詳細チャート（BB48/288 ±2σ/±3σ・▲▼・CCI48/288）、
+48h の「データが○時間前のまま」警告。米国は魔法の公式順位・F（`data/us_fundamentals.json`・週次）。
+日経225 の理論株価・割安度・総合判定は公開しない（Mac mini のローカル出力だけ・ADR-002）。計算式は `src/screener/calc/` だけ。
+架空データのプレビュー: `python3 tools/build_preview.py /tmp/site && python3 -m http.server -d /tmp/site`。
+
+### Mac mini（日本株・ローカルだけ）
+
+初期設定は `bash ~/hf-signal-dashboard/scripts/install_macmini.sh`（毎日 19:00 に `python -m screener.daily`）。判断の記録は `docs/decisions/`、検証の記録は `docs/verification.md`。
+本物のデータでの確認（初回実行の後・毎回）:
+1. `~/screener-data/out/counts.json` を開く（`japan_rows` が今回、`previous.japan_rows` が前回の件数）。
+2. `japan_diff_pct`（前回とのずれ %）が ±5% 以内か見る。
+3. 外れていたら `~/screener-data/logs/daily.err.log` を見て、原因が分かるまで一覧を使わない。
 
 All of it is **market context only** — not investment advice, price targets, trade execution,
 or buy/sell recommendations. IMM `long`/`short` refer to CFTC positioning categories only.

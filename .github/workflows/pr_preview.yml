@@ -1,0 +1,42 @@
+name: PR preview (fake data screenshots)
+
+# PR ごとに、架空データ（tests/screener/calc/fixtures）でサイトを組み立て、Playwright で
+# 日経225 / Nasdaq 100（米国の買い判定一覧）/ 銘柄詳細チャート / 検証タブを撮って artifact にする。
+# Pages にはデプロイしない（Pages の設定にも触らない）。
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  preview:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Install (lock + playwright)
+        run: |
+          pip install -r requirements.lock
+          npm install --no-save playwright@1
+          npx playwright install --with-deps chromium
+      - name: Build preview site (fake data)
+        run: python3 tools/build_preview.py _preview_site/site
+      - name: Screenshots
+        run: |
+          python3 -m http.server -d _preview_site/site 8765 &
+          sleep 2
+          node tools/preview_screens.mjs http://127.0.0.1:8765 _preview_site/screens
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pr-preview
+          path: _preview_site
+          retention-days: 14

@@ -39,3 +39,19 @@ docs/link_check.json
 
 # Task 5-3: decisions.jsonl は「生成物ではなく記録」。追跡下に置く（無視しない）。
 !docs/decisions.jsonl
+# §21: 検証層（fetch_signals が毎日生成・git 非追跡）。
+docs/verify.json
+# PR プレビュー（tools/build_preview.py の出力）
+_preview_site/
+
+# ADR-002: J-Quants 由来のデータ・ローカルの一覧はリポジトリに置かない。
+# 既定のデータ置き場はリポジトリの外（~/screener-data）。誤ってリポジトリ内に作られても無視されるよう二重に。
+screener-data/
+out/
+data/jquants/
+local_report/
+*.jq.json
+# uv の仮想環境
+.venv/
+.mypy_cache/
+.ruff_cache/

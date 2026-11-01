@@ -1,5 +1,5 @@
 # DEPRECATED 2026-07-26: deploy.yml の full / corr_refresh ジョブに統合済み。
-# 手動実行すると git add docs/data.json が gitignore により exit 1 で失敗する。
+# 2026-11: commit/push ステップを削除（data.json を誰もコミットしない）。手動の生成確認用。
 # deploy.yml が1週間安定稼働したら削除予定。
 name: Daily Signal Update (00:00 JST)
 
@@ -8,7 +8,7 @@ on:
   workflow_dispatch:   # Allow manual trigger from GitHub UI
 
 permissions:
-  contents: write      # Needed to push data.json back to repo
+  contents: read       # 2026-11: 何もコミットしない（data.json は git に積まない）
 
 jobs:
   update-signals:
@@ -64,36 +64,6 @@ jobs:
           FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
         run: python pipeline/build_macro.py
 
-      # ── 5. Commit updated data.json + macro.json ───────
-      - name: Commit data.json
-        run: |
-          git config --local user.email "github-actions[bot]@users.noreply.github.com"
-          git config --local user.name  "github-actions[bot]"
-          git add docs/data.json docs/data/macro.json
-          git diff --cached --quiet && echo "No changes to commit" || \
-            git commit -m "chore: update signals $(date -u '+%Y-%m-%d %H:%M UTC')"
-
-      # ── 6. Push (競合リトライ付き) ─────────────────────
-      # 並走push(人間/他workflow)による non-fast-forward 拒否で赤×に
-      # なるのを防ぐ。rebase採用の根拠: bot commit は生成物のみで、
-      # rebase 後も直前のビルド結果として正しいまま。
-      # 同内容が先に反映済みの場合は rebase が commit を落とし、push は
-      # "Everything up-to-date" となり「commitなし=成功」で緑終了する。
-      # rebase 衝突は自己解決せず abort して exit 1。
-      - name: Push changes (with conflict retry)
-        run: |
-          BRANCH="$GITHUB_REF_NAME"
-          for attempt in 1 2 3 4; do   # 1=初回, 2-4=リトライ最大3回
-            if ! git pull --rebase --autostash origin "$BRANCH"; then
-              git rebase --abort || true
-              echo "::error::git pull --rebase failed (attempt ${attempt}): conflict requires manual resolution"
-              exit 1
-            fi
-            if git push origin "HEAD:${BRANCH}"; then
-              echo "Push succeeded (attempt ${attempt})"
-              exit 0
-            fi
-            echo "Push rejected (attempt ${attempt}), re-rebasing..."
-          done
-          echo "::error::Push failed after 3 retries"
-          exit 1
+      # ── 5/6. (removed 2026-11) commit/push of docs/data.json ──
+      # 生成物は git に積まない（DATA_CONTRACT §11）。配信は deploy.yml の actions/deploy-pages だけ。
+      # このワークフローは手動の生成確認用としてだけ残す（何もコミットしない）。
