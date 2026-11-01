@@ -74,6 +74,20 @@ def _ticker(cell):
     return m.group(1).replace(".", "-") if m else None
 
 
+def describe_tables(html, limit=8):
+    """0 件だったときの手がかり: 表ごとの列名と先頭行（ログ用）。Wikipedia の表の形が変わったときに原因を見るため。"""
+    lines = []
+    try:
+        tables = _tables(html)
+    except Exception as exc:  # noqa: BLE001
+        return [f"read_html 失敗 {type(exc).__name__}: {str(exc)[:120]}"]
+    lines.append(f"表の数={len(tables)}")
+    for i, df in enumerate(tables[:limit]):
+        first = [str(v)[:24] for v in (df.iloc[0].tolist() if len(df) else [])][:6]
+        lines.append(f"  表{i}: 行={len(df)} 列={[_norm_col(c) for c in df.columns][:8]} 先頭行={first}")
+    return lines
+
+
 def parse_table(html, sym_cols=("Symbol", "Ticker"), name_cols=("Security", "Company", "Company name")):
     """sym_cols のどれかを列に持つ最初の表 → {ticker: name}。
     2026-11: Wikipedia の Nasdaq-100 / Dow 30 で 0 件になったため、列名の脚注・MultiIndex・大文字小文字、
@@ -129,10 +143,13 @@ def fetch_one(name, fetch, nikkei_dynamic=False):
             if len(d) < 400:
                 d = parse_sp500_csv(fetch(URLS["sp500_csv"]))
             return d, "wikipedia/datahub"
-        if name == "nasdaq100":
-            return parse_table(fetch(URLS["nasdaq100"])), "wikipedia"
-        if name == "dow30":
-            return parse_table(fetch(URLS["dow30"]), sym_cols=("Symbol",), name_cols=("Company",)), "wikipedia"
+        if name in ("nasdaq100", "dow30"):
+            html = fetch(URLS[name])
+            kw = {} if name == "nasdaq100" else {"sym_cols": ("Symbol",), "name_cols": ("Company",)}
+            d = parse_table(html, **kw)
+            if not d:   # 0 件: 表の形が想定と違う。原因を見られるよう列名と先頭行をログに出す
+                print(f"[{name}] 0 件。表の形:", *describe_tables(html), sep="\n")
+            return d, "wikipedia"
         if name == "nikkei225":
             if not nikkei_dynamic:
                 return None, "DATA_CONTRACT §19: 機械取得しない（内蔵一覧を件数検査のみ）"
