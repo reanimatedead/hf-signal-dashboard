@@ -160,7 +160,7 @@ tbody tr.detail-row,tbody tr.detail-row:hover{background:var(--bg2)}
 .dt-tf{margin-top:8px;font-size:11px;color:var(--text)}
 .dt-note{margin-top:10px;font-size:10px;color:var(--text-dim)}
 .dt-note a{color:var(--accent)}
-.dt-disc{margin-top:6px;font-size:10px;color:var(--text-faint)}
+.dt-disc{margin-top:6px;font-size:10px;color:var(--text-faint);white-space:normal;overflow-wrap:anywhere}
 .dt-bb{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:4px 18px;margin-top:6px;font-size:11px;color:var(--text)}
 .dt-bb b{color:var(--text-dim);font-weight:400}
 /* BB/CCI caption cells sit inside the table, which sets white-space:nowrap
@@ -312,6 +312,12 @@ body.light .cname{color:var(--text-dim)}
   .mf-grid{grid-template-columns:1fr !important}
   /* v5(4): 上部チップ帯は内部スクロールで封じ、ページ全体の横スクロールを防ぐ */
   #sum-bar,#tabs,#toolbar{overflow-x:auto;-webkit-overflow-scrolling:touch}
+  /* 2026-11: スマホでは表の枠の高さを切らない（枠の中だけのスクロールで銘柄詳細の下の説明が下端のフッターの
+     裏に隠れて読めなかった）。ページ全体のスクロールで最後の行まで読め、フッターは内容の後に来る。 */
+  .tbl-wrap{max-height:none;overflow-y:visible}
+  /* 銘柄詳細は表の横幅ではなく画面の幅に収める（説明の最後の行が右に切れないように） */
+  .detail-row .dt-wrap{position:sticky;left:12px;box-sizing:border-box;max-width:calc(100vw - 24px)}
+  #footer{padding-bottom:calc(10px + env(safe-area-inset-bottom,0px))}
 }
 html,body{overflow-x:hidden}
 
