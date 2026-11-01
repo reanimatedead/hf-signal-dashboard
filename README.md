@@ -29,8 +29,9 @@
 | 使わなくなったワークフローの削除 | `_to_delete/` に移しただけ。削除は本人が承認してから |
 
 ### 本人が Mac mini でやること（2つだけ）
+すでに `~/hf-signal-dashboard` に clone してある（main・手元の変更なし）ので、最新にするだけ。無ければ `git clone https://github.com/reanimatedead/hf-signal-dashboard ~/hf-signal-dashboard`。
 ```bash
-git clone https://github.com/reanimatedead/hf-signal-dashboard ~/hf-signal-dashboard
+git -C ~/hf-signal-dashboard pull --ff-only
 ```
 ```bash
 bash ~/hf-signal-dashboard/scripts/install_macmini.sh
