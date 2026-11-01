@@ -125,6 +125,23 @@ def load(path: str | Path | None = None) -> Config:
     return Config(data_dir=data_dir, repo_dir=repo_dir, raw=raw, path=p if p.exists() else None)
 
 
+def fallback(path: str | Path | None = None) -> Config:
+    """設定が読めないとき（壊れた toml 等）でも失敗の通知だけは送れるよう、ntfy の topic だけを拾った最小の設定。"""
+    import re
+
+    p = Path(path).expanduser() if path else default_config_path()
+    topic = ""
+    try:
+        m = re.search(r'^\s*topic\s*=\s*"([A-Za-z0-9_-]+)"', p.read_text(encoding="utf-8"), re.M)
+        topic = m.group(1) if m else ""
+    except OSError:
+        pass
+    raw = {k: dict(v) for k, v in DEFAULTS.items()}
+    raw["ntfy"]["topic"] = topic
+    home = Path.home()
+    return Config(data_dir=home / "screener-data", repo_dir=home / "hf-signal-dashboard", raw=raw, path=None)
+
+
 def today_jst() -> dt.date:
     return dt.datetime.now(JST).date()
 

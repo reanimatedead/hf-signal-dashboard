@@ -207,12 +207,11 @@ jobs:
           python-version: "3.11"
           cache: "pip"
 
-      # 2026-11: 版を固定した requirements.lock を使う（requirements.txt は下限指定として残す）。
-      # 最新版での確認は毎月1日の deps_latest.yml（自動では上げない）。
-      - name: Install dependencies (requirements.lock)
+      - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.lock
+          pip install -r requirements.txt
+          pip install pytest
 
       # Pull docs/data.json + required charts/*.json from the live site (chart
       # tabs derived from data.json), then guard the base (fail closed): stale

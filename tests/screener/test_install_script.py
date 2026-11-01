@@ -29,9 +29,9 @@ def test_key_never_written_to_file_or_log():
             bad.append(ln)
     assert not bad, bad
     text = "\n".join(_lines())
-    assert "read -rs KEY" in text
-    assert 'security add-generic-password -U -s "$SERVICE" -a "$USER" -w "$KEY"' in text
-    assert re.search(r"security add-generic-password[^\n]*\n\s*unset KEY", text)
+    # キーは security 自身に対話入力させる（-w を値なしで最後に置く）。引数（ps で見える）に載せない
+    assert re.search(r'security add-generic-password -U -s "\$SERVICE" -a "\$USER" -w( |$)', text, re.M)
+    assert "$KEY" not in text and "read -rs" not in text
     assert "set -x" not in text
 
 

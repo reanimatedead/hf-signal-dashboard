@@ -88,6 +88,13 @@ def _urlopen(req: urllib.request.Request, timeout: float) -> Any:
     return urllib.request.urlopen(req, timeout=timeout)
 
 
+MAX_PER_MIN = 50
+
+
+class PartialFetch(RuntimeError):
+    """ページ送りの途中で失敗した（データが欠けたまま成功扱いにしない）。"""
+
+
 class Client:
     def __init__(
         self,
@@ -100,7 +107,8 @@ class Client:
     ) -> None:
         self._key = key
         self._service = service
-        self.limiter = limiter or RateLimiter(rate_per_min, 60.0)
+        # J-Quants Light の上限は60回/分。設定で大きくしても50回/分より速くはしない。
+        self.limiter = limiter or RateLimiter(min(int(rate_per_min), MAX_PER_MIN), 60.0)
         self.opener: Opener = opener or _urlopen
         self.sleep = sleep
         self.calls = 0
@@ -142,13 +150,17 @@ class Client:
                         self.sleep(15 * (i + 1))
                         continue
                     body = e.read()[:200].decode("utf-8", "replace") if hasattr(e, "read") else ""
-                    return out if out else {"err": e.code, "body": body}
+                    if out:
+                        raise PartialFetch(f"{path}: {len(out)} 件取得後に HTTP {e.code}") from None
+                    return {"err": e.code, "body": body}
                 except KeyNotFound:
                     raise
                 except Exception:
                     self.sleep(5 * (i + 1))
             if d is None:
-                return out if out else {"err": "retry", "body": "6回失敗"}
+                if out:
+                    raise PartialFetch(f"{path}: {len(out)} 件取得後に6回失敗")
+                return {"err": "retry", "body": "6回失敗"}
             out += d.get("data", [])
             pk = d.get("pagination_key")
             if not pk:

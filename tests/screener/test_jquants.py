@@ -136,3 +136,27 @@ def test_missing_security_command_message_has_no_key():
 
     with pytest.raises(J.KeyNotFound):
         J.get_key("svc", env={}, runner=runner)
+
+
+def test_rate_cannot_be_raised_above_50():
+    cl = J.Client(key="k", rate_per_min=500)
+    assert cl.limiter.max_calls == 50
+    c = FakeClock()
+    cl2 = J.Client(key="k", rate_per_min=500, opener=lambda r, t: Resp(b'{"data":[]}'), sleep=c.sleep)
+    cl2.limiter.clock, cl2.limiter.sleep = c.now, c.sleep
+    for _ in range(120):
+        cl2.get("equities/bars/daily", date="2026-01-05")
+    assert max_in_window(cl2.limiter.calls) <= 50
+
+
+def test_partial_pagination_raises_not_silently_short():
+    def opener(req, timeout):
+        if "pagination_key" in req.full_url:
+            raise urllib.error.HTTPError(req.full_url, 500, "err", {}, io.BytesIO(b"x"))
+        return Resp(json.dumps({"data": [{"n": 1}], "pagination_key": "p2"}).encode())
+
+    rl = J.RateLimiter(50, 60, clock=lambda: 0, sleep=lambda s: None)
+    cl = J.Client(key="SECRET", limiter=rl, opener=opener, sleep=lambda s: None)
+    with pytest.raises(J.PartialFetch) as e:
+        cl.get("equities/bars/daily", date="2026-01-05")
+    assert "SECRET" not in str(e.value)

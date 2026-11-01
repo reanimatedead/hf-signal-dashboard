@@ -37,12 +37,10 @@ UV="$(command -v uv)"
 
 # ── 2. J-Quants のキー（キーチェーンだけに置く）─────────────────────────────
 if [ "$REKEY" = 1 ] || ! security find-generic-password -s "$SERVICE" >/dev/null 2>&1; then
-  printf 'J-Quants の API キーを貼り付けて Enter（画面には出ません）: '
-  read -rs KEY
-  printf '\n'
-  [ -n "$KEY" ] || die "キーが空です"
-  security add-generic-password -U -s "$SERVICE" -a "$USER" -w "$KEY"
-  unset KEY
+  # -w を最後に値なしで置くと、security 自身が画面に出さずに入力を求める（2回）。
+  # キーはコマンドの引数（ps で見える）にも、ファイルにも、ログにも出ない。
+  printf 'J-Quants の API キーを貼り付けて Enter（画面には出ません。確認のためもう一度聞かれます）\n'
+  security add-generic-password -U -s "$SERVICE" -a "$USER" -w || die "キーチェーンへの登録に失敗しました"
   printf 'キーチェーンに登録しました（service=%s）\n' "$SERVICE"
 else
   printf 'キーチェーンに登録済み（service=%s）。入れ直すときは --rekey\n' "$SERVICE"

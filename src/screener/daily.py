@@ -91,8 +91,7 @@ def main(
         (run or pipeline)(cfg, today)
     except Exception:
         traceback.print_exc()
-        if cfg is not None:
-            notify.send(cfg, "失敗", today, **send_kw)
+        notify.send(cfg if cfg is not None else config_mod.fallback(), "失敗", today, **send_kw)
         return 1
     if today.weekday() == 0:
         notify.send(cfg, "週次 OK", today, **send_kw)

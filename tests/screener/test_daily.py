@@ -95,3 +95,12 @@ def test_contract_fixtures_ok_and_broken(fixture_src):
     assert contract.evaluate(ok)[0] is True
     good, text = contract.evaluate(bad)
     assert good is False and "1200" in text and "NxFEPS" in text
+
+
+def test_broken_config_still_sends_fail(tmp_path, monkeypatch):
+    conf = tmp_path / "config.toml"
+    conf.write_text('[ntfy]\ntopic = "screener-abc123"\n[paths\nbroken', encoding="utf-8")
+    monkeypatch.setenv("SCREENER_CONFIG", str(conf))
+    sent = []
+    rc = daily.main([], today=TUE, poster=lambda u, b: sent.append((u, b.decode())))
+    assert rc == 1 and sent == [("https://ntfy.sh/screener-abc123", "screener 2026-11-03 失敗")]
