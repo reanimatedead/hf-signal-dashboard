@@ -1,0 +1,45 @@
+name: CI
+
+# データもキーも不要（架空データだけ）。uv.lock の版で ruff / mypy / pytest。
+# 生成物（docs/data.json など）が要るテストは自動で skip される（tests/_data_json_gate.py）。
+# それらは deploy.yml full の「Data tests」ステップで生成後にスキップ禁止で回る。
+# 旧 marketcalc.yml（計算式のテスト）はここに統合した（tests/screener/calc）。
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+
+      - name: uv sync (uv.lock)
+        run: uv sync --locked
+
+      - name: ruff check
+        run: uv run ruff check src tests/screener
+
+      - name: ruff format --check
+        run: uv run ruff format --check src tests/screener
+
+      - name: mypy
+        run: uv run mypy src/screener
+
+      - name: pytest
+        run: uv run pytest -q

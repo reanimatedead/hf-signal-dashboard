@@ -33,7 +33,11 @@ packages = ["src/screener"]
 
 [tool.pytest.ini_options]
 # uv 無しの python3 -m pytest tests/ でも src/screener を import できるように
+testpaths = ["tests"]
 pythonpath = ["src", "."]
+markers = [
+    "needs_data_json: 生成物（docs/data.json など）が必要。無ければ skip、REQUIRE_DATA_JSON=1 なら fail（tests/_data_json_gate.py）",
+]
 
 # ── ruff: src/screener と tests/screener だけ（既存のトップレベルのファイルは整形・検査しない）──
 [tool.ruff]
