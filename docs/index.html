@@ -699,6 +699,7 @@ tbody tr.mrow-normal:hover{opacity:1}
     <section id="corr-panel"></section>
   </div>
   <div id="universe-badge" style="display:none;padding:6px 16px 0"></div>
+  <div id="mac-only-note" class="mac-only-note"></div>
   <div id="us-buy-list"></div>
   <div class="tbl-wrap">
     <table><thead id="thead"></thead><tbody id="tbody"></tbody></table>
@@ -1047,14 +1048,14 @@ function sw(key,btn){
   const wlb=document.getElementById("wlbtn"); if (wlb) wlb.classList.remove("wl-active");
   // SURVIVAL (Phase 1) is the default. Mode B/C use localStorage only.
   if (key === "survival") {
-    if (window.SIG) { SIG.hideVerify(); SIG.renderWeakBanner(key); SIG.renderUsBuyList(key, DATA||{}); }
+    if (window.SIG) { SIG.hideVerify(); SIG.renderWeakBanner(key); SIG.renderUsBuyList(key, DATA||{}); SIG.renderMacOnlyNote(key); }
     if (window.__mfHide) window.__mfHide();
     if (window.__survivalShow) window.__survivalShow();
     return;
   }
   if (window.__survivalHide) window.__survivalHide();
   if (window.__relHide) window.__relHide();
-  if (window.SIG) { SIG.hideVerify(); SIG.renderWeakBanner(key); SIG.renderUsBuyList(key, DATA||{}); }
+  if (window.SIG) { SIG.hideVerify(); SIG.renderWeakBanner(key); SIG.renderUsBuyList(key, DATA||{}); SIG.renderMacOnlyNote(key); }
   if (key === "verify") {
     if (window.__mfHide) window.__mfHide();
     if (window.SIG) SIG.showVerify();
@@ -1110,7 +1111,7 @@ function renderTbl(){
   // renderBody now writes #rowcount itself (data rows only, excluding sections).
   updWLBtn();
   renderUniverseBadge();
-  if (window.SIG) SIG.renderUsBuyList(tab, DATA);   // §21: Nasdaq 100 タブの上に米国の買い判定一覧
+  if (window.SIG) { SIG.renderUsBuyList(tab, DATA); SIG.renderMacOnlyNote(tab); }   // §21: Nasdaq 100 タブの上に米国の買い判定一覧
 }
 
 // 銘柄ユニバースの取得率をタブ上部に表示（劣化を隠さない・pixel辞書「不明N件」と同方針）。
@@ -1441,19 +1442,23 @@ function codeV(field, x){
 }
 
 // ══ Symbol detail panel ════════════════════════════
-async function toggleDetail(ev,sym){
+// srcTab: 行が別のタブのデータから来ているとき（米国の買い判定一覧＝Dow/NDX/S&P の和集合）。省略時は今のタブ。
+async function toggleDetail(ev,sym,srcTab){
   if(ev&&ev.target&&ev.target.closest&&ev.target.closest(".star, a")) return;
-  const row=document.querySelector(`tr[data-sym="${CSS.escape(sym)}"]`);
+  // 押された行そのもの（同じ銘柄が買い判定一覧と通常の表の両方にあるとき、別の行の下に開かないように）
+  const cur=ev&&ev.currentTarget&&ev.currentTarget.tagName==="TR"?ev.currentTarget:null;
+  const row=cur||document.querySelector(`tr[data-sym="${CSS.escape(sym)}"]`);
   if(!row) return;
   const nxt=row.nextElementSibling;
   const open=nxt&&nxt.classList.contains("detail-row");
   document.querySelectorAll("tr.detail-row").forEach(e=>e.remove());
   if(open) return;
-  const r=ROWMAP[sym]||{};
+  const t=srcTab||tab;
+  const r=(srcTab?((DATA&&DATA.markets&&DATA.markets[srcTab])||[]).find(x=>x&&x.symbol===sym):ROWMAP[sym])||{};
   // Hydrate this row's chart block from charts/{tab}.json before rendering.
   // Only "ready" rows have a stored block; pending/unavailable render a reason.
   if(r.chart_status === "ready" && !r.charts){
-    const store = await loadCharts(tab);
+    const store = await loadCharts(t);
     if(store && store[sym]) r.charts = store[sym];
   }
   const tr=document.createElement("tr");

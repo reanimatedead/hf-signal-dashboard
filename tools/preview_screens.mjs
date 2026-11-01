@@ -107,6 +107,39 @@ for (const lang of langs) {
       await shot(name, det);
       await scanSnake(page, tag, name, "tr.detail-row");
     };
+    // ── E2E: 銘柄を表示している表すべてで、1行目を押すと銘柄詳細が開く ──
+    // 通常の表（日経225 / Dow 30 / Nasdaq 100 / S&P 500 / FX）と、米国の買い判定一覧（Nasdaq 100 タブの上）。
+    // 買い判定一覧は Enter キーでも開くこと・cursor: pointer であることも見る。
+    // （SURVIVAL の候補表は Take/Skip の操作用、金利・債券・VOL と ポジション/割安度 は詳細を出さない設計なので対象外）
+    const opened = async (where) => {
+      try { await page.waitForSelector("tr.detail-row .dt-wrap", { timeout: 8000 }); }
+      catch (e) { report.errors.push({ tag, type: "e2e", text: `${where}: 1行目を押しても銘柄詳細が開かない` }); return false; }
+      await page.evaluate(() => document.querySelectorAll("tr.detail-row").forEach((e) => e.remove()));
+      return true;
+    };
+    for (const t of ["nikkei225", "dow30", "nasdaq100", "sp500", "fx"]) {
+      await page.click(`.tab[data-tab="${t}"]`);
+      await page.waitForTimeout(400);
+      const first = await page.$("#tbody tr[data-sym]:not([data-sym=''])");
+      if (!first) { report.errors.push({ tag, type: "e2e", text: `${t}: 表に銘柄の行が無い` }); continue; }
+      await first.click();
+      await opened(`${t} の表`);
+    }
+    await page.click('.tab[data-tab="nasdaq100"]');
+    await page.waitForTimeout(400);
+    const ub = await page.$("#us-buy-list tr.ub-row");
+    if (ub) {
+      const cur = await ub.evaluate((el) => getComputedStyle(el).cursor);
+      if (cur !== "pointer") report.errors.push({ tag, type: "e2e", text: `米国の買い判定一覧: cursor が ${cur}（pointer であるべき）` });
+      await ub.click();
+      if (await opened("米国の買い判定一覧（クリック）")) {
+        await ub.focus();
+        await page.keyboard.press("Enter");
+        await opened("米国の買い判定一覧（Enter）");
+      }
+    } else if (await page.$("#us-buy-list table")) {
+      report.errors.push({ tag, type: "e2e", text: "米国の買い判定一覧: 表はあるのに押せる行（tr.ub-row）が無い" });
+    }
     await detail("nikkei225", (s) => (document.querySelector(`#tbody tr[data-sym="${s}"]`) ? s : null), "detail_7735T").catch((e) => report.errors.push({ tag, type: "script", text: String(e) }));
     await detail("fx", () => {
       const rows = [...document.querySelectorAll("#tbody tr[data-sym]")].map((r) => r.getAttribute("data-sym"));
