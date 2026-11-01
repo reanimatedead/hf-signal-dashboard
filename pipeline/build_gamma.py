@@ -172,11 +172,11 @@ def main():
     except Exception as exc:
         print(f"  [gamma] chain load failed ({type(exc).__name__}: {exc})")
         payload = {"as_of": now.isoformat(), "data_status": "error",
-                   "error": str(exc)[:160],
+                   "error": "exception",
                    "assumption": "naive_dealer_convention",
-                   "note": "chain unavailable; layer degraded.",
+                   "note": "chain_unavailable_degraded",   # chain unavailable; layer degraded.
                    "coverage": {"us": "unavailable", "eu": "unavailable", "jp": "unavailable"},
-                   "disclaimer": "For data visualization purposes only. Not investment advice."}
+                   "disclaimer": "disclaimer_data_viz_not_advice"}
         OUT.parent.mkdir(parents=True, exist_ok=True)
         json.dump(payload, open(OUT, "w", encoding="utf-8"), ensure_ascii=False)
         return 0
@@ -200,10 +200,9 @@ def main():
     # as null + status "unavailable" (not 0) to avoid the "no 0DTE exists" misread.
     n_0dte_contracts = sum(1 for r in recs if r[7] == snap_date)
     _0dte_captured = n_0dte_contracts > 0
-    _0dte_reason = ("この CBOE 遅延フィードは前営業日引け時点のスナップショットのため当日満期(0DTE)は"
-                    "既に消えており捕捉できない。gex_volume_0dte は 0DTE の実態を表さない。"
-                    "建玉ベースの gex_oi も 0DTE の影響を過小評価している。0DTE を捉えるには"
-                    "リアルタイムフィードが必要だが無料では入手できない。")
+    # この CBOE 遅延フィードは前営業日引け時点のスナップショットのため当日満期(0DTE)は既に消えており捕捉できない。
+    # gex_volume_0dte は 0DTE の実態を表さない。gex_oi も 0DTE を過小評価。リアルタイムフィードは無料では入手できない。
+    _0dte_reason = "delayed_snapshot_no_0dte"
 
     # volatility structure
     vix = _csv_latest_close("VIX_History.csv")
@@ -244,20 +243,18 @@ def main():
             "term_state": ("contango" if (term and term > 1) else
                            "backwardation" if (term and term <= 1) else "unknown"),
             "move_vix_ratio": move_vix,
-            "note": "VIX3M/VIX>1=contango(平常)/<1=backwardation(ストレス)。MOVE/VIX=金利ボラ対株ボラ。",
+            "note": "vol_structure_note",   # VIX3M/VIX>1=contango(平常)/<1=backwardation(ストレス)。MOVE/VIX=金利ボラ対株ボラ
         },
         "assumption": "naive_dealer_convention",
-        "note": ("ディーラーがコール買い/プット売りという慣習的仮定に基づく。"
-                 "CBOEは売買主体を公開していない。仮定が外れると符号が反転する。"),
-        "reading": ("現値がフリップ(zero_gamma)より下＝負ガンマ＝増幅ゾーン（下落で売り上昇で買い）。"
-                    "上＝正ガンマ＝値が貼り付く。"),
-        "zero_dte_note": ("建玉(OI)ベースGEX(gex_oi)は寄り引けで消える0DTEを過小評価する。"
-                          "本フィードは遅延(前営業日引け)スナップショットのため0DTEを捕捉できず、"
-                          "gex_volume_0dteはunavailable。0DTEを捉えるにはリアルタイムフィードが"
-                          "必要だが無料では入手できない。gex_oiと合算しない。"),
+        # ディーラーがコール買い/プット売りという慣習的仮定に基づく。CBOEは売買主体を公開していない。仮定が外れると符号が反転する。
+        "note": "naive_dealer_assumption_note",
+        # 現値がフリップ(zero_gamma)より下＝負ガンマ＝増幅ゾーン（下落で売り上昇で買い）。上＝正ガンマ＝値が貼り付く。
+        "reading": "gamma_flip_reading",
+        # OI ベース GEX は 0DTE を過小評価。本フィードは遅延のため 0DTE を捕捉できず gex_volume_0dte は unavailable。gex_oi と合算しない。
+        "zero_dte_note": "zero_dte_note",
         "coverage": {"us": "full", "eu": "unavailable", "jp": "unavailable"},
-        "coverage_note": "この層は米国のみ。JPX/Eurex はギリシャ文字を公開していない。",
-        "disclaimer": "For data visualization purposes only. Not investment advice.",
+        "coverage_note": "us_only_no_greeks_jpx_eurex",   # この層は米国のみ。JPX/Eurex はギリシャ文字を公開していない
+        "disclaimer": "disclaimer_data_viz_not_advice",
     }
 
     OUT.parent.mkdir(parents=True, exist_ok=True)

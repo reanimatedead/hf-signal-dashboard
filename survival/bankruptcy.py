@@ -104,5 +104,5 @@ def heatmap(win_prob: float, win_loss_ratio: float,
         "balances_pct_basis": balances,
         "risk_grid": grid,
         "dd_stop_pct": dd_stop_pct,
-        "note": "% 空間で計算。残高違いは絶対額表示のみに影響。",
+        "note": "pct_space_balance_abs_only",   # % 空間で計算。残高違いは絶対額表示のみに影響。
     }

@@ -160,10 +160,10 @@ def metrics(fd, px):
         "mcap_bn": round(mcap / 1e9, 1),
         "PER": round(mcap / ni, 1) if ni > 0 else None,
         "PBR": round(pbr, 2) if pbr else None,
-        "ROE%": round(100 * roe, 1) if roe is not None else None,
-        "RI余地%": round(100 * (tpbr / pbr - 1), 1) if tpbr and pbr else None,
-        "益回り%": round(100 * ebit / ev, 1) if ebit and ev > 0 else None,
-        "資本利益率%": round(100 * ebit / cap, 1) if ebit and cap > 0 else None,
+        "roe_pct": round(100 * roe, 1) if roe is not None else None,
+        "ri_upside_pct": round(100 * (tpbr / pbr - 1), 1) if tpbr and pbr else None,
+        "earnings_yield_pct": round(100 * ebit / ev, 1) if ebit and ev > 0 else None,
+        "roc_pct": round(100 * ebit / cap, 1) if ebit and cap > 0 else None,
     }
 
 
@@ -188,15 +188,15 @@ def screen_one(ticker, info, F, p, asof, p1y=None, p1m=None):
         "price": round(px, 2),
         **metrics(fd, px),
         "F": fd["f_score"],
-        "F満点": fd["f_max"],
+        "f_max": fd["f_max"],
         "fin": is_fin(info.get("sector")),
     }
     if p1y and p1m:
         a, b = price_at(p, p1y, True), price_at(p, p1m, True)
-        r["1年騰落%"] = round(100 * (b / a - 1), 1) if a and b else None
+        r["ret_1y_pct"] = round(100 * (b / a - 1), 1) if a and b else None
     return r
 
 
 def rank(rows):
     """魔法の公式の順位（金融・不動産・公益は除く）。"""
-    return magic_rank(rows, "益回り%", "資本利益率%", skip=lambda r: r.get("fin"), out_key="魔法の公式順位")
+    return magic_rank(rows, "earnings_yield_pct", "roc_pct", skip=lambda r: r.get("fin"), out_key="magic_rank")

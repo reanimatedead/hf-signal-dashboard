@@ -236,7 +236,7 @@ def _write_progress(progress: Dict[str, Any]) -> None:
             "coverage": progress.get("coverage", {}),
             "free_gb": progress.get("free_gb"),
             "store_backend": progress.get("store_backend"),
-            "note": "Macro environment visualization / not investment advice.",
+            "note": "disclaimer_macro_viz_not_advice",   # Macro environment visualization / not investment advice.
         }
         PUBLIC_PROGRESS_PATH.write_text(json.dumps(public, ensure_ascii=False, indent=2),
                                          encoding="utf-8")

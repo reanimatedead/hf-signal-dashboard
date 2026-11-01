@@ -1,7 +1,7 @@
 """残余利益モデル（理論PBR）・F スコア集計・一時的な利益の目印。データは持たない。"""
 
 RI = {"r": 0.08, "years": 10, "roe_cap": 0.40, "payout_keep": 0.5}
-ONE_OFF_NOTE = "決算短信で確認"
+ONE_OFF_NOTE = "check_earnings_release"  # 決算短信で確認（言葉は描画側）
 
 
 def ri_ratio(roe, p=RI):
@@ -36,9 +36,9 @@ def one_off_flag(net_income=None, op_income=None, roe_fwd=None, roe_act=None):
     （営業利益・実績ROE が正のときだけ判定。符号が逆のときは比率に意味がない）"""
     reasons = []
     if net_income is not None and op_income is not None and op_income > 0 and net_income > op_income * 1.3:
-        reasons.append("純利益が営業利益の1.3倍超")
+        reasons.append("net_income_gt_op_income_1_3x")  # 純利益が営業利益の1.3倍超
     if roe_fwd is not None and roe_act is not None and roe_act > 0 and roe_fwd > roe_act * 2:
-        reasons.append("予想ROEが実績ROEの2倍超")
+        reasons.append("roe_fwd_gt_roe_act_2x")  # 予想ROEが実績ROEの2倍超
     return {"flag": bool(reasons), "reasons": reasons, "note": ONE_OFF_NOTE if reasons else ""}
 
 

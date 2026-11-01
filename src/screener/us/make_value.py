@@ -13,27 +13,27 @@ from ..config import Config
 from . import screen as S
 
 KEYS = [
-    "ticker", "name", "idx", "sector", "判定", "fy", "price", "mcap_bn", "PER", "PBR", "ROE%", "益回り%",
-    "資本利益率%", "魔法の公式順位", "F", "F満点", "1年騰落%", "RI余地%",
+    "ticker", "name", "idx", "sector", "fin_tag", "fy", "price", "mcap_bn", "PER", "PBR", "roe_pct", "earnings_yield_pct",
+    "roc_pct", "magic_rank", "F", "f_max", "ret_1y_pct", "ri_upside_pct",
 ]  # fmt: skip
 
 
 def tag(r: S.Row) -> str:
-    q = r["F満点"] >= 5 and r["F"] >= r["F満点"] - 2
-    mf = r.get("魔法の公式順位")
+    q = r["f_max"] >= 5 and r["F"] >= r["f_max"] - 2
+    mf = r.get("magic_rank")
     t = []
     if not r["fin"] and mf and mf <= 50 and q:
-        t.append("割安×質 上位50")
-    if not r["fin"] and mf and mf <= 100 and q and (r.get("1年騰落%") or -1) > 0:
-        t.append("中期候補")
-    return "・".join(t)
+        t.append("value_quality_top50")
+    if not r["fin"] and mf and mf <= 100 and q and (r.get("ret_1y_pct") or -1) > 0:
+        t.append("mid_candidate")
+    return "|".join(t)
 
 
 def build(cfg: Config, today: dt.date) -> list[S.Row]:
     rows = S.screen(str(today), str(today - dt.timedelta(days=365)), str(today - dt.timedelta(days=30)), cfg=cfg)
     for r in rows:
-        r["判定"] = tag(r)
-    rows.sort(key=lambda r: r.get("魔法の公式順位") or 9999)
+        r["fin_tag"] = tag(r)
+    rows.sort(key=lambda r: r.get("magic_rank") or 9999)
     return [{k: r.get(k) for k in KEYS} | {"fin": r.get("fin")} for r in rows]
 
 

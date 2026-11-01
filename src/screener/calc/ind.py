@@ -5,9 +5,11 @@ import numpy as np
 P = {"cci_long": 288, "cci_short": 48, "bb_long": 288, "bb_short": 48, "k2": 2.0, "k3": 3.0, "cci_th": 100}
 MIN_BARS = 300  # 判定を出すのに必要な最低本数（288 + 余裕）
 
-LABELS = {2: "強い買い", 1: "買い", 0: "様子見", -1: "売り", -2: "強い売り"}
-LONG_OVERSOLD_LABEL = "買い（長期の売られすぎ）"
-SELL_NOTE = "空売りの根拠なし。新しく買わない・利益を確定する目安"
+# 判定はコード（表示の言葉は描画側の辞書: 公開画面は docs/assets/i18n、ローカルは screener.labels）。
+LABELS = {2: "buy_strong", 1: "buy", 0: "neutral", -1: "sell", -2: "sell_strong"}
+LONG_OVERSOLD_LABEL = "buy_long_oversold"
+SELL_NOTE = "sell_note"  # 売り系の補足（空売りの根拠ではない）のコード
+TREND = {True: "long_up", False: "long_down"}
 
 
 def sma(x, n):
@@ -96,13 +98,13 @@ def _r(v, nd):
 
 
 def judge(x, p=P, i=None):
-    """i 日目（既定は最新日）の状態を言葉で返す（画面用）。"""
+    """i 日目（既定は最新日）の状態をコードで返す（言葉にするのは描画側）。"""
     i = len(x["c"]) - 1 if i is None else i
     c, mS, sS, mL, sL = x["c"][i], x["mS"][i], x["sS"][i], x["mL"][i], x["sL"][i]
     zS = (c - mS) / sS if sS else np.nan
     zL = (c - mL) / sL if sL else np.nan
     s = int(signals(x, p)[i])
-    trend = "長期は上向き" if x["cciL"][i] > 0 else "長期は下向き"
+    trend = TREND[bool(x["cciL"][i] > 0)]
     label = LABELS[s]
     lo = bool(long_oversold(x, p)[i])
     if lo and s >= 0:
@@ -173,8 +175,8 @@ SELL_LABELS = (LABELS[-1], LABELS[-2])
 
 
 def label_conditions(x, p=P):
-    """判定ラベルごとの日次 bool 配列（検証用）。judge() の最新日の言葉と同じ規則:
-    強い買い / 買い / 買い（長期の売られすぎ: シグナル0 かつ BB288 -2σ 以下）/ 売り / 強い売り。"""
+    """判定コードごとの日次 bool 配列（検証用）。judge() の最新日のコードと同じ規則:
+    buy_strong / buy / buy_long_oversold（シグナル0 かつ BB288 -2σ 以下）/ sell / sell_strong。"""
     s = signals(x, p)
     lo = long_oversold(x, p)
     return {

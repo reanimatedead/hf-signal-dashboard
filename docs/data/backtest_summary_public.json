@@ -3867,5 +3867,5 @@
       }
     ]
   },
-  "note": "想定精度のみ / This is the system's estimated accuracy, not real trading P&L. Macro environment visualization, not investment advice. Phase 2 (model training) is not implemented."
+  "note": "backtest_estimated_accuracy_not_pnl"
 }

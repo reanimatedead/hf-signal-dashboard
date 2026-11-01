@@ -41,12 +41,12 @@ def _g(sel: list[screen.Row], base: float | None = None) -> dict[str, Any]:
     v = [r["fwd"] for r in sel if r["fwd"] is not None]
     out: dict[str, Any] = {
         "n": len(v),
-        "消えた": sum(r["fwd"] is None for r in sel),
-        "平均%": round(statistics.mean(v), 1) if v else None,
-        "中央値%": round(statistics.median(v), 1) if v else None,
+        "gone": sum(r["fwd"] is None for r in sel),
+        "mean_pct": round(statistics.mean(v), 1) if v else None,
+        "median_pct": round(statistics.median(v), 1) if v else None,
     }
     if v and base is not None:
-        out["勝率%(全体平均超)"] = round(100 * sum(x > base for x in v) / len(v))
+        out["win_rate_vs_base_pct"] = round(100 * sum(x > base for x in v) / len(v))
     return out
 
 
@@ -59,17 +59,19 @@ def yearly(cfg: Config, n: int = 3) -> dict[str, Any]:
         rows = screen.screen(t0, t0, p1y, p1m, mp, cfg=cfg)
         a, b = _px(cfg, t0), _px(cfg, t1)
         for r in rows:
-            c = r["コード"]
+            c = r["code"]
             r["fwd"] = (b[c] / a[c] - 1) * 100 if a.get(c) and b.get(c) else None
-        U = [r for r in rows if not r["金融"] and (r["時価総額(億円)"] or 0) >= 300]
-        base = _g(U)["平均%"]
-        out = {"全体(300億以上・金融除く)": _g(U, base)}
-        for t in ("長期候補", "中期候補", "割安だが質に注意"):
-            out[t] = _g([r for r in rows if t in r["判定"]], base)
-        q = sorted([r for r in U if r["上値余地%"] is not None], key=lambda r: r["上値余地%"])
+        U = [r for r in rows if not r["financial"] and (r["mcap_oku_jpy"] or 0) >= 300]
+        base = _g(U)["mean_pct"]
+        out = {"all_300oku_ex_fin": _g(U, base)}
+        for t in ("long_candidate", "mid_candidate", "cheap_low_quality"):
+            out[t] = _g([r for r in rows if t in r["fin_tag"]], base)
+        q = sorted([r for r in U if r["upside_pct"] is not None], key=lambda r: r["upside_pct"])
         nq = len(q)
         for i in range(5):
-            out[f"余地 第{i + 1}群(低→高)"] = _g(q[i * nq // 5 : (i + 1) * nq // 5], base)
+            out[f"upside_q{i + 1}"] = _g(  # 余地の5分位（1=低→5=高）
+                q[i * nq // 5 : (i + 1) * nq // 5], base
+            )
         res[t0] = {"t1": t1, **out}
     return res
 
@@ -80,9 +82,9 @@ def _st(v: list[float]) -> dict[str, Any] | None:
         return None
     return {
         "n": int(len(a)),
-        "平均%": round(float(a.mean()), 2),
-        "中央値%": round(float(np.median(a)), 2),
-        "上昇%": round(float((a > 0).mean() * 100), 1),
+        "mean_pct": round(float(a.mean()), 2),
+        "median_pct": round(float(np.median(a)), 2),
+        "up_ratio_pct": round(float((a > 0).mean() * 100), 1),
     }
 
 
@@ -98,17 +100,21 @@ def with_chart(cfg: Config, min_bars: int = 420, min_mcap: float = 300e8) -> dic
         U = [
             r
             for r in rows
-            if not r["金融"] and (r["時価総額(億円)"] or 0) * 1e8 >= min_mcap and r["上値余地%"] is not None
+            if not r["financial"] and (r["mcap_oku_jpy"] or 0) * 1e8 >= min_mcap and r["upside_pct"] is not None
         ]
         if not U:
             continue
-        q = sorted(r["上値余地%"] for r in U)
+        q = sorted(r["upside_pct"] for r in U)
         n = len(q)
         lo, hi = q[n // 5], q[4 * n // 5]
         V[d] = {
-            r["コード"]: (
-                "割安5分の1" if r["上値余地%"] >= hi else "割高5分の1" if r["上値余地%"] <= lo else "中間",
-                "長期候補" in r["判定"],
+            r["code"]: (
+                "cheap_quintile"
+                if r["upside_pct"] >= hi
+                else "expensive_quintile"
+                if r["upside_pct"] <= lo
+                else "middle",
+                "long_candidate" in r["fin_tag"],
             )
             for r in U
         }
@@ -133,11 +139,11 @@ def with_chart(cfg: Config, min_bars: int = 420, min_mcap: float = 300e8) -> dic
                 continue
             fw = (C[i + 20] / C[i] - 1) * 100
             grp, lt = v
-            R[("基準", grp)].append(fw)
-            for name, cond in (("買い", s[i] >= 1), ("長期の売られすぎ", lo_[i]), ("どちらか", s[i] >= 1 or lo_[i])):
+            R[("base", grp)].append(fw)
+            for name, cond in (("buy", s[i] >= 1), ("long_oversold", lo_[i]), ("either", s[i] >= 1 or lo_[i])):
                 if not cond:
                     continue
-                for g in (grp, "全体") + (("長期候補",) if lt else ()):
+                for g in (grp, "all") + (("long_candidate",) if lt else ()):
                     key = (name, g)
                     if i - last[key] < 20:
                         continue

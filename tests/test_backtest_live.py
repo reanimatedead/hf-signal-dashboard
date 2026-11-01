@@ -79,7 +79,7 @@ def test_run_local_public_summary_written(tmp_local):
     body = json.loads(public.read_text(encoding="utf-8"))
     for k in ("per_symbol", "overall", "note", "as_of_utc", "source_used"):
         assert k in body
-    assert "想定精度" in body["note"] or "not investment advice" in body["note"]
+    assert body["note"] == "backtest_estimated_accuracy_not_pnl"   # 想定精度のみ / not investment advice（UI が描画）
 
 
 def test_judge_categories_well_defined():

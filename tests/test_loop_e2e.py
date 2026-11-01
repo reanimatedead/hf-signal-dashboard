@@ -64,8 +64,8 @@ def test_verdict_string_one_of_two_values():
                           bootstrap_runs=20)
     v = res["verdict"]
     assert isinstance(v, str)
-    assert (v.startswith("transfer-candidate-survived")
-            or v == "empty-set under current gate → 指数転用は防御止まり / 転用Completion-B")
+    assert v in ("transfer_candidate_survived", "empty_set_under_gate")
+    assert isinstance(res["survivors"], list) and (v == "transfer_candidate_survived") == bool(res["survivors"])
 
 
 def test_frontier_has_hit_skew_pairs():

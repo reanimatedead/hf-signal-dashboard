@@ -306,6 +306,5 @@ def run_h1(*, jp_bars: Sequence[Dict[str, Any]],
         "hypothesis": "h1",
         "jp_symbol": jp_symbol, "us_symbol": us_symbol,
         "segments": segments_out,
-        "note": "Single-hypothesis raw predictive-power measurement. "
-                "Not investment advice. Phase 2 (learning) is not implemented.",
+        "note": "h1_single_hypothesis_note",   # Single-hypothesis raw predictive-power measurement. Not advice. Phase 2 not implemented.
     }

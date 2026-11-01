@@ -8,7 +8,7 @@ def test_overall_pass_when_all_four_pass():
     flags = {"cost": {"pass": True}, "outlier": {"pass": True},
              "subperiod": {"pass": True}, "fade": {"pass": True}}
     out = hr.combine_verdict(flags)
-    assert out["overall"] == "Stage2-conditioners-justified"
+    assert out["overall"] == "stage2_conditioners_justified"
     assert all(out["criteria"][k] for k in ("cost", "outlier", "subperiod", "fade"))
 
 
@@ -18,7 +18,7 @@ def test_overall_fail_when_any_single_fail(failed):
              "subperiod": {"pass": True}, "fade": {"pass": True}}
     flags[failed]["pass"] = False
     out = hr.combine_verdict(flags)
-    assert out["overall"] == "raw-cross-asset-not-tradeable → Completion-B候補"
+    assert out["overall"] == "raw_cross_asset_not_tradeable"
     assert out["criteria"][failed] is False
 
 
@@ -38,6 +38,6 @@ def test_run_robustness_e2e_emits_full_struct():
               "subperiod", "fade", "verdict", "note"):
         assert k in res
     assert res["verdict"]["overall"] in (
-        "Stage2-conditioners-justified",
-        "raw-cross-asset-not-tradeable → Completion-B候補",
+        "stage2_conditioners_justified",
+        "raw_cross_asset_not_tradeable",
     )

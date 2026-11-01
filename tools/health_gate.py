@@ -85,9 +85,10 @@ def evaluate(d):
     # gate: "deploy" = 配信可否を止める（payload構造/被覆/鮮度の破損）。
     #       "data"   = そのデータ領域(domain)の品質のみ。デプロイは止めない（該当タブを
     #                  警告表示し、コード/UI/他タブは通常反映）。2026-07-30 分離。
-    def add(name, level, status, detail, gate="deploy", domain=None):
+    # detail はコード（snake_case）。数値・一覧は values に入れる（文はここに書かない）。
+    def add(name, level, status, detail, gate="deploy", domain=None, **values):
         checks.append({"name": name, "level": level, "status": status,
-                       "detail": detail, "gate": gate, "domain": domain})
+                       "detail": detail, "values": values, "gate": gate, "domain": domain})
         if status == "fail":
             fails.append(name)
         elif status in ("warn", "unknown"):
@@ -96,10 +97,9 @@ def evaluate(d):
     # 1) structural completeness (FAIL)
     missing = [k for k in REQUIRED_TOP if k not in d]
     if missing:
-        add("structure", "FAIL", "fail", f"missing top-level keys: {missing}")
+        add("structure", "FAIL", "fail", "missing_top_level_keys", missing=missing)
     else:
-        add("structure", "FAIL", "pass",
-            "markets/summary/money_flow/survival_loop present")
+        add("structure", "FAIL", "pass", "top_level_present", keys=list(REQUIRED_TOP))
 
     # 2) equity chart coverage (FAIL if < 90%)
     tot = rdy = 0
@@ -112,9 +112,11 @@ def evaluate(d):
         rdy += r
     pct = (rdy / tot * 100) if tot else 0.0
     if tot and pct < READY_MIN_PCT:
-        add("equity_ready", "FAIL", "fail", f"{pct:.1f}% < {READY_MIN_PCT}% {per}")
+        add("equity_ready", "FAIL", "fail", "ready_pct_below_min",
+            pct=round(pct, 1), min_pct=READY_MIN_PCT, per_tab=per)
     else:
-        add("equity_ready", "FAIL", "pass", f"{pct:.1f}% >= {READY_MIN_PCT}% {per}")
+        add("equity_ready", "FAIL", "pass", "ready_pct_ok",
+            pct=round(pct, 1), min_pct=READY_MIN_PCT, per_tab=per)
 
     # freshness reference for live/auto-refetched series = pipeline run date.
     run_dt = _parse_date((d.get("meta") or {}).get("updated_at"))
@@ -123,13 +125,13 @@ def evaluate(d):
     # 3) us_rates / jgb / fred_daily lag (FAIL) — proxied by pipeline run date.
     for name, thr in FAIL_LAG.items():
         if run_lag is None:
-            add(name, "FAIL", "unknown", "meta.updated_at missing/unparseable")
+            add(name, "FAIL", "unknown", "updated_at_missing")
         elif run_lag > thr:
-            add(name, "FAIL", "fail",
-                f"pipeline lag {run_lag}d > {thr}d (ref: meta.updated_at)")
+            add(name, "FAIL", "fail", "pipeline_lag_exceeded",
+                lag_days=run_lag, max_days=thr, ref="meta.updated_at")
         else:
-            add(name, "FAIL", "pass",
-                f"pipeline lag {run_lag}d <= {thr}d (ref: meta.updated_at)")
+            add(name, "FAIL", "pass", "pipeline_lag_ok",
+                lag_days=run_lag, max_days=thr, ref="meta.updated_at")
 
     # 4) boj_assets lag (WARN) — real per-series date/lag.
     boj = ((d.get("money_flow") or {}).get("jp") or {}).get("cb_assets") or {}
@@ -137,11 +139,11 @@ def evaluate(d):
     if boj_lag is None:
         boj_lag = _lag(_parse_date(boj.get("as_of")))
     if boj_lag is None:
-        add("boj_assets", "WARN", "unknown", "no cb_assets date")
+        add("boj_assets", "WARN", "unknown", "no_cb_assets_date")
     elif boj_lag > WARN_LAG["boj_assets"]:
-        add("boj_assets", "WARN", "warn", f"lag {boj_lag}d > {WARN_LAG['boj_assets']}d")
+        add("boj_assets", "WARN", "warn", "lag_exceeded", lag_days=boj_lag, max_days=WARN_LAG["boj_assets"])
     else:
-        add("boj_assets", "WARN", "pass", f"lag {boj_lag}d <= {WARN_LAG['boj_assets']}d")
+        add("boj_assets", "WARN", "pass", "lag_ok", lag_days=boj_lag, max_days=WARN_LAG["boj_assets"])
 
     # 5) imm lag (WARN) — CFTC COT weekly; real per-row date.
     imm_dates = [x for x in
@@ -149,11 +151,11 @@ def evaluate(d):
                  if x]
     imm_lag = _lag(max(imm_dates)) if imm_dates else None
     if imm_lag is None:
-        add("imm", "WARN", "unknown", "no imm date")
+        add("imm", "WARN", "unknown", "no_imm_date")
     elif imm_lag > WARN_LAG["imm"]:
-        add("imm", "WARN", "warn", f"lag {imm_lag}d > {WARN_LAG['imm']}d")
+        add("imm", "WARN", "warn", "lag_exceeded", lag_days=imm_lag, max_days=WARN_LAG["imm"])
     else:
-        add("imm", "WARN", "pass", f"lag {imm_lag}d <= {WARN_LAG['imm']}d")
+        add("imm", "WARN", "pass", "lag_ok", lag_days=imm_lag, max_days=WARN_LAG["imm"])
 
     # ── Task 5-2: v2 検証層の拡張チェック ──────────────────────────────
     # relations.json / macro_v2.json / gamma.json は data.json の兄弟生成物。
@@ -163,66 +165,63 @@ def evaluate(d):
 
     # FAIL: relations の 3 地域いずれかが series 200 件未満
     if rel is None:
-        add("relations_series", "FAIL", "unknown", "relations.json 読み込み不可")
+        add("relations_series", "FAIL", "unknown", "file_unreadable", file="relations.json")
     else:
         regions = rel.get("regions") or {}
         short = {r: len((regions.get(r) or {}).get("series") or [])
                  for r in ("us", "eu", "jp")
                  if len((regions.get(r) or {}).get("series") or []) < 200}
         if short:
-            add("relations_series", "FAIL", "fail",
-                f"series < 200 の地域: {short}", gate="data", domain="relations")
+            add("relations_series", "FAIL", "fail", "series_below_200",
+                gate="data", domain="relations", short=short)
         else:
-            add("relations_series", "FAIL", "pass",
-                "us/eu/jp series >= 200", gate="data", domain="relations")
+            add("relations_series", "FAIL", "pass", "series_ok", gate="data", domain="relations")
 
     # FAIL: correlations.align が inner_join でない
     corr_align = (d.get("correlations") or {}).get("align")
     if corr_align is None:
-        add("corr_align", "FAIL", "unknown", "correlations.align 欠落",
+        add("corr_align", "FAIL", "unknown", "align_missing",
             gate="data", domain="correlations")
     elif corr_align != "inner_join":
-        add("corr_align", "FAIL", "fail",
-            f"correlations.align='{corr_align}' (inner_join でない)",
-            gate="data", domain="correlations")
+        add("corr_align", "FAIL", "fail", "align_not_inner_join",
+            gate="data", domain="correlations", align=corr_align)
     else:
-        add("corr_align", "FAIL", "pass", "correlations.align=inner_join",
+        add("corr_align", "FAIL", "pass", "align_inner_join",
             gate="data", domain="correlations")
 
     # data_gate: macro_v2 の fisher.ok が False（該当タブのみ警告・デプロイは止めない）
     if mac is None:
-        add("macro_fisher", "FAIL", "unknown", "macro_v2.json 読み込み不可",
-            gate="data", domain="macro")
+        add("macro_fisher", "FAIL", "unknown", "file_unreadable",
+            gate="data", domain="macro", file="macro_v2.json")
     else:
         fisher = (mac.get("identities") or {}).get("fisher") or {}
         if fisher.get("ok") is not True:
-            add("macro_fisher", "FAIL", "fail",
-                f"fisher.ok={fisher.get('ok')} gap={fisher.get('gap')}",
-                gate="data", domain="macro")
+            add("macro_fisher", "FAIL", "fail", "fisher_not_ok",
+                gate="data", domain="macro", ok=fisher.get("ok"), gap=fisher.get("gap"))
         else:
-            add("macro_fisher", "FAIL", "pass",
-                f"fisher.ok gap={fisher.get('gap')}", gate="data", domain="macro")
+            add("macro_fisher", "FAIL", "pass", "fisher_ok",
+                gate="data", domain="macro", gap=fisher.get("gap"))
 
     # WARN: gamma が data_status: error または unavailable
     if gam is None:
-        add("gamma_status", "WARN", "unknown", "gamma.json 読み込み不可")
+        add("gamma_status", "WARN", "unknown", "file_unreadable", file="gamma.json")
     else:
         gs = gam.get("data_status")
         if gs in ("error", "unavailable"):
-            add("gamma_status", "WARN", "warn", f"gamma.data_status={gs}")
+            add("gamma_status", "WARN", "warn", "gamma_degraded", data_status=gs)
         else:
-            add("gamma_status", "WARN", "pass", f"gamma.data_status={gs}")
+            add("gamma_status", "WARN", "pass", "gamma_ok", data_status=gs)
 
     # WARN: macro_v2 の系列のうち error のものが 3 件以上
     if mac is not None:
         series = mac.get("series") or {}
         errs = [k for k, v in series.items() if v.get("data_status") == "error"]
         if len(errs) >= 3:
-            add("macro_series_errors", "WARN", "warn",
-                f"error 系列 {len(errs)} 件: {errs}")
+            add("macro_series_errors", "WARN", "warn", "error_series_3plus",
+                count=len(errs), series=errs)
         else:
-            add("macro_series_errors", "WARN", "pass",
-                f"error 系列 {len(errs)} 件 (< 3)")
+            add("macro_series_errors", "WARN", "pass", "error_series_below_3",
+                count=len(errs), series=errs)
 
     # WARN: relations の d20_z が絶対値 2 を超える（速度警告）
     if rel is not None:
@@ -233,10 +232,9 @@ def evaluate(d):
             if isinstance(dz, (int, float)) and abs(dz) > 2:
                 hot[k] = dz
         if hot:
-            add("relations_speed", "WARN", "warn",
-                f"|d20_z| > 2 の系列: {hot}")
+            add("relations_speed", "WARN", "warn", "d20_z_above_2", series=hot)
         else:
-            add("relations_speed", "WARN", "pass", "|d20_z| <= 2")
+            add("relations_speed", "WARN", "pass", "d20_z_ok")
 
     # WARN: decisions.jsonl の review_date が到来（見直し期限）— Task 5-3
     dec_path = os.path.join(DOCS_DIR, "decisions.jsonl")
@@ -253,13 +251,12 @@ def evaluate(d):
                     if rv is not None and rv <= _today():
                         due.append(rec.get("review_date"))
         except Exception as e:
-            add("decisions_review", "WARN", "unknown", f"decisions.jsonl 解析失敗: {e}")
+            add("decisions_review", "WARN", "unknown", "decisions_parse_failed", error=type(e).__name__)
         else:
             if due:
-                add("decisions_review", "WARN", "warn",
-                    f"review_date 到来 {len(due)} 件: {due} → 判断を見直せ")
+                add("decisions_review", "WARN", "warn", "review_due", count=len(due), dates=due)
             else:
-                add("decisions_review", "WARN", "pass", "見直し期限なし")
+                add("decisions_review", "WARN", "pass", "no_review_due")
 
     # equity fetch heal（バッチ部分劣化の個別再取得）統計を surface — Task Q4。
     # 発動頻度を health.json に恒久記録（CI ログは失効する）。still_degraded>0 は WARN。
@@ -268,13 +265,12 @@ def evaluate(d):
         deg = heal.get("degraded", 0)
         rec = heal.get("recovered", 0)
         still = heal.get("still_degraded", 0)
-        detail = (f"degraded={deg} recovered={rec} still_degraded={still} "
-                  f"symbols_degraded={heal.get('symbols_degraded', [])}")
+        vals = {"degraded": deg, "recovered": rec, "still_degraded": still,
+                "symbols_degraded": heal.get("symbols_degraded", [])}
         if still > 0:
-            add("equity_fetch_heal", "WARN", "warn",
-                detail + " (再取得後も劣化が残存)")
+            add("equity_fetch_heal", "WARN", "warn", "heal_still_degraded", **vals)   # 再取得後も劣化が残存
         else:
-            add("equity_fetch_heal", "WARN", "pass", detail)
+            add("equity_fetch_heal", "WARN", "pass", "heal_ok", **vals)
 
     # ── ゲート分離 (2026-07-30) ─────────────────────────────────────────
     # deploy_gate だけが exit code を左右する。data_gate の fail は該当 domain を
@@ -302,12 +298,9 @@ def evaluate(d):
         "fails": real_fails,
         "warns": real_warns,
         "checks": checks,
-        "notes": [
-            "deploy_gate だけが exit code を決める。data_gate の fail(fisher/relations/corr)は "
-            "該当 domain を degraded にするのみで配信は止めない（UI が該当タブを警告表示）。",
-            "us_rates/jgb/fred_daily lag is proxied by meta.updated_at (pipeline run date).",
-            "boj_assets and imm use real per-series dates.",
-        ],
+        # deploy_gate だけが exit code を決める。data_gate の fail は該当 domain を degraded にするのみ /
+        # us_rates/jgb/fred_daily lag は meta.updated_at で代用 / boj_assets と imm は系列の実日付
+        "notes": ["deploy_gate_only_exit_code", "lag_proxied_by_updated_at", "boj_imm_real_dates"],
     }
 
 
@@ -315,7 +308,8 @@ def main():
     try:
         d = json.load(open(DATA, encoding="utf-8"))
     except Exception as e:
-        rep = {"status": "FAIL", "error": f"cannot read {DATA}: {e}",
+        print(f"health_gate: cannot read {DATA}: {e}", file=sys.stderr)
+        rep = {"status": "FAIL", "error": "cannot_read_data_json",
                "fails": ["read"], "warns": [], "checks": []}
         with open(OUT, "w", encoding="utf-8") as f:
             json.dump(rep, f, ensure_ascii=False, indent=2)

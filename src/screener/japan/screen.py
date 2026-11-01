@@ -1,7 +1,8 @@
 """日本株 全銘柄: 理論株価（残余利益モデル）＋質（F）＋魔法の公式＋一時利益の目印。
 
 式（理論PBR・F の数え方・魔法の公式・一時利益の目印）は screener.calc.value にだけある。
-ここはデータの読み込みと列づくり。一時利益の目印が立った行は「決算短信で確認」と書く。
+ここはデータの読み込みと列づくり（列名・値はコード。言葉は screener.labels）。
+一時利益の目印が立った行は one_off_note = "check_earnings_release"（決算短信で確認）。
 """
 
 from __future__ import annotations
@@ -122,61 +123,59 @@ def screen(asof: str, px_d: str, p1y_d: str, p1m_d: str, master_path: str, cfg: 
         oo = one_off_flag(net_income=np_, op_income=op, roe_fwd=roe_fwd, roe_act=roe_act)
         rows.append(
             {
-                "コード": code[:4],
-                "会社名": m["CoName"],
-                "市場": m["MktNm"],
-                "業種": m["S33Nm"],
-                "規模": m.get("ScaleCat", ""),
-                "金融": "○" if m.get("S33") in FIN else "",
-                "決算期": ks[-1],
-                "株価": px,
-                "理論株価": round(fair) if fair else None,
-                "上値余地%": round(100 * (fair / px - 1), 1) if fair else None,
+                "code": code[:4],
+                "company_name": m["CoName"],
+                "market": m["MktNm"],
+                "sector": m["S33Nm"],
+                "scale": m.get("ScaleCat", ""),
+                "financial": m.get("S33") in FIN,
+                "fiscal_period": ks[-1],
+                "price": px,
+                "fair_price": round(fair) if fair else None,
+                "upside_pct": round(100 * (fair / px - 1), 1) if fair else None,
                 "PBR": round(pbr, 2),
-                "理論PBR": _r(tpbr, 2) if tpbr else None,
-                "予想PER": round(mcap / fnp, 1) if fnp and fnp > 0 else None,
-                "実績ROE%": _r(100 * roe_act, 1) if roe_act is not None else None,
-                "予想ROE%": _r(100 * roe_fwd, 1) if roe_fwd is not None else None,
-                "益回り%(営業利益/時価)": round(100 * op / mcap, 1) if op and mcap else None,
-                "総資産利益率%(営業)": round(100 * op / ta, 1) if op and ta else None,
-                "自己資本比率%": round(100 * eqar, 1) if eqar else None,
-                "予想配当利回り%": round(100 * div / px, 2) if div else None,
+                "fair_pbr": _r(tpbr, 2) if tpbr else None,
+                "per_fwd": round(mcap / fnp, 1) if fnp and fnp > 0 else None,
+                "roe_act_pct": _r(100 * roe_act, 1) if roe_act is not None else None,
+                "roe_fwd_pct": _r(100 * roe_fwd, 1) if roe_fwd is not None else None,
+                "earnings_yield_pct": round(100 * op / mcap, 1) if op and mcap else None,
+                "roa_op_pct": round(100 * op / ta, 1) if op and ta else None,
+                "equity_ratio_pct": round(100 * eqar, 1) if eqar else None,
+                "div_yield_fwd_pct": round(100 * div / px, 2) if div else None,
                 "F": fs.score,
-                "F満点": fs.max,
-                "1年騰落%(直近1か月除く)": round(100 * (p1m / p1y - 1), 1) if p1y and p1m else None,
-                "時価総額(億円)": round(mcap / 1e8),
+                "f_max": fs.max,
+                "ret_1y_ex1m_pct": round(100 * (p1m / p1y - 1), 1) if p1y and p1m else None,
+                "mcap_oku_jpy": round(mcap / 1e8),
                 "one_off_flag": oo["flag"],
-                "一時利益の目印": oo["note"],
-                "一時利益の理由": "・".join(oo["reasons"]),
+                "one_off_note": oo["note"],
+                "one_off_reasons": "|".join(oo["reasons"]),
             }
         )
-    magic_rank(
-        rows, "益回り%(営業利益/時価)", "総資産利益率%(営業)", skip=lambda r: bool(r["金融"]), out_key="魔法の公式順位"
-    )
+    magic_rank(rows, "earnings_yield_pct", "roa_op_pct", skip=lambda r: bool(r["financial"]), out_key="magic_rank")
     for r in rows:
-        r["判定"] = tag(r)
+        r["fin_tag"] = tag(r)
     return rows
 
 
 def quality_ok(r: Row) -> bool:
-    return bool(r["F満点"] >= 6 and r["F"] >= r["F満点"] - 2)
+    return bool(r["f_max"] >= 6 and r["F"] >= r["f_max"] - 2)
 
 
 def tag(r: Row) -> str:
     t = []
     ok_q = quality_ok(r)
-    big = (r["時価総額(億円)"] or 0) >= 300
+    big = (r["mcap_oku_jpy"] or 0) >= 300
     if (
         ok_q
-        and (r["予想ROE%"] or 0) >= 8
-        and (r["上値余地%"] or -99) >= 20
-        and (r["自己資本比率%"] or 0) >= 40
+        and (r["roe_fwd_pct"] or 0) >= 8
+        and (r["upside_pct"] or -99) >= 20
+        and (r["equity_ratio_pct"] or 0) >= 40
         and big
-        and not r["金融"]
+        and not r["financial"]
     ):
-        t.append("長期候補")
-    if (r.get("魔法の公式順位") or 9999) <= 300 and (r["1年騰落%(直近1か月除く)"] or -99) > 0 and ok_q and big:
-        t.append("中期候補")
-    if (r["上値余地%"] or 0) >= 50 and (r["F"] <= 3 or (r["予想ROE%"] or 0) < 3):
-        t.append("割安だが質に注意")
-    return "・".join(t)
+        t.append("long_candidate")
+    if (r.get("magic_rank") or 9999) <= 300 and (r["ret_1y_ex1m_pct"] or -99) > 0 and ok_q and big:
+        t.append("mid_candidate")
+    if (r["upside_pct"] or 0) >= 50 and (r["F"] <= 3 or (r["roe_fwd_pct"] or 0) < 3):
+        t.append("cheap_low_quality")
+    return "|".join(t)

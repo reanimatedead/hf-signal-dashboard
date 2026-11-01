@@ -5,7 +5,7 @@
   "jp_symbol": "^N225",
   "us_symbol": "^GSPC",
   "source_used": "jsonl",
-  "executable_assumption": "JP open is the 9:00 JST 板寄せ price; ETF (1306/1321) or NK225 futures fill at this price. Retail slippage + commission captured by 5/10/20 bps round-trip sensitivity.",
+  "executable_assumption": "jp_open_itayose_fill",
   "segments": {
     "since_2023": {
       "label": "open_to_close",
@@ -154,7 +154,9 @@
         ],
         "verdict": {
           "pass": false,
-          "reason": "single year 2026 dominates (53%)",
+          "reason": "single_year_dominates",
+          "year": "2026",
+          "share": 0.53,
           "table": [
             {
               "year": "2023",
@@ -194,7 +196,7 @@
         },
         "verdict": {
           "pass": false,
-          "reason": "neg-skew -1.48 AND worst-day -10.75%",
+          "reason": "neg_skew_and_worst_day",
           "summary": {
             "n": 846,
             "hit_rate": 0.5,
@@ -208,7 +210,7 @@
         }
       },
       "verdict": {
-        "overall": "raw-cross-asset-not-tradeable → Completion-B候補",
+        "overall": "raw_cross_asset_not_tradeable",
         "criteria": {
           "cost": false,
           "outlier": false,
@@ -216,7 +218,7 @@
           "fade": false
         }
       },
-      "note": "頑健性検証. 想定 + 取引可能性検証 / not investment advice. Phase 2 (学習) 未実装."
+      "note": "robustness_check_note"
     },
     "pre_2023": {
       "label": "open_to_close",
@@ -689,7 +691,20 @@
         ],
         "verdict": {
           "pass": false,
-          "reason": "negative year(s): ['1989', '1993', '2001', '2005', '2006', '2007', '2012', '2015', '2017', '2019', '2021']",
+          "reason": "negative_years",
+          "years": [
+            "1989",
+            "1993",
+            "2001",
+            "2005",
+            "2006",
+            "2007",
+            "2012",
+            "2015",
+            "2017",
+            "2019",
+            "2021"
+          ],
           "table": [
             {
               "year": "1965",
@@ -1053,7 +1068,7 @@
         },
         "verdict": {
           "pass": false,
-          "reason": "neg-skew -0.99 AND worst-day -13.24%",
+          "reason": "neg_skew_and_worst_day",
           "summary": {
             "n": 14262,
             "hit_rate": 0.290422,
@@ -1067,7 +1082,7 @@
         }
       },
       "verdict": {
-        "overall": "raw-cross-asset-not-tradeable → Completion-B候補",
+        "overall": "raw_cross_asset_not_tradeable",
         "criteria": {
           "cost": false,
           "outlier": true,
@@ -1075,11 +1090,11 @@
           "fade": false
         }
       },
-      "note": "頑健性検証. 想定 + 取引可能性検証 / not investment advice. Phase 2 (学習) 未実装."
+      "note": "robustness_check_note"
     }
   },
   "primary_verdict": {
-    "overall": "raw-cross-asset-not-tradeable → Completion-B候補",
+    "overall": "raw_cross_asset_not_tradeable",
     "criteria": {
       "cost": false,
       "outlier": false,
@@ -1087,5 +1102,5 @@
       "fade": false
     }
   },
-  "note": "H1 open_to_close robustness analysis (Phase 1.9.1). Single-hypothesis raw predictive power tested against costs, outliers, subperiod stability, and fade skewness. Not investment advice. Phase 2 (learning) not implemented."
+  "note": "h1_robustness_analysis_note"
 }

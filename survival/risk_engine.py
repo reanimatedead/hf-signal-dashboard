@@ -175,7 +175,7 @@ def margin_simulator(notional_pct: float, equity_pct: float = 100.0,
         "maint_ratio": round(maint, 4),
         "warning": warning,
         "leverage_sensitivity": sens,
-        "note": "情報提供のみ。買い/売り推奨ではない。",
+        "note": "info_only_not_advice",   # 情報提供のみ。買い/売り推奨ではない。
     }
 
 

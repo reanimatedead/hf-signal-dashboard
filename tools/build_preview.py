@@ -44,9 +44,9 @@ def build(out, hours_ago=50.0):
     fs._batched_2y_ohlc = lambda syms, **k: {s: frames.get(s) for s in syms}   # 通信しない
 
     def rows(syms, label):
-        return [fs.process_ticker(frames[s].tail(126), s, f"架空銘柄 {s}（{label}・fake）") for s in syms]
-    markets_eq = {"nikkei225": rows(list(jp), "日本"), "dow30": rows(TICKERS[:2], "米国"),
-                  "nasdaq100": rows(TICKERS, "米国"), "sp500": rows(TICKERS, "米国")}
+        return [fs.process_ticker(frames[s].tail(126), s, f"FAKE {s} ({label})") for s in syms]
+    markets_eq = {"nikkei225": rows(list(jp), "JP"), "dow30": rows(TICKERS[:2], "US"),
+                  "nasdaq100": rows(TICKERS, "US"), "sp500": rows(TICKERS, "US")}
     collect = {}
     fs.attach_equity_charts(markets_eq, collect=collect)
     vrec = fs.build_and_write_verify(collect, out / "verify.json")
@@ -61,7 +61,7 @@ def build(out, hours_ago=50.0):
                  "universe_source": "preview", "fetch_failures": []} for tab, rs in markets_eq.items()}
     payload = {
         "meta": {"updated_at": now.isoformat(), "updated_at_str": now.strftime("%Y-%m-%d %H:%M JST"),
-                 "next_update_str": "—", "preview": "架空データ（tools/build_preview.py）。本物の銘柄・価格ではありません。",
+                 "next_update_str": "—", "preview": "preview_fake_data",   # 架空データ（本物の銘柄・価格ではない）
                  "counts": {k: len(v) for k, v in markets_eq.items()}, "universe": uni, "fallbacks": [],
                  "stale_hours": fs._stale_hours(), "verify": vrec, "us_fundamentals": urec},
         "summary": {k: fs.build_summary(v) for k, v in markets_eq.items()},

@@ -724,7 +724,7 @@
       }
     }
   ],
-  "note": "Single-hypothesis raw predictive-power measurement. Not investment advice. Phase 2 (learning) is not implemented.",
+  "note": "h1_single_hypothesis_note",
   "source_used": "jsonl",
   "persisted": "/Users/takahiroyamada/hf-signal-dashboard/data/local/h1/2026-06-21T092344+0000_e4a38237f1.json"
 }
