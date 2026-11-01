@@ -30,13 +30,16 @@ const origin = new URL(base).origin;
 const report = { base, offline, errors: [], stubbed: [], shots: [] };
 const browser = await chromium.launch();
 // snake_case: 英小文字/数字の語が _ でつながった形（例 high_vol, n_symbols）。URL・ファイル名は innerText に出ない前提。
-const SNAKE = /(?<![A-Za-z0-9_.\/-])[a-z][a-z0-9]*(?:_[a-z0-9]+)+(?![A-Za-z0-9_.\/-])/g;
+// 2026-11: 点でつながった ID（real_yield.10y / fx_rate_corr.usdeur.2y.30d / yield_curve.slope.10y_2y）も 1 語として捕まえる。
+// ファイル名（*.json など）は除く。
+const SNAKE = /(?<![A-Za-z0-9_.\/-])[a-z][a-z0-9]*(?:_[a-z0-9]+)+(?:\.[a-z0-9_]+)*(?![A-Za-z0-9_\/-])/g;
+const FILE_EXT = /\.(json|jsonl|js|csv|html|png|xlsx)$/;
 async function scanSnake(page, tag, where, root) {
   const text = await page.evaluate((sel) => {
     const el = sel ? document.querySelector(sel) : document.body;
     return el ? el.innerText : "";
   }, root || null);
-  const hits = [...new Set(text.match(SNAKE) || [])];
+  const hits = [...new Set((text.match(SNAKE) || []).filter((h) => !FILE_EXT.test(h)))];
   if (hits.length) report.errors.push({ tag, type: "snake", text: `${where}: ${hits.join(", ")}` });
 }
 
@@ -49,7 +52,7 @@ function macroFxStub() {
   const meta = {}, series = {};
   const d = (n) => new Date(Date.now() - n * 86400000).toISOString().slice(0, 10);
   for (const id of ids) {
-    meta[id] = { family: fam(id), label_ja: "架空 " + id };            // label_en は付けない（本番と同じ）
+    meta[id] = { family: fam(id), label_ja: "架空の指標" };              // label_en は付けない（本番と同じ）。名前に ID を入れない
     series[id] = [{ observed_at: d(2), value: 0.5 }, { observed_at: d(1), value: 0.6 }];
   }
   return { meta, series, interpretations: {} };
