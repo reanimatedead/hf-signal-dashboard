@@ -1,4 +1,5 @@
 """CCI と ボリンジャーバンド、売買判定（日足）。入力は numpy 配列のみ（データは持たない）。"""
+
 import numpy as np
 
 P = {"cci_long": 288, "cci_short": 48, "bb_long": 288, "bb_short": 48, "k2": 2.0, "k3": 3.0, "cci_th": 100}
@@ -15,14 +16,15 @@ def sma(x, n):
     if len(x) < n:
         return s
     c = np.cumsum(np.insert(x, 0, 0.0))
-    s[n - 1:] = (c[n:] - c[:-n]) / n
+    s[n - 1 :] = (c[n:] - c[:-n]) / n
     return s
 
 
 def rolling_std(x, n):
     """母標準偏差（ddof=0）。"""
     x = np.asarray(x, dtype=float)
-    m = sma(x, n); m2 = sma(x * x, n)
+    m = sma(x, n)
+    m2 = sma(x * x, n)
     return np.sqrt(np.maximum(m2 - m * m, 0))
 
 
@@ -36,7 +38,8 @@ def cci(h, l, c, n):
     m = sma(tp, n)
     md = np.full_like(tp, np.nan)
     for i in range(n - 1, len(tp)):
-        w = tp[i - n + 1:i + 1]; md[i] = np.mean(np.abs(w - m[i]))
+        w = tp[i - n + 1 : i + 1]
+        md[i] = np.mean(np.abs(w - m[i]))
     with np.errstate(divide="ignore", invalid="ignore"):
         return (tp - m) / (0.015 * md)
 
@@ -45,11 +48,22 @@ def compute(h, l, c, p=P):
     h, l, c = (np.asarray(v, dtype=float) for v in (h, l, c))
     ok = ~np.isnan(c)
     h, l, c = h[ok], l[ok], c[ok]
-    h = np.where(np.isnan(h), c, h); l = np.where(np.isnan(l), c, l)
-    mS, sS = bb(c, p["bb_short"]); mL, sL = bb(c, p["bb_long"])
-    return {"ok": ok, "h": h, "l": l, "c": c,
-            "cciL": cci(h, l, c, p["cci_long"]), "cciS": cci(h, l, c, p["cci_short"]),
-            "mS": mS, "sS": sS, "mL": mL, "sL": sL}
+    h = np.where(np.isnan(h), c, h)
+    l = np.where(np.isnan(l), c, l)
+    mS, sS = bb(c, p["bb_short"])
+    mL, sL = bb(c, p["bb_long"])
+    return {
+        "ok": ok,
+        "h": h,
+        "l": l,
+        "c": c,
+        "cciL": cci(h, l, c, p["cci_long"]),
+        "cciS": cci(h, l, c, p["cci_short"]),
+        "mS": mS,
+        "sS": sS,
+        "mL": mL,
+        "sL": sL,
+    }
 
 
 def signals(x, p=P):
@@ -63,8 +77,10 @@ def signals(x, p=P):
     with np.errstate(invalid="ignore"):
         buy = (cL > 0) & (c <= mS - p["k2"] * sS) & (cS < -p["cci_th"])
         sell = (cL < 0) & (c >= mS + p["k2"] * sS) & (cS > p["cci_th"])
-        s[buy] = 1; s[buy & (c <= mS - p["k3"] * sS)] = 2
-        s[sell] = -1; s[sell & (c >= mS + p["k3"] * sS)] = -2
+        s[buy] = 1
+        s[buy & (c <= mS - p["k3"] * sS)] = 2
+        s[sell] = -1
+        s[sell & (c >= mS + p["k3"] * sS)] = -2
     return s
 
 
@@ -91,9 +107,16 @@ def judge(x, p=P, i=None):
     lo = bool(long_oversold(x, p)[i])
     if lo and s >= 0:
         label = LONG_OVERSOLD_LABEL if s == 0 else label
-    return {"label": label, "signal": s, "long_oversold": lo, "trend": trend,
-            "zS": _r(zS, 2), "zL": _r(zL, 2),
-            "cciL": _r(x["cciL"][i], 0), "cciS": _r(x["cciS"][i], 0)}
+    return {
+        "label": label,
+        "signal": s,
+        "long_oversold": lo,
+        "trend": trend,
+        "zS": _r(zS, 2),
+        "zL": _r(zL, 2),
+        "cciL": _r(x["cciL"][i], 0),
+        "cciS": _r(x["cciS"][i], 0),
+    }
 
 
 def summary(h, l, c, p=P):
@@ -104,37 +127,60 @@ def summary(h, l, c, p=P):
         return None
     x = compute(h, l, c, p)
     j = judge(x, p)
-    return {"chart_signal": j["label"], "chart_signal_code": j["signal"],
-            "long_oversold": j["long_oversold"], "trend": j["trend"],
-            "cci288": j["cciL"], "cci48": j["cciS"], "bb48_z": j["zS"], "bb288_z": j["zL"]}
+    return {
+        "chart_signal": j["label"],
+        "chart_signal_code": j["signal"],
+        "long_oversold": j["long_oversold"],
+        "trend": j["trend"],
+        "cci288": j["cciL"],
+        "cci48": j["cciS"],
+        "bb48_z": j["zS"],
+        "bb288_z": j["zL"],
+    }
 
 
 def chart_series(h, l, c, p=P, tail=None, nd=4):
     """銘柄詳細チャート用の系列（終値・BB48/288 ±2σ/±3σ・CCI48/288・判定の印）。
     nd は価格系列の小数桁（容量を抑えるため呼ぶ側が株価の桁に合わせて渡す）。"""
     x = compute(h, l, c, p)
-    s = signals(x, p); lo = long_oversold(x, p)
-    n = len(x["c"]); a = 0 if not tail else max(0, n - tail)
+    s = signals(x, p)
+    lo = long_oversold(x, p)
+    n = len(x["c"])
+    a = 0 if not tail else max(0, n - tail)
 
     def arr(v, nd=nd):
         return [None if not np.isfinite(t) else round(float(t), nd) for t in v[a:]]
+
     out = {"close": arr(x["c"]), "cci48": arr(x["cciS"], 1), "cci288": arr(x["cciL"], 1)}
     for k, (m, sd) in (("bb48", (x["mS"], x["sS"])), ("bb288", (x["mL"], x["sL"]))):
-        out[k] = {"mid": arr(m), "p2": arr(m + 2 * sd), "m2": arr(m - 2 * sd), "p3": arr(m + 3 * sd), "m3": arr(m - 3 * sd)}
-    out["marks"] = [{"i": i - a, "type": ("buy" if s[i] > 0 else "sell"), "code": int(s[i])}
-                    for i in range(a, n) if s[i] != 0]
+        out[k] = {
+            "mid": arr(m),
+            "p2": arr(m + 2 * sd),
+            "m2": arr(m - 2 * sd),
+            "p3": arr(m + 3 * sd),
+            "m3": arr(m - 3 * sd),
+        }
+    out["marks"] = [
+        {"i": i - a, "type": ("buy" if s[i] > 0 else "sell"), "code": int(s[i])} for i in range(a, n) if s[i] != 0
+    ]
     out["marks"] += [{"i": i - a, "type": "long_oversold", "code": 1} for i in range(a, n) if lo[i] and s[i] == 0]
     out["index_map"] = np.flatnonzero(x["ok"]).tolist()[a:]
     return out
 
 
-BUY_LABELS = (LABELS[2], LABELS[1], LONG_OVERSOLD_LABEL)   # 買い系（画面の「買い判定一覧」・検証の弱まり判定に使う）
+BUY_LABELS = (LABELS[2], LABELS[1], LONG_OVERSOLD_LABEL)  # 買い系（画面の「買い判定一覧」・検証の弱まり判定に使う）
 SELL_LABELS = (LABELS[-1], LABELS[-2])
 
 
 def label_conditions(x, p=P):
     """判定ラベルごとの日次 bool 配列（検証用）。judge() の最新日の言葉と同じ規則:
     強い買い / 買い / 買い（長期の売られすぎ: シグナル0 かつ BB288 -2σ 以下）/ 売り / 強い売り。"""
-    s = signals(x, p); lo = long_oversold(x, p)
-    return {LABELS[2]: s == 2, LABELS[1]: s == 1, LONG_OVERSOLD_LABEL: lo & (s == 0),
-            LABELS[-1]: s == -1, LABELS[-2]: s == -2}
+    s = signals(x, p)
+    lo = long_oversold(x, p)
+    return {
+        LABELS[2]: s == 2,
+        LABELS[1]: s == 1,
+        LONG_OVERSOLD_LABEL: lo & (s == 0),
+        LABELS[-1]: s == -1,
+        LABELS[-2]: s == -2,
+    }

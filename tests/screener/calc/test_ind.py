@@ -1,6 +1,9 @@
 """ind: CCI・BB が手計算と一致し、判定が条件どおりに出る。"""
+
 import math
+
 import numpy as np
+
 from screener.calc import ind
 
 
@@ -12,14 +15,17 @@ def hand_cci(h, l, c, n, i):
 
 
 def hand_bb(c, n, i):
-    w = c[i - n + 1:i + 1]; m = sum(w) / n
-    sd = math.sqrt(sum((v - m) ** 2 for v in w) / n)   # 母標準偏差
+    w = c[i - n + 1 : i + 1]
+    m = sum(w) / n
+    sd = math.sqrt(sum((v - m) ** 2 for v in w) / n)  # 母標準偏差
     return m, sd
 
 
 def test_cci_matches_hand_calc():
     rng = np.random.default_rng(1)
-    c = list(100 + np.cumsum(rng.normal(0, 1, 60))); h = [v + 1 for v in c]; l = [v - 1.5 for v in c]
+    c = list(100 + np.cumsum(rng.normal(0, 1, 60)))
+    h = [v + 1 for v in c]
+    l = [v - 1.5 for v in c]
     got = ind.cci(h, l, c, 20)
     for i in (19, 30, 59):
         assert abs(got[i] - hand_cci(h, l, c, 20, i)) < 1e-9
@@ -40,16 +46,25 @@ def test_bb_matches_hand_calc():
 
 
 def _x(c, cL, cS, mS, sS, mL=None, sL=None):
-    a = lambda v: np.array(v, dtype=float)
+    def a(v):
+        return np.array(v, dtype=float)
+
     n = len(c)
-    return {"c": a(c), "cciL": a(cL), "cciS": a(cS), "mS": a(mS), "sS": a(sS),
-            "mL": a(mL if mL else [100] * n), "sL": a(sL if sL else [10] * n)}
+    return {
+        "c": a(c),
+        "cciL": a(cL),
+        "cciS": a(cS),
+        "mS": a(mS),
+        "sS": a(sS),
+        "mL": a(mL if mL else [100] * n),
+        "sL": a(sL if sL else [10] * n),
+    }
 
 
 def test_signal_conditions_exact():
     # 0:買い(-2σちょうど) 1:強い買い(-3σ) 2:長期下向きなので買いにならない 3:CCI48が-100ちょうど→買いにならない
     # 4:売り(+2σ) 5:強い売り(+3σ) 6:長期上向きなので売りにならない 7:何もなし
-    c  = [96, 94, 94, 96, 104, 106, 106, 100]
+    c = [96, 94, 94, 96, 104, 106, 106, 100]
     cL = [10, 10, -10, 10, -10, -10, 10, 0]
     cS = [-150, -150, -150, -100, 150, 150, 150, 0]
     x = _x(c, cL, cS, [100] * 8, [2] * 8)
@@ -59,7 +74,8 @@ def test_signal_conditions_exact():
 def test_long_oversold_and_labels():
     x = _x([79, 81, 94], [-5, -5, 10], [0, 0, -150], [100] * 3, [10] * 3, mL=[100] * 3, sL=[10] * 3)
     assert ind.long_oversold(x).tolist() == [True, False, False]
-    j0 = ind.judge(x, i=0); j2 = ind.judge(x, i=2)
+    j0 = ind.judge(x, i=0)
+    j2 = ind.judge(x, i=2)
     assert j0["label"] == "買い（長期の売られすぎ）" and j0["long_oversold"]
     assert ind.judge(x, i=1)["label"] == "様子見"
     # 2: c=94 は mS-2σ(80) を下回らないので買いにならない

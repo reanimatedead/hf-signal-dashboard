@@ -1,23 +1,26 @@
 import numpy as np
-from screener.calc import value, events, contracts
+
+from screener.calc import contracts, events, value
 
 
 def test_one_off_flag():
     assert value.one_off_flag(131, 100)["flag"] and value.one_off_flag(131, 100)["note"] == "決算短信で確認"
-    assert not value.one_off_flag(130, 100)["flag"]                       # ちょうど1.3倍は対象外（「超える」）
+    assert not value.one_off_flag(130, 100)["flag"]  # ちょうど1.3倍は対象外（「超える」）
     assert value.one_off_flag(None, None, roe_fwd=0.21, roe_act=0.10)["flag"]
     assert not value.one_off_flag(None, None, roe_fwd=0.20, roe_act=0.10)["flag"]
-    assert not value.one_off_flag(50, -10)["flag"]                         # 営業赤字は比率に意味がない
+    assert not value.one_off_flag(50, -10)["flag"]  # 営業赤字は比率に意味がない
     assert len(value.one_off_flag(200, 100, 0.5, 0.1)["reasons"]) == 2
 
 
 def test_event_returns_and_gap():
     c = np.linspace(100, 200, 400)
-    cond = np.zeros(400, bool); cond[300] = cond[305] = cond[330] = True
+    cond = np.zeros(400, bool)
+    cond[300] = cond[305] = cond[330] = True
     r = events.event_returns(c, {"sig": cond}, h=20, gap=20, start=288)
-    assert len(r["sig"]) == 2                     # 305 は 300 から20日未満なので数えない
+    assert len(r["sig"]) == 2  # 305 は 300 から20日未満なので数えない
     assert len(r["base"]) == 400 - 20 - 288
-    s = events.stats(r["sig"]); assert s["n"] == 2 and s["up_pct"] == 100.0
+    s = events.stats(r["sig"])
+    assert s["n"] == 2 and s["up_pct"] == 100.0
 
 
 def test_weakened():

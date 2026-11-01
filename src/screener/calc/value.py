@@ -18,13 +18,16 @@ def ri_ratio(roe, p=RI):
 
 class FScore:
     """None（判定できない項目）は満点にも数えない。"""
+
     def __init__(self):
-        self.score = 0; self.max = 0
+        self.score = 0
+        self.max = 0
 
     def chk(self, cond):
         if cond is None:
             return
-        self.max += 1; self.score += 1 if cond else 0
+        self.max += 1
+        self.score += 1 if cond else 0
 
 
 def one_off_flag(net_income=None, op_income=None, roe_fwd=None, roe_act=None):
@@ -45,7 +48,8 @@ def magic_rank(rows, ey_key, roc_key, skip=lambda r: False, out_key="magic_rank"
     rk = {}
     for k in (ey_key, roc_key):
         for i, r in enumerate(sorted(nf, key=lambda r: -r[k]), 1):
-            rk.setdefault(id(r), 0); rk[id(r)] += i
+            rk.setdefault(id(r), 0)
+            rk[id(r)] += i
     for i, r in enumerate(sorted(nf, key=lambda r: rk[id(r)]), 1):
         r[out_key] = i
     return rows

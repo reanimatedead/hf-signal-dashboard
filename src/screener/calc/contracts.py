@@ -8,10 +8,50 @@ JQ_DAILY_MIN = 3500
 JQ_FIN_COLUMNS = ("NP", "Eq", "BPS", "NxFEPS", "EPS", "OP", "Sales", "TA", "CFO", "DocType", "CurFYEn", "DiscDate")
 JQ_API_VERSION = "v2"
 # 主要20銘柄（契約テストのサンプル。構成の変化に強い大型株）
-US_PROBE = ["AAPL", "MSFT", "NVDA", "AMZN", "GOOGL", "META", "JPM", "V", "JNJ", "PG",
-            "XOM", "WMT", "KO", "HD", "UNH", "CSCO", "PEP", "MRK", "CVX", "MCD"]
-JP_PROBE = ["7203.T", "6758.T", "9984.T", "8306.T", "6861.T", "9432.T", "8035.T", "4063.T", "6098.T", "9983.T",
-            "7974.T", "6501.T", "8058.T", "4502.T", "6367.T", "7267.T", "8031.T", "6954.T", "4568.T", "6902.T"]
+US_PROBE = [
+    "AAPL",
+    "MSFT",
+    "NVDA",
+    "AMZN",
+    "GOOGL",
+    "META",
+    "JPM",
+    "V",
+    "JNJ",
+    "PG",
+    "XOM",
+    "WMT",
+    "KO",
+    "HD",
+    "UNH",
+    "CSCO",
+    "PEP",
+    "MRK",
+    "CVX",
+    "MCD",
+]
+JP_PROBE = [
+    "7203.T",
+    "6758.T",
+    "9984.T",
+    "8306.T",
+    "6861.T",
+    "9432.T",
+    "8035.T",
+    "4063.T",
+    "6098.T",
+    "9983.T",
+    "7974.T",
+    "6501.T",
+    "8058.T",
+    "4502.T",
+    "6367.T",
+    "7267.T",
+    "8031.T",
+    "6954.T",
+    "4568.T",
+    "6902.T",
+]
 
 
 def count_within(name, n, expected=None, tol=COUNT_TOL):
