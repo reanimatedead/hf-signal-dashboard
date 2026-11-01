@@ -139,7 +139,7 @@ jobs:
         run: REQUIRE_DATA_JSON=1 python3 -m pytest tests/ -q -m needs_data_json
 
       - name: Contract tests
-        run: python3 -m pytest tests/ -q -m "not ci_only"   # workflow の形を調べるテストは通常の CI だけ
+        run: python3 -m pytest tests/ -q
 
       # Link liveness (Task 5-4) — 警告のみ。Yahoo 429 等の誤検知で job を落とさない
       # ため、常に成功扱い（|| true は不要：スクリプト自身が exit 0 を返す）。
@@ -239,7 +239,7 @@ jobs:
         run: PYTHONPATH=tools python3 tools/assert_gen_health.py
 
       - name: Contract tests
-        run: python3 -m pytest tests/ -q -m "not ci_only"   # workflow の形を調べるテストは通常の CI だけ
+        run: python3 -m pytest tests/ -q
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v5

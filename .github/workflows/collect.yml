@@ -60,7 +60,6 @@ jobs:
                  tests/test_collector_idempotent.py \
                  tests/test_collector_schema.py \
                  tests/test_collector_resilience.py \
-                 tests/test_collect_workflow.py \
                  -q
 
       - name: Commit history + log

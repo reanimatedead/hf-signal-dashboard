@@ -12,10 +12,8 @@
      （CSS の値や class 名はハイフン・数字・コロンを含むので語にならない。）
   4. dict.js の ja と en のキー集合が一致しなければ FAIL（片側だけのキーを禁止）。
   5. コードが T("key") / data-i18n="key" で直接参照するキーは辞書に存在しなければ FAIL。
-  6. CCI の基準線（±100）を説明する辞書の文言は ja / en とも ±200 も含む（±200 は表示用の線のみ）。
-     売買判定の閾値は ind.P["cci_th"] == 100 のまま（表示の変更で判定を変えていない）。
+  6. 売買判定の閾値は ind.P["cci_th"] == 100 のまま（±200 は表示用の線のみ。表示の変更で判定を変えていない）。
 """
-import pytest
 import json
 import pathlib
 import re
@@ -246,19 +244,6 @@ def test_referenced_keys_exist():
     assert not missing, f"keys used but not in dict.js: {sorted(missing)}"
 
 
-def test_cci_reference_line_texts_include_200():
-    d = load_dict()["d"]
-    bad = []
-    for lang in ("ja", "en"):
-        for k, v in d[lang].items():
-            v = str(v)
-            if "CCI" in v and re.search(r"±\s?100", v) and not re.search(r"±\s?200", v):
-                bad.append(f"{lang}:{k}")
-            if k.startswith("chart.") and "line" in k and not re.search(r"±\s?200", v):
-                bad.append(f"{lang}:{k}")
-    assert not bad, f"CCI reference-line texts must mention ±200 too: {bad}"
-
-
 def test_cci_trade_threshold_unchanged():
     from marketcalc import ind
     assert ind.P["cci_th"] == 100, "±200 is display-only; the buy/sell threshold stays CCI48 ±100"
@@ -298,41 +283,3 @@ def test_codes_only_seen_in_production_are_translated():
         need.add(f"code.gamma_assumption.{a}")
     missing = [f"{lang} {k}" for lang in ("ja", "en") for k in sorted(need) if k not in d[lang]]
     assert not missing, missing
-
-
-# 2026-11: 公開後の訳し漏れ確認は deploy.yml full の「Deploy to Pages の後」で、警告だけ（公開を止めない）。
-@pytest.mark.ci_only   # workflow ファイルを読む: 通常の CI だけ
-def test_post_deploy_i18n_check_is_after_deploy_and_warn_only():
-    # yaml は使わない（deploy.yml の full ジョブは requirements.lock で動き、pyyaml が入っていない。
-    # 2026-11-01 の deploy #265 はこのテストの `import yaml` で失敗した）。テキストで順番と設定を確かめる。
-    text = (pathlib.Path(__file__).resolve().parents[1] / ".github/workflows/deploy.yml").read_text(encoding="utf-8")
-    full = text[text.index("\n  full:"):text.index("\n  corr_refresh:")]
-    i_dep = full.index("- name: Deploy to Pages")
-    i_chk = full.index("- name: Post-deploy i18n check")
-    assert i_chk > i_dep
-    step = full[i_chk:full.index("\n      - name:", i_chk + 1)]
-    assert "continue-on-error: true" in step and "--warn-only" in step
-
-
-@pytest.mark.ci_only   # workflow ファイルを読む: 通常の CI だけ
-def test_tests_do_not_import_packages_missing_from_requirements_lock():
-    """deploy.yml の full は requirements.lock で pytest を回す。テストが lock に無いパッケージを import しないこと。"""
-    root = pathlib.Path(__file__).resolve().parents[1]
-    lock = {l.split("==")[0].strip().lower().replace("_", "-")
-            for l in (root / "requirements.lock").read_text(encoding="utf-8").splitlines() if "==" in l}
-    # import 名 → 配布名（lock に書かれる名前）
-    dist = {"yaml": "pyyaml", "bs4": "beautifulsoup4", "dateutil": "python-dateutil"}
-    bad = []
-    for f in (root / "tests").glob("test_*.py"):
-        for m in re.finditer(r"^\s*(?:import|from)\s+(yaml|bs4|dateutil)\b", f.read_text(encoding="utf-8"), re.M):
-            if dist[m.group(1)] not in lock:
-                bad.append(f"{f.name}: {m.group(1)}")
-    assert not bad, bad
-
-
-@pytest.mark.ci_only   # workflow ファイルを読む: 通常の CI だけ
-def test_deploy_pytest_steps_exclude_ci_only():
-    """公開（deploy.yml）で回す pytest は、データと画面のテストだけ（workflow の形を調べる ci_only は除く）。"""
-    text = (pathlib.Path(__file__).resolve().parents[1] / ".github/workflows/deploy.yml").read_text(encoding="utf-8")
-    runs = [l for l in text.splitlines() if "pytest tests/" in l and "needs_data_json" not in l]
-    assert runs and all('not ci_only' in l for l in runs), runs

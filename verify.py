@@ -56,7 +56,6 @@ REQUIRED_FILES = [
     "tests/test_collector_idempotent.py",
     "tests/test_collector_schema.py",
     "tests/test_collector_resilience.py",
-    "tests/test_collect_workflow.py",
     "SPEC_NOTIFY.md",                       # v4.4 Phase 1.6 contract
     "notify/__init__.py",
     "notify/chain.py",

@@ -37,7 +37,6 @@ packages = ["src/screener"]
 testpaths = ["tests"]
 pythonpath = ["src", "."]
 markers = [
-    "ci_only: workflow ファイルの形などリポジトリの構成を調べるテスト。通常の CI（ci.yml）だけで動かし、公開（deploy.yml）では動かさない",
     "needs_data_json: 生成物（docs/data.json など）が必要。無ければ skip、REQUIRE_DATA_JSON=1 なら fail（tests/_data_json_gate.py）",
 ]
 

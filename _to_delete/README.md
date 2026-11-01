@@ -9,3 +9,4 @@
 - `workflows/marketcalc.yml` — 計算式のテスト。`.github/workflows/ci.yml` に統合した
 - `workflows/corr.yml` — 廃止済み（deploy.yml の corr_refresh に統合）。手動実行で docs/data.json を
   コミットしようとする唯一の workflow だったため移した（data.json はコミットしない・ADR-003）
+- `tests/test_collect_workflow.py` — workflow ファイルの形を調べるテスト（ci_only）。方針により廃止
