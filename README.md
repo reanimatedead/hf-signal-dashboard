@@ -341,6 +341,14 @@ Nasdaq 100 タブ上の「米国の買い判定一覧」、詳細チャート（
 日経225 の理論株価・割安度・総合判定は公開しない（Mac mini のローカル出力だけ・ADR-002）。計算式は `src/screener/calc/` だけ。
 架空データのプレビュー: `python3 tools/build_preview.py /tmp/site && python3 -m http.server -d /tmp/site`。
 
+### Mac mini（日本株・ローカルだけ）
+
+初期設定は `bash ~/hf-signal-dashboard/scripts/install_macmini.sh`（毎日 19:00 に `python -m screener.daily`）。判断の記録は `docs/decisions/`、検証の記録は `docs/verification.md`。
+本物のデータでの確認（初回実行の後・毎回）:
+1. `~/screener-data/out/counts.json` を開く（`japan_rows` が今回、`previous.japan_rows` が前回の件数）。
+2. `japan_diff_pct`（前回とのずれ %）が ±5% 以内か見る。
+3. 外れていたら `~/screener-data/logs/daily.err.log` を見て、原因が分かるまで一覧を使わない。
+
 All of it is **market context only** — not investment advice, price targets, trade execution,
 or buy/sell recommendations. IMM `long`/`short` refer to CFTC positioning categories only.
 
