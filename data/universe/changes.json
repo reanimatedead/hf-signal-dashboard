@@ -551,6 +551,17 @@
     "WBD",
     "ZS"
    ]
+  },
+  {
+   "date": "2026-11-01",
+   "name": "dow30",
+   "count": 30,
+   "added": [
+    "GOOGL"
+   ],
+   "removed": [
+    "VZ"
+   ]
   }
  ],
  "last_run": {
@@ -576,16 +587,12 @@
     "check": "sp500: 503 件（想定 500 ±5%）"
    },
    "dow30": {
-    "status": "kept",
+    "status": "updated",
     "count": 30,
-    "source": "builtin",
-    "fetched": 0,
-    "reason": "dow30: 0 件（想定 30 ±5%） → 外れ",
-    "check": "dow30: 0 件（想定 30 ±5%） → 外れ"
+    "source": "ssga_dia_holdings",
+    "check": "dow30: 30 件（想定 30 ±5%）"
    }
   },
-  "bad": [
-   "dow30"
-  ]
+  "bad": []
  }
 }
