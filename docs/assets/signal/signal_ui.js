@@ -53,6 +53,9 @@
   #us-buy-list table{width:100%;border-collapse:collapse;font-size:12px}
   #us-buy-list th,#us-buy-list td{padding:4px 6px;border-bottom:1px solid var(--border);text-align:left;vertical-align:top}
   #us-buy-list .ub-empty{color:var(--text-faint);font-size:12px;padding:6px 0}
+  #us-buy-list tr.ub-row:hover{background:var(--bg2)}
+  #us-buy-list tr.ub-row:focus{outline:1px solid var(--accent, #3b82f6);outline-offset:-1px}
+  .mac-only-note{display:none;padding:6px 16px 0;font-size:11px;color:var(--text-faint)}
   #verify-pane{display:none;padding:12px 16px;overflow-x:auto}
   #verify-pane h2{font-size:15px;margin:4px 0 8px} #verify-pane h3{font-size:13px;margin:14px 0 6px}
   #verify-pane table{border-collapse:collapse;font-size:12px;min-width:560px}
@@ -131,7 +134,8 @@
   function cols(tab, base) {
     if (!EQ_TABS.includes(tab)) return base;
     const head = base.slice(0, 2), rest = base.slice(2);   // Signal / Score はそのまま先頭
-    return head.concat(C_SIG, rest, C_IND, tab === "nikkei225" ? C_JP : C_US);
+    // 魔法の公式・F（C_US）は公開版では値が無い（Mac mini 版のみ）ので列に出さない。上に注記を1行（renderMacOnlyNote）。
+    return head.concat(C_SIG, rest, C_IND, tab === "nikkei225" ? C_JP : []);
   }
   const DASH = `<span style="color:var(--text-faint)">—</span>`;
   function cell(c, r, tab) {
@@ -161,21 +165,32 @@
     const seen = {}, rows = [];
     US_TABS.forEach((t) => ((DATA.markets || {})[t] || []).forEach((r) => {
       if (!r || String(r.symbol || "").startsWith("^") || !BUY.includes(sig(r.chart_signal))) return;
-      if (!seen[r.symbol]) { seen[r.symbol] = { r, idx: [] }; rows.push(seen[r.symbol]); }
+      if (!seen[r.symbol]) { seen[r.symbol] = { r, idx: [], src: t }; rows.push(seen[r.symbol]); }
       seen[r.symbol].idx.push(T("ub.idx_" + t));
     }));
     const order = { buy_strong: 0, buy: 1, buy_long_oversold: 2 };
     rows.sort((a, b) => (order[sig(a.r.chart_signal)] - order[sig(b.r.chart_signal)]) || ((a.r.bb48_z ?? 0) - (b.r.bb48_z ?? 0)));
     el.style.display = "block";
-    const body = rows.map(({ r, idx }) => `<tr><td>${judgeCell(r, "us")}</td><td><b>${esc(r.symbol)}</b></td><td>${esc(r.name || "")}</td>`
+    // 行を押す／Enter で、通常の表と同じ銘柄詳細（toggleDetail）を開く。データとチャートは行の元のタブ（src）から。
+    const open = (sym, src) => `data-sym="${esc(sym)}" data-src-tab="${src}" tabindex="0" style="cursor:pointer"`
+      + ` onclick="toggleDetail(event,'${esc(sym)}','${src}')"`
+      + ` onkeydown="if(event.key==='Enter'){event.preventDefault();toggleDetail(event,'${esc(sym)}','${src}')}"`;
+    const body = rows.map(({ r, idx, src }) => `<tr class="ub-row" ${open(r.symbol, src)}><td>${judgeCell(r, "us")}</td><td><b>${esc(r.symbol)}</b></td><td>${esc(r.name || "")}</td>`
       + `<td>${esc(idx.join(T("common.sep_list")))}</td><td style="text-align:right">${num(r.price) == null ? "—" : I18.fmtNum(r.price, 2)}</td>`
-      + `<td style="text-align:right">${cell({ k: "cci288" }, r)}</td><td style="text-align:right">${cell({ k: "bb48_z" }, r)}</td>`
-      + `<td style="text-align:right">${cell({ k: "magic_rank" }, r)}</td><td style="text-align:center">${cell({ k: "f_score" }, r)}</td></tr>`).join("");
-    const th = ["ub.th_judge", "col.symbol", "col.name", "ub.th_index", "col.price", "col.cci288", "col.bb48_z", "ub.th_magic", "col.f_score"]
+      + `<td style="text-align:right">${cell({ k: "cci288" }, r)}</td><td style="text-align:right">${cell({ k: "bb48_z" }, r)}</td></tr>`).join("");
+    const th = ["ub.th_judge", "col.symbol", "col.name", "ub.th_index", "col.price", "col.cci288", "col.bb48_z"]
       .map((k) => `<th>${T(k)}</th>`).join("");
     el.innerHTML = `<h3>${T("ub.title", { n: I18.fmtNum(rows.length, 0) })}</h3>`
       + (rows.length ? `<table><thead><tr>${th}</tr></thead><tbody>${body}</tbody></table>`
         : `<div class="ub-empty">${T("ub.empty")}</div>`);
+  }
+
+  // ── 「理論株価・魔法の公式・F は Mac mini 版のみ」（米国タブの表の上に1行） ──
+  function renderMacOnlyNote(tab) {
+    const el = document.getElementById("mac-only-note"); if (!el) return;
+    const show = US_TABS.includes(tab);
+    el.style.display = show ? "block" : "none";
+    el.textContent = show ? T("ub.mac_only_note") : "";
   }
 
   // ── バナー ──
@@ -423,6 +438,6 @@
     return `<div class="sg-chart">${svg}${leg}<div class="dt-cap">${capTxt}</div></div>`;
   }
 
-  window.SIG = { loadVerify, cols, cell, judgeCell, renderUsBuyList, renderStaleBanner, renderWeakBanner,
+  window.SIG = { loadVerify, cols, cell, judgeCell, renderUsBuyList, renderMacOnlyNote, renderStaleBanner, renderWeakBanner,
     showVerify, hideVerify, drawPriceCciChart, EQ_TABS, BUY, SELL, state: S };
 })();

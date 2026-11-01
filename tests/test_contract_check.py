@@ -5,6 +5,7 @@
 - 生成後の欠損チェック（--post）: meta.nan_report で price=None が 10% 超なら止める。
 - Issue は作らない（gh を呼ばない）。
 """
+import pytest
 import json
 import pathlib
 import subprocess
@@ -51,6 +52,7 @@ def test_precheck_never_contacts_yahoo(monkeypatch):
         assert name not in src, name
 
 
+@pytest.mark.ci_only   # workflow ファイルを読む: 通常の CI だけ
 def test_ntfy_missing_topic_warns_in_every_workflow():
     for wf in (ROOT / ".github" / "workflows").glob("*.yml"):
         text = wf.read_text(encoding="utf-8")
@@ -85,6 +87,7 @@ def test_post_without_nan_report_stops(tmp_path):
     assert cc.post(tmp_path / "nope.json") == 1
 
 
+@pytest.mark.ci_only   # workflow ファイルを読む: 通常の CI だけ
 def test_no_issue_creation_anywhere():
     src = (ROOT / "tools" / "contract_check.py").read_text(encoding="utf-8")
     assert "gh issue" not in src and "issue_once" not in src
