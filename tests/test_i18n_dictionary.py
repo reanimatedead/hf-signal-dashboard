@@ -232,9 +232,13 @@ def test_referenced_keys_exist():
     missing = set()
     for f in _targets():
         src = f.read_text(encoding="utf-8")
-        for m in re.finditer(r"""(?<![\w.])T\(\s*["']([A-Za-z0-9_.\-]+)["']""", src):
-            if m.group(1) not in d:
-                missing.add(f"{f.name}: {m.group(1)}")
+        for m in re.finditer(r"""(?<![\w.])T\(\s*["']([A-Za-z0-9_.\-]+)["']\s*([,)+])""", src):
+            k = m.group(1)
+            if m.group(2) == "+":          # dynamic key: the prefix must name at least one key
+                if not any(x.startswith(k) for x in d):
+                    missing.add(f"{f.name}: {k}*")
+            elif k not in d:
+                missing.add(f"{f.name}: {k}")
         for m in re.finditer(r'data-i18n(?:-[a-z]+)?="([^"]+)"', src):
             if m.group(1) not in d:
                 missing.add(f"{f.name}: {m.group(1)}")

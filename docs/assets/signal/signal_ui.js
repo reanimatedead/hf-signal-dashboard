@@ -61,7 +61,9 @@
   #verify-pane .vf-meta{font-size:12px;color:var(--text-dim);line-height:1.6}
   #verify-pane .vf-weak{color:#e5a23d;font-weight:700}
   .dt-chart:has(.sg-chart){max-width:min(1100px,100%)}
-  .sg-chart{background:var(--bg2);border:1px solid var(--border);border-radius:5px;padding:4px;width:min(1100px,92vw);box-sizing:border-box}
+  .sg-chart{background:var(--bg2);border:1px solid var(--border);border-radius:5px;padding:4px;width:min(1100px,calc(100vw - 48px));box-sizing:border-box}
+  tr.detail-row > td{white-space:normal}
+  .sg-chart .dt-cap{white-space:normal}
   .sg-chart svg{width:100%;height:auto;display:block}
   .sg-chart svg text{font-family:inherit}
   .sg-leg{display:flex;flex-wrap:wrap;gap:10px;font-size:11px;color:var(--text-dim);margin:4px 2px}
@@ -347,7 +349,7 @@
     const n = d.n;
     if (n < 2 || allNull(d.close)) return "";
     const vw = (typeof window !== "undefined" && window.innerWidth) || 1000;
-    const W = Math.round(o.width || Math.max(320, Math.min(1100, vw * 0.92) - 10));
+    const W = Math.round(o.width || Math.max(300, Math.min(1100, vw - 48) - 10));
     const FS = 10, L = Math.max(44, Math.round(textW("000,000", FS) + 10)), R = 8;
     const TOP = 6, PH = Math.round(Math.max(170, Math.min(240, W * 0.3))), XA = 18, TT = 16, CH = 120;
     const pTop = TOP, pBot = TOP + PH;                                  // 上段の枠

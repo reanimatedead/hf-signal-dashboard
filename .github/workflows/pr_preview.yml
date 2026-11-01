@@ -1,7 +1,10 @@
-name: PR preview (fake data screenshots)
+name: PR preview (fake data + live data screenshots)
 
-# PR ごとに、架空データ（tests/screener/calc/fixtures）でサイトを組み立て、Playwright で
-# 日経225 / Nasdaq 100（米国の買い判定一覧）/ 銘柄詳細チャート / 検証タブを撮って artifact にする。
+# PR ごとに、
+#   1) 架空データ（tests/screener/calc/fixtures）でサイトを組み立て、
+#   2) 本番（Pages）の data.json / charts / verify.json / macro 層を取ってきて、この PR の docs/ に重ね、
+# どちらも Playwright で 全タブ + 銘柄詳細（7735.T・FX 1 本）× ja/en × 幅 1280/390 を撮って artifact にする。
+# 2) はブラウザのコンソールエラー / ページの例外が 1 件でもあれば FAIL（本物のデータでの表示崩れを止める）。
 # Pages にはデプロイしない（Pages の設定にも触らない）。
 on:
   pull_request:
@@ -13,7 +16,9 @@ permissions:
 jobs:
   preview:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
+    env:
+      PAGES_BASE: https://reanimatedead.github.io/hf-signal-dashboard
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -30,13 +35,51 @@ jobs:
           npx playwright install --with-deps chromium
       - name: Build preview site (fake data)
         run: python3 tools/build_preview.py _preview_site/site
-      - name: Screenshots
+      - name: Screenshots (fake data, external hosts stubbed)
         run: |
           python3 -m http.server -d _preview_site/site 8765 &
           sleep 2
-          node tools/preview_screens.mjs http://127.0.0.1:8765 _preview_site/screens
+          node tools/preview_screens.mjs http://127.0.0.1:8765 _preview_site/screens --offline
+      - name: Build live-data site (this PR's docs/ + live JSON)
+        run: |
+          mkdir -p _preview_site/live
+          cp -r docs/. _preview_site/live/
+          python3 - <<'PY'
+          import json, os, pathlib, urllib.request
+          base = os.environ["PAGES_BASE"].rstrip("/")
+          out = pathlib.Path("_preview_site/live")
+          ua = {"User-Agent": "Mozilla/5.0 (pr-preview)"}
+          def get(rel, required):
+              try:
+                  with urllib.request.urlopen(urllib.request.Request(f"{base}/{rel}", headers=ua), timeout=60) as r:
+                      body = r.read()
+              except Exception as e:
+                  if required:
+                      raise SystemExit(f"live {rel}: {e}")
+                  print(f"skip {rel}: {e}")
+                  return None
+              p = out / rel
+              p.parent.mkdir(parents=True, exist_ok=True)
+              p.write_bytes(body)
+              print(f"got {rel} ({len(body):,} B)")
+              return body
+          data = json.loads(get("data.json", True))
+          for tab in (data.get("markets") or {}):
+              if any(r.get("chart_status") == "ready" for r in data["markets"][tab]):
+                  get(f"charts/{tab}.json", True)
+          for rel in ("verify.json", "relations.json", "macro_v2.json", "gamma.json", "health.json"):
+              get(rel, False)
+          PY
+      - name: Screenshots (live data — fails on any console / page error)
+        run: |
+          python3 -m http.server -d _preview_site/live 8766 &
+          sleep 2
+          node tools/preview_screens.mjs http://127.0.0.1:8766 _preview_site/screens_live
       - uses: actions/upload-artifact@v4
+        if: always()
         with:
           name: pr-preview
-          path: _preview_site
+          path: |
+            _preview_site/screens
+            _preview_site/screens_live
           retention-days: 14
