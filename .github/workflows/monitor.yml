@@ -57,7 +57,7 @@ jobs:
         env:
           NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
         run: |
-          [ -n "$NTFY_TOPIC" ] || { echo "NTFY_TOPIC 未設定: 通知なし"; exit 0; }
+          [ -n "$NTFY_TOPIC" ] || { echo "::warning::NTFY_TOPIC が未設定のため、失敗の通知を送れませんでした（Settings → Secrets → Actions に NTFY_TOPIC を登録）"; exit 0; }
           curl -fsS -m 20 -d "hf-signal-dashboard monitor $(TZ=Asia/Tokyo date +%F) 失敗" "https://ntfy.sh/$NTFY_TOPIC" >/dev/null || echo "ntfy 送信失敗"
 
       # ソフト失敗（exit 1）は「直前の scheduled run も failure だった」場合のみ
@@ -93,7 +93,7 @@ jobs:
           echo "previous scheduled run: id=$PREV_ID conclusion=$PREV_CONCL"
 
           if [ "$PREV_CONCL" = "failure" ]; then
-            [ -n "$NTFY_TOPIC" ] || { echo "NTFY_TOPIC 未設定: 通知なし"; exit 0; }
+            [ -n "$NTFY_TOPIC" ] || { echo "::warning::NTFY_TOPIC が未設定のため、失敗の通知を送れませんでした（Settings → Secrets → Actions に NTFY_TOPIC を登録）"; exit 0; }
             curl -fsS -m 20 -d "hf-signal-dashboard monitor $(TZ=Asia/Tokyo date +%F) 失敗" "https://ntfy.sh/$NTFY_TOPIC" >/dev/null || echo "ntfy 送信失敗"
           else
             echo "single soft failure — suppressing notification (previous conclusion was '$PREV_CONCL', not 'failure')"

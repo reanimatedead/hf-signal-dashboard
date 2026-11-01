@@ -55,11 +55,11 @@ jobs:
           tools/git_push_retry.sh "chore(universe): weekly $(date -u '+%Y-%m-%d')" data/universe data/us_fundamentals.json
 
       # 失敗の通知は ntfy だけ（Issue は作らない）。本文は「ジョブ名・日付・失敗」だけ。
-      # リポジトリの Secret NTFY_TOPIC が無ければ何もしない。
+      # リポジトリの Secret NTFY_TOPIC が無ければ ::warning:: をログに出す（通知は送れない）。
       - name: Notify ntfy on failure (universe)
         if: failure()
         env:
           NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
         run: |
-          [ -n "$NTFY_TOPIC" ] || { echo "NTFY_TOPIC 未設定: 通知なし"; exit 0; }
+          [ -n "$NTFY_TOPIC" ] || { echo "::warning::NTFY_TOPIC が未設定のため、失敗の通知を送れませんでした（Settings → Secrets → Actions に NTFY_TOPIC を登録）"; exit 0; }
           curl -fsS -m 20 -d "hf-signal-dashboard universe $(TZ=Asia/Tokyo date +%F) 失敗" "https://ntfy.sh/$NTFY_TOPIC" >/dev/null || echo "ntfy 送信失敗"

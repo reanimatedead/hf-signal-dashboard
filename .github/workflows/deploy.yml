@@ -83,9 +83,8 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.lock
 
-      # 2026-11 (M2): 外部データの事前確認。構成銘柄件数 ±5% が外れたら止める。
-      # Yahoo 主要20×2 は「警告だけ」（HTTP 429 は「取れない」ではなく「確認できない」。公開は止めない）。
-      # 本当の欠損チェックは生成後の nan_report（下の "Missing-data check" ステップ）。
+      # 2026-11 (M2): 事前の確認は構成銘柄件数 ±5% だけ（外れたら止める）。Yahoo には問い合わせない
+      # （本体の取得と同じ IP の回数制限枠を使ってしまうため）。欠損は生成後の nan_report（"Missing-data check"）で見る。
       - name: Contract check (external data)
         run: python3 tools/contract_check.py
 
@@ -157,13 +156,13 @@ jobs:
         uses: actions/deploy-pages@v5
 
       # 失敗の通知は ntfy だけ（Issue は作らない）。本文は「ジョブ名・日付・失敗」だけ。
-      # リポジトリの Secret NTFY_TOPIC が無ければ何もしない。
+      # リポジトリの Secret NTFY_TOPIC が無ければ ::warning:: をログに出す（通知は送れない）。
       - name: Notify ntfy on failure (deploy-full)
         if: failure()
         env:
           NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
         run: |
-          [ -n "$NTFY_TOPIC" ] || { echo "NTFY_TOPIC 未設定: 通知なし"; exit 0; }
+          [ -n "$NTFY_TOPIC" ] || { echo "::warning::NTFY_TOPIC が未設定のため、失敗の通知を送れませんでした（Settings → Secrets → Actions に NTFY_TOPIC を登録）"; exit 0; }
           curl -fsS -m 20 -d "hf-signal-dashboard deploy-full $(TZ=Asia/Tokyo date +%F) 失敗" "https://ntfy.sh/$NTFY_TOPIC" >/dev/null || echo "ntfy 送信失敗"
 
   # ── CORR_REFRESH: 07:30 / 11:00 JST Mon-Fri (or manual `job=corr_refresh`) ─
@@ -234,11 +233,11 @@ jobs:
         uses: actions/deploy-pages@v5
 
       # 失敗の通知は ntfy だけ（Issue は作らない）。本文は「ジョブ名・日付・失敗」だけ。
-      # リポジトリの Secret NTFY_TOPIC が無ければ何もしない。
+      # リポジトリの Secret NTFY_TOPIC が無ければ ::warning:: をログに出す（通知は送れない）。
       - name: Notify ntfy on failure (deploy-corr_refresh)
         if: failure()
         env:
           NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
         run: |
-          [ -n "$NTFY_TOPIC" ] || { echo "NTFY_TOPIC 未設定: 通知なし"; exit 0; }
+          [ -n "$NTFY_TOPIC" ] || { echo "::warning::NTFY_TOPIC が未設定のため、失敗の通知を送れませんでした（Settings → Secrets → Actions に NTFY_TOPIC を登録）"; exit 0; }
           curl -fsS -m 20 -d "hf-signal-dashboard deploy-corr_refresh $(TZ=Asia/Tokyo date +%F) 失敗" "https://ntfy.sh/$NTFY_TOPIC" >/dev/null || echo "ntfy 送信失敗"

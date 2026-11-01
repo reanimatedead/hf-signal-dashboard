@@ -1,7 +1,7 @@
 """tools/contract_check.py（オフライン。Yahoo には繋がない）。
 
-- Yahoo の事前確認は警告だけ: 429 は「確認できない」で、公開を止めない（2026-11-01 deploy #260 の再発防止）。
-- 構成銘柄の件数 ±5% が外れたら止める。
+- 事前の確認は構成銘柄の件数 ±5% だけ。Yahoo には問い合わせない（2026-11-01 deploy #260 の再発防止:
+  事前の40回が本体の取得と同じ IP の回数制限枠を使い 429 を受けた）。
 - 生成後の欠損チェック（--post）: meta.nan_report で price=None が 10% 超なら止める。
 - Issue は作らない（gh を呼ばない）。
 """
@@ -9,23 +9,17 @@ import json
 import pathlib
 import subprocess
 import sys
-import urllib.error
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools"))
 import contract_check as cc  # noqa: E402
-from marketcalc import contracts  # noqa: E402
 
 GOOD_COUNTS = {"nikkei225": 225, "nasdaq100": 101, "sp500": 503, "dow30": 30}
-SYMS = contracts.US_PROBE + contracts.JP_PROBE
 
 
-def _fixture(tmp_path, missing=0, limited=0, counts=None):
-    prices = {}
-    for i, s in enumerate(SYMS):
-        prices[s] = cc.RATE_LIMITED if i < limited else (None if i < limited + missing else [100.0, None])
+def _fixture(tmp_path, counts=None):
     p = tmp_path / "fx.json"
-    p.write_text(json.dumps({"prices": prices, "counts": counts or GOOD_COUNTS}))
+    p.write_text(json.dumps({"counts": counts or GOOD_COUNTS}))
     return p
 
 
@@ -33,42 +27,38 @@ def test_ok(tmp_path):
     assert cc.run(_fixture(tmp_path)) == 0
 
 
-def test_all_429_is_unverifiable_and_does_not_stop(tmp_path, capsys):
-    """deploy #260 と同じ状況: 40 件すべて 429 → 止めない（警告だけ）。"""
-    assert cc.run(_fixture(tmp_path, limited=len(SYMS))) == 0
-    out = capsys.readouterr().out
-    assert out.count("確認できない") >= 2 and "contract_check: OK" in out
-
-
-def test_missing_prices_only_warn(tmp_path, capsys):
-    """429 以外で取れなくても事前確認では止めない（本当の欠損は --post で見る）。"""
-    assert cc.run(_fixture(tmp_path, missing=15)) == 0
-    assert "警告だけ" in capsys.readouterr().out
-
-
 def test_count_out_of_range_still_stops(tmp_path):
     bad = dict(GOOD_COUNTS, sp500=102)          # S&P500 が 102 件 fallback → ±5% 外れ
     assert cc.run(_fixture(tmp_path, counts=bad)) == 1
 
 
-def test_probe_maps_429_to_rate_limited(monkeypatch):
-    calls = []
+def test_precheck_never_contacts_yahoo(monkeypatch):
+    """事前の確認は Yahoo に1回も問い合わせない（件数だけ）。"""
+    import fetch_signals as fs
+    import urllib.request
 
-    def fake_urlopen(req, timeout=None):
-        calls.append(req.full_url)
-        raise urllib.error.HTTPError(req.full_url, 429, "Too Many Requests", {}, None)
+    def boom(*a, **k):
+        raise AssertionError("network call in pre-check")
 
-    monkeypatch.setattr(cc.urllib.request, "urlopen", fake_urlopen)
-    assert cc._probe_one("AAPL") == cc.RATE_LIMITED
-    assert len(calls) == 2                       # query1 → query2 の1回ずつ。叩き続けない
+    monkeypatch.setattr(urllib.request, "urlopen", boom)
+    monkeypatch.setattr(fs, "_chart_api_json", boom, raising=False)
+    monkeypatch.setattr(fs, "fetch_chart_api", boom, raising=False)
+    monkeypatch.setattr(fs, "fetch_batch", boom, raising=False)
+    monkeypatch.setattr(cc, "live_counts", lambda: dict(GOOD_COUNTS))
+    assert cc.run() == 0
+    src = (ROOT / "tools" / "contract_check.py").read_text(encoding="utf-8")
+    for name in ("chart_api", "urlopen", "live_prices", "yahoo_warnings", "_probe_one", "US_PROBE", "JP_PROBE"):
+        assert name not in src, name
 
 
-def test_probe_other_error_is_missing(monkeypatch):
-    def fake_urlopen(req, timeout=None):
-        raise urllib.error.HTTPError(req.full_url, 404, "Not Found", {}, None)
-
-    monkeypatch.setattr(cc.urllib.request, "urlopen", fake_urlopen)
-    assert cc._probe_one("ZZZZ") is None
+def test_ntfy_missing_topic_warns_in_every_workflow():
+    for wf in (ROOT / ".github" / "workflows").glob("*.yml"):
+        text = wf.read_text(encoding="utf-8")
+        if "NTFY_TOPIC" not in text:
+            continue
+        n_steps = text.count('curl -fsS -m 20 -d "hf-signal-dashboard')
+        assert text.count("::warning::NTFY_TOPIC が未設定") == n_steps > 0, wf.name
+        assert "通知なし\"; exit 0" not in text, wf.name
 
 
 def _data(tmp_path, null=None):

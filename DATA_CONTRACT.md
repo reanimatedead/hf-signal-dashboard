@@ -1671,11 +1671,11 @@ Stats = {n, mean, median, up_pct}
 
 ### 契約テスト（M2）とゲート
 
-- `tools/contract_check.py` を deploy.yml full の**最初**に実行: 構成銘柄件数 ±5%（外れたら止める）。
-  Yahoo 主要 20×2 の終値は**警告だけ**（HTTP 429 は「取れない」ではなく「確認できない」。2026-11-01 の deploy #260 で
-  この事前確認だけが 429 を 100% 受けて公開を止めたため）。
+- `tools/contract_check.py` を deploy.yml full の**最初**に実行: 構成銘柄件数 ±5% だけ（外れたら止める）。
+  Yahoo には事前に問い合わせない（2026-11-01 の deploy #260 で、事前の40回が本体の取得と同じ IP の回数制限枠を使い、
+  HTTP 429 を 100% 受けて公開を止めたため）。
 - 本当の欠損チェックは**生成後**: `tools/contract_check.py --post docs/data.json` が `meta.nan_report` を読み、
   株式4タブのどれかで price=None が 10% を超えたら止める（upload / deploy-pages は走らず Pages は前日のまま）。
-- 失敗時の Issue 自動起票はしない。通知は各 workflow の ntfy ステップだけ（Secret `NTFY_TOPIC`、本文はジョブ名・日付・失敗のみ）。
+- 失敗時の Issue 自動起票はしない。通知は各 workflow の ntfy ステップだけ（Secret `NTFY_TOPIC`、本文はジョブ名・日付・失敗のみ）。`NTFY_TOPIC` が未設定なら、ジョブのログに `::warning::` を出す。
 - `assert_gen_health` / `verify_live` / `health_gate` の判定は**変更なし**。
 - 依存は `requirements.lock`（Python 3.11・deploy.yml）と `uv.lock`（ci.yml・Mac mini）で固定。自動では上げない。
