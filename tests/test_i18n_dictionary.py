@@ -301,12 +301,27 @@ def test_codes_only_seen_in_production_are_translated():
 
 # 2026-11: 公開後の訳し漏れ確認は deploy.yml full の「Deploy to Pages の後」で、警告だけ（公開を止めない）。
 def test_post_deploy_i18n_check_is_after_deploy_and_warn_only():
-    import yaml
-    wf = yaml.safe_load((pathlib.Path(__file__).resolve().parents[1] / ".github/workflows/deploy.yml").read_text(encoding="utf-8"))
-    steps = wf["jobs"]["full"]["steps"]
-    names = [s.get("name", "") for s in steps]
-    i_dep = names.index("Deploy to Pages")
-    i_chk = next(i for i, n in enumerate(names) if n.startswith("Post-deploy i18n check"))
+    # yaml は使わない（deploy.yml の full ジョブは requirements.lock で動き、pyyaml が入っていない。
+    # 2026-11-01 の deploy #265 はこのテストの `import yaml` で失敗した）。テキストで順番と設定を確かめる。
+    text = (pathlib.Path(__file__).resolve().parents[1] / ".github/workflows/deploy.yml").read_text(encoding="utf-8")
+    full = text[text.index("\n  full:"):text.index("\n  corr_refresh:")]
+    i_dep = full.index("- name: Deploy to Pages")
+    i_chk = full.index("- name: Post-deploy i18n check")
     assert i_chk > i_dep
-    chk = steps[i_chk]
-    assert chk.get("continue-on-error") is True and "--warn-only" in chk["run"]
+    step = full[i_chk:full.index("\n      - name:", i_chk + 1)]
+    assert "continue-on-error: true" in step and "--warn-only" in step
+
+
+def test_tests_do_not_import_packages_missing_from_requirements_lock():
+    """deploy.yml の full は requirements.lock で pytest を回す。テストが lock に無いパッケージを import しないこと。"""
+    root = pathlib.Path(__file__).resolve().parents[1]
+    lock = {l.split("==")[0].strip().lower().replace("_", "-")
+            for l in (root / "requirements.lock").read_text(encoding="utf-8").splitlines() if "==" in l}
+    # import 名 → 配布名（lock に書かれる名前）
+    dist = {"yaml": "pyyaml", "bs4": "beautifulsoup4", "dateutil": "python-dateutil"}
+    bad = []
+    for f in (root / "tests").glob("test_*.py"):
+        for m in re.finditer(r"^\s*(?:import|from)\s+(yaml|bs4|dateutil)\b", f.read_text(encoding="utf-8"), re.M):
+            if dist[m.group(1)] not in lock:
+                bad.append(f"{f.name}: {m.group(1)}")
+    assert not bad, bad
