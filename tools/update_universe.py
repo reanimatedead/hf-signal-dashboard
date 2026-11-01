@@ -38,39 +38,24 @@ UA = ("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
 URLS = {
     "sp500": "https://en.wikipedia.org/wiki/List_of_S%26P_500_companies",
     "sp500_csv": "https://raw.githubusercontent.com/datasets/s-and-p-500-companies/main/data/constituents.csv",
-    "nasdaq100": "https://en.wikipedia.org/wiki/Nasdaq-100",
-    "dow30": "https://en.wikipedia.org/wiki/Dow_Jones_Industrial_Average",
+    # 2026-11: Wikipedia の Nasdaq-100 / DJIA のページから構成銘柄の表そのものが消えたため、公式の出典へ。
+    "nasdaq100": "https://api.nasdaq.com/api/quote/list-type/nasdaq100",   # Nasdaq 公式（JSON）
+    "dow30": ("https://www.ssga.com/us/en/intermediary/library-content/products/fund-data/etfs/us/"
+              "holdings-daily-us-en-dia.xlsx"),                            # SPDR DIA（DJIA 連動 ETF）の保有銘柄
     "nikkei225": "https://en.wikipedia.org/wiki/Nikkei_225",
 }
 NAMES = ("nikkei225", "nasdaq100", "sp500", "dow30")
-# 2026-11: Wikipedia の Nasdaq-100 / Dow 30 の本ページから構成銘柄の表が無くなった（実物の表の形を
-# ログで確認: 構成銘柄は navbox だけ・ティッカー無し）。候補を順に試し、件数 ±5% に入った最初の出典を使う。
-CANDIDATES = {
-    "nasdaq100": [
-        ("wikipedia_list", "https://en.wikipedia.org/wiki/List_of_Nasdaq-100_companies"),
-        ("nasdaq_api", "https://api.nasdaq.com/api/quote/list-type/nasdaq100"),
-        ("wikipedia_index", "https://en.wikipedia.org/wiki/Nasdaq-100"),
-    ],
-    "dow30": [
-        ("wikipedia_list", "https://en.wikipedia.org/wiki/List_of_Dow_Jones_Industrial_Average_components"),
-        ("wikipedia_index", "https://en.wikipedia.org/wiki/Dow_Jones_Industrial_Average"),
-    ],
-}
-
-
-def parse_nasdaq_api(text):
-    """Nasdaq 公式 API（list-type/nasdaq100）の JSON → {ticker: name}。"""
-    j = json.loads(text)
-    rows = (((j.get("data") or {}).get("data") or {}).get("rows")) or []
-    return {str(r["symbol"]).strip().replace(".", "-"): str(r.get("companyName") or r["symbol"]).strip()
-            for r in rows if r.get("symbol")}
 
 
 def http_get(url):
+    """本文を返す（.xlsx は bytes、それ以外は str）。Nasdaq の API はブラウザの UA と Accept: application/json が要る。"""
     import requests
-    r = requests.get(url, headers={"User-Agent": UA}, timeout=30)
+    headers = {"User-Agent": UA}
+    if "api.nasdaq.com" in url:
+        headers["Accept"] = "application/json"
+    r = requests.get(url, headers=headers, timeout=30)
     r.raise_for_status()
-    return r.text
+    return r.content if url.endswith(".xlsx") else r.text
 
 
 def _tables(html):
@@ -95,20 +80,6 @@ def _ticker(cell):
     return m.group(1).replace(".", "-") if m else None
 
 
-def describe_tables(html, limit=8):
-    """0 件だったときの手がかり: 表ごとの列名と先頭行（ログ用）。Wikipedia の表の形が変わったときに原因を見るため。"""
-    lines = []
-    try:
-        tables = _tables(html)
-    except Exception as exc:  # noqa: BLE001
-        return [f"read_html 失敗 {type(exc).__name__}: {str(exc)[:120]}"]
-    lines.append(f"表の数={len(tables)}")
-    for i, df in enumerate(tables[:limit]):
-        first = [str(v)[:24] for v in (df.iloc[0].tolist() if len(df) else [])][:6]
-        lines.append(f"  表{i}: 行={len(df)} 列={[_norm_col(c) for c in df.columns][:8]} 先頭行={first}")
-    return lines
-
-
 def parse_table(html, sym_cols=("Symbol", "Ticker"), name_cols=("Security", "Company", "Company name")):
     """sym_cols のどれかを列に持つ最初の表 → {ticker: name}。
     2026-11: Wikipedia の Nasdaq-100 / Dow 30 で 0 件になったため、列名の脚注・MultiIndex・大文字小文字、
@@ -131,6 +102,38 @@ def parse_table(html, sym_cols=("Symbol", "Ticker"), name_cols=("Security", "Com
         if out:
             return out
     return {}
+
+
+_TICKER_RE = re.compile(r"[A-Z][A-Z0-9.\-]{0,6}")
+
+
+def parse_nasdaq_api(text):
+    """Nasdaq 公式 API（list-type/nasdaq100）→ {ticker: name}。data.data.rows[].symbol / companyName。"""
+    rows = (((json.loads(text).get("data") or {}).get("data") or {}).get("rows")) or []
+    out = {}
+    for r in rows:
+        t = str(r.get("symbol") or "").strip()
+        if _TICKER_RE.fullmatch(t):
+            out[t.replace(".", "-")] = str(r.get("companyName") or t).strip()
+    return out
+
+
+def parse_dia_xlsx(data):
+    """SPDR DIA の保有銘柄 xlsx（先頭 4 行は説明、5 行目が見出し）→ {ticker: name}。
+    現金・先物などティッカーの形でない行と、末尾の注記は落とす。"""
+    import pandas as pd
+    df = pd.read_excel(io.BytesIO(data), skiprows=4)
+    cols = {str(c).strip().lower(): c for c in df.columns}
+    tc, nc = cols.get("ticker"), cols.get("name")
+    if tc is None:
+        return {}
+    out = {}
+    for _, row in df.iterrows():
+        t = str(row[tc]).strip()
+        if not _TICKER_RE.fullmatch(t) or t.upper().startswith("CASH"):
+            continue
+        out[t.replace(".", "-")] = str(row[nc]).strip() if nc is not None else t
+    return out
 
 
 def parse_sp500_csv(text):
@@ -164,27 +167,10 @@ def fetch_one(name, fetch, nikkei_dynamic=False):
             if len(d) < 400:
                 d = parse_sp500_csv(fetch(URLS["sp500_csv"]))
             return d, "wikipedia/datahub"
-        if name in CANDIDATES:
-            kw = {} if name == "nasdaq100" else {"sym_cols": ("Symbol",), "name_cols": ("Company",)}
-            tried = []
-            best, best_src = {}, None      # どれも ±5% に入らなければ一番多く取れたものを返す（件数検査が実数で外れを示す）
-            for src, url in CANDIDATES[name]:
-                try:
-                    body = fetch(url)
-                    d = parse_nasdaq_api(body) if src == "nasdaq_api" else parse_table(body, **kw)
-                except Exception as exc:  # noqa: BLE001
-                    tried.append(f"{src}: 取得失敗 {type(exc).__name__}: {str(exc)[:60]}")
-                    continue
-                if d and count_within(name, len(d))[0]:
-                    if tried:
-                        print(f"[{name}] 使った出典: {src}（先に試して外れた: {tried}）")
-                    return d, src
-                tried.append(f"{src}: {len(d)} 件")
-                if len(d) > len(best):
-                    best, best_src = d, src
-                if not d and src != "nasdaq_api":   # 0 件: 原因を見られるよう表の形をログに出す
-                    print(f"[{name}] {src} 0 件。表の形:", *describe_tables(body), sep="\n")
-            return best, (best_src or "none") + "（" + " / ".join(tried) + "）"
+        if name == "nasdaq100":
+            return parse_nasdaq_api(fetch(URLS["nasdaq100"])), "nasdaq_api"
+        if name == "dow30":
+            return parse_dia_xlsx(fetch(URLS["dow30"])), "ssga_dia_holdings"
         if name == "nikkei225":
             if not nikkei_dynamic:
                 return None, "DATA_CONTRACT §19: 機械取得しない（内蔵一覧を件数検査のみ）"
