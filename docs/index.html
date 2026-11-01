@@ -1269,6 +1269,15 @@ function macroFxSymbol(id){
   }
   return id;
 }
+// 外部データ（macro-fx-base）に英語名が無いときの表示名。ID から辞書の型（rv.mf_*）で組み立てる（ID をそのまま出さない）。
+function macroFxName(id){
+  const p = String(id).split(".");
+  const up = (x) => String(x||"").toUpperCase();
+  if (id.startsWith("yield_curve.slope.")) { const ab = (p[2]||"").split("_"); return T("rv.mf_slope", {a: up(ab[0]), b: up(ab[1])}); }
+  if (id.startsWith("real_yield.")) return T("rv.mf_real", {t: up(p[1])});
+  if (id.startsWith("fx_rate_corr.")) return T("rv.mf_corr", {pair: up(p[1]).replace(/^(...)(...)$/, "$1/$2"), t: up(p[2]), w: up(p[3])});
+  return T("rv.mf_unknown");
+}
 function macroFxRisk(family, v){
   if (v==null || !isFinite(v)) return "—";
   if (family==="slope")      return v < 0 ? "high" : v < 0.1 ? "medium" : "low";
@@ -1325,7 +1334,7 @@ function buildMacroFxRows(){
     rows.push({
       __orig: "macro_fx",
       symbol: macroFxSymbol(id),
-      name: I18.lang()==="en" ? (m.label_en || m.label || id) : (m.label_ja || id),   // 外部データ: 英語名が無ければ id
+      name: I18.lang()==="en" ? (m.label_en || macroFxName(id)) : (m.label_ja || macroFxName(id)),   // 外部データ: 名前が無ければ辞書で組み立てる
       type_label: T(m.family === "slope" ? "rv.type_slope" : m.family === "real_yield" ? "rv.type_real" : "rv.type_corr"),
       value: valStr, unit,
       delta: (delta!=null && isFinite(delta)) ? delta : null,

@@ -18,6 +18,8 @@ const opt = (name, dflt) => { const i = args.indexOf(name); return i >= 0 ? args
 const base = (args[0] && !args[0].startsWith("--") ? args[0] : "http://127.0.0.1:8765").replace(/\/$/, "");
 const out = args[1] && !args[1].startsWith("--") ? args[1] : "preview";
 const offline = args.includes("--offline");
+// --warn-only: 公開後の確認用（deploy.yml full）。見つかったものは ::warning:: として出し、常に exit 0（公開は止めない）。
+const warnOnly = args.includes("--warn-only");
 const langs = opt("--langs", "ja,en").split(",");
 const widths = opt("--widths", "1280,390").split(",").map(Number);
 const TABS = ["survival", "nikkei225", "dow30", "nasdaq100", "sp500", "fx", "rates_vol", "pos_val", "relations", "moneyflow", "verify"];
@@ -38,11 +40,29 @@ async function scanSnake(page, tag, where, root) {
   if (hits.length) report.errors.push({ tag, type: "snake", text: `${where}: ${hits.join(", ")}` });
 }
 
+function macroFxStub() {
+  const ids = ["yield_curve.slope.10y_2y", "yield_curve.slope.10y_3m", "yield_curve.slope.30y_5y",
+    "real_yield.1y", "real_yield.2y", "real_yield.5y", "real_yield.10y", "real_yield.30y",
+    "fx_rate_corr.usdeur.2y.30d", "fx_rate_corr.usdeur.10y.30d", "fx_rate_corr.jpyeur.2y.30d",
+    "fx_rate_corr.jpyeur.10y.30d", "fx_rate_corr.gbpeur.2y.30d", "fx_rate_corr.gbpeur.10y.30d"];
+  const fam = (id) => (id.startsWith("yield_curve") ? "slope" : id.startsWith("real_yield") ? "real_yield" : "fx_corr");
+  const meta = {}, series = {};
+  const d = (n) => new Date(Date.now() - n * 86400000).toISOString().slice(0, 10);
+  for (const id of ids) {
+    meta[id] = { family: fam(id), label_ja: "架空 " + id };            // label_en は付けない（本番と同じ）
+    series[id] = [{ observed_at: d(2), value: 0.5 }, { observed_at: d(1), value: 0.6 }];
+  }
+  return { meta, series, interpretations: {} };
+}
+
 async function stub(route) {
   const url = route.request().url();
   report.stubbed.push(url);
   if (/\.css(\?|$)|fonts\.googleapis/.test(url)) return route.fulfill({ status: 200, contentType: "text/css", body: "" });
   if (/scenarios\.json/.test(url)) return route.fulfill({ status: 200, contentType: "application/json", body: '{"scenarios":[]}' });
+  // macro-fx-base latest.json: 本物と同じ形（英語名 label_en は無し＝本番と同じ条件）で 14 指標を返す。
+  // 英語表示で ID（real_yield.10y など）がそのまま出る訳し漏れを、オフラインでも snake_case 検査で見つけるため。
+  if (/latest\.json/.test(url)) return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(macroFxStub()) });
   if (/\.json(\?|$)/.test(url)) return route.fulfill({ status: 200, contentType: "application/json", body: "{}" });
   return route.fulfill({ status: 204, body: "" });
 }
@@ -96,4 +116,10 @@ await browser.close();
 report.error_count = report.errors.length;
 fs.writeFileSync(path.join(out, "console_report.json"), JSON.stringify(report, null, 2));
 console.log(JSON.stringify({ shots: report.shots.length, error_count: report.error_count, stubbed: [...new Set(report.stubbed)] }));
-if (report.errors.length) { console.error("errors:", JSON.stringify(report.errors, null, 2)); process.exit(1); }
+if (report.errors.length) {
+  if (warnOnly) {
+    for (const e of report.errors) console.log(`::warning::${e.type} ${e.tag} ${String(e.text).slice(0, 300).replace(/\r?\n/g, " ")}`);
+    process.exit(0);
+  }
+  console.error("errors:", JSON.stringify(report.errors, null, 2)); process.exit(1);
+}

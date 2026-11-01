@@ -297,3 +297,16 @@ def test_codes_only_seen_in_production_are_translated():
         need.add(f"code.gamma_assumption.{a}")
     missing = [f"{lang} {k}" for lang in ("ja", "en") for k in sorted(need) if k not in d[lang]]
     assert not missing, missing
+
+
+# 2026-11: 公開後の訳し漏れ確認は deploy.yml full の「Deploy to Pages の後」で、警告だけ（公開を止めない）。
+def test_post_deploy_i18n_check_is_after_deploy_and_warn_only():
+    import yaml
+    wf = yaml.safe_load((pathlib.Path(__file__).resolve().parents[1] / ".github/workflows/deploy.yml").read_text(encoding="utf-8"))
+    steps = wf["jobs"]["full"]["steps"]
+    names = [s.get("name", "") for s in steps]
+    i_dep = names.index("Deploy to Pages")
+    i_chk = next(i for i, n in enumerate(names) if n.startswith("Post-deploy i18n check"))
+    assert i_chk > i_dep
+    chk = steps[i_chk]
+    assert chk.get("continue-on-error") is True and "--warn-only" in chk["run"]
