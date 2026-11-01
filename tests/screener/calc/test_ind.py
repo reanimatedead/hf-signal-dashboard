@@ -1,7 +1,7 @@
 """ind: CCI・BB が手計算と一致し、判定が条件どおりに出る。"""
 import math
 import numpy as np
-from marketcalc import ind
+from screener.calc import ind
 
 
 def hand_cci(h, l, c, n, i):

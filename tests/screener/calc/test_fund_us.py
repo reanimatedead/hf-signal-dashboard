@@ -1,6 +1,6 @@
 """fund_us: 理論株価余地・F・魔法の公式の順位が計算でき、株式分割の前後で PBR が崩れない。"""
 import copy
-from marketcalc import fund_us, value
+from screener.calc import fund_us, value
 
 ASOF = "2026-06-30"
 

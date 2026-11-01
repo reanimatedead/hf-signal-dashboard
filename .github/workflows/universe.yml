@@ -66,7 +66,7 @@ jobs:
             --body "build_us_fundamentals が止まりました（契約テスト or 取得率不足）。data/us_fundamentals.json は前回のままです。run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
 
       - name: Offline tests for the changed files
-        run: python -m pytest tests/test_universe_lists.py tests/test_update_universe.py tests/test_us_fundamentals.py marketcalc/tests -q
+        run: python -m pytest tests/test_universe_lists.py tests/test_update_universe.py tests/test_us_fundamentals.py tests/screener/calc -q
 
       - name: Commit universe + fundamentals
         run: |

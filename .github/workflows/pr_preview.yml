@@ -1,6 +1,6 @@
 name: PR preview (fake data screenshots)
 
-# PR ごとに、架空データ（marketcalc/tests/fixtures）でサイトを組み立て、Playwright で
+# PR ごとに、架空データ（tests/screener/calc/fixtures）でサイトを組み立て、Playwright で
 # 日経225 / Nasdaq 100（米国の買い判定一覧）/ 銘柄詳細チャート / 検証タブを撮って artifact にする。
 # Pages にはデプロイしない（Pages の設定にも触らない）。
 on:

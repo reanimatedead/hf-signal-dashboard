@@ -1,12 +1,19 @@
-"""marketcalc — データを含まない計算式だけのパッケージ。
+"""互換の薄い再エクスポート。式は src/screener/calc/ にだけある（ここに書かない）。
 
-公開リポジトリ (hf-signal-dashboard) と非公開リポジトリ (screener-private, git submodule 経由)
-の両方がここを使う。式を直すのはこのディレクトリだけ。
-- ind:        CCI / ボリンジャーバンド / 売買判定（日足）
-- fund_us:    米国株 EDGAR 決算から指標（F・魔法の公式・残余利益モデル）
-- value:      残余利益モデル（理論PBR）・F スコア集計・一時利益の目印
-- events:     シグナル後 N 日の値動き検証（イベントスタディ）
-- contracts:  外部データの契約テスト用の小さな判定関数
-データ・キー・ファイル入出力は持たない（呼ぶ側が渡す）。
+既存の `from marketcalc import ind` / `from marketcalc.contracts import ...`
+（fetch_signals.py・pipeline/・tools/）を壊さないため、src/ を sys.path に入れて
+screener.calc のモジュールをそのまま marketcalc.* として見せる。
 """
-__version__ = "1.0.0"
+import pathlib
+import sys
+
+_SRC = str(pathlib.Path(__file__).resolve().parents[1] / "src")
+if _SRC not in sys.path:
+    sys.path.insert(0, _SRC)
+
+from screener.calc import contracts, events, fund_us, ind, value  # noqa: E402
+
+for _m in (contracts, events, fund_us, ind, value):
+    sys.modules[f"{__name__}.{_m.__name__.rsplit('.', 1)[-1]}"] = _m
+
+__all__ = ["contracts", "events", "fund_us", "ind", "value"]

@@ -18,7 +18,7 @@ def test_since_six_months():
 def test_fixture_cli_and_shape(tmp_path):
     out = tmp_path / "v.json"
     r = subprocess.run([sys.executable, str(ROOT / "pipeline" / "build_verify.py"), "--fixture",
-                        str(ROOT / "marketcalc" / "tests" / "fixtures"), "--out", str(out)], capture_output=True, text=True)
+                        str(ROOT / "tests" / "screener" / "calc" / "fixtures"), "--out", str(out)], capture_output=True, text=True)
     assert r.returncode == 0, r.stderr
     v = json.loads(out.read_text())
     assert v["schema"] == bv.SCHEMA and v["method"]["horizon_days"] == events.H == 20

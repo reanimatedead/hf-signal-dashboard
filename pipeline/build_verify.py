@@ -11,10 +11,10 @@ Yahoo の日足だけを使い、次の判定を**同じ方法**で検証する:
 
 計算式はここに書かない（marketcalc.events / marketcalc.ind を呼ぶだけ）。通信もしない:
 fetch_signals.py が 2y 日足フレームを渡して build() を呼ぶ（取得し直さない）。
-オフライン確認用に --fixture DIR（marketcalc/tests/fixtures 形の px_*.json）で動く。
+オフライン確認用に --fixture DIR（tests/screener/calc/fixtures 形の px_*.json）で動く。
 
 使い方:
-    python3 pipeline/build_verify.py --fixture marketcalc/tests/fixtures --out /tmp/verify.json
+    python3 pipeline/build_verify.py --fixture tests/screener/calc/fixtures --out /tmp/verify.json
 """
 from __future__ import annotations
 
@@ -129,7 +129,7 @@ def write(obj, path):
 
 
 def items_from_fixture(fixdir):
-    """marketcalc/tests/fixtures の px_*.json（架空データ）→ items。composite は無し。"""
+    """tests/screener/calc/fixtures の px_*.json（架空データ）→ items。composite は無し。"""
     items = []
     for p in sorted(pathlib.Path(fixdir).glob("px_*.json")):
         px = fund_us.parse_yahoo_chart(json.loads(p.read_text()))

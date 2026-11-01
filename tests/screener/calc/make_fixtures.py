@@ -1,5 +1,5 @@
 """架空の5銘柄×400営業日・決算2期分のサンプルデータを作る（決まった乱数で毎回同じ）。
-本物のデータは一切使わない。実行: python -m marketcalc.tests.make_fixtures"""
+本物のデータは一切使わない。実行: python tests/screener/calc/make_fixtures.py"""
 import datetime as dt
 import json
 import pathlib

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """tools/build_preview.py — 架空データでサイトのプレビューを組み立てる（通信なし）。
 
-docs/ の静的ファイル（index.html・assets）をコピーし、marketcalc/tests/fixtures の
+docs/ の静的ファイル（index.html・assets）をコピーし、tests/screener/calc/fixtures の
 **架空 5 銘柄**（AAA〜EEE、本物の銘柄・本物の価格ではない）から、本番と同じ関数
 （fetch_signals.process_ticker / attach_equity_charts / split_chart_payload /
 build_and_write_verify / attach_us_fundamentals / record_payload_size）で

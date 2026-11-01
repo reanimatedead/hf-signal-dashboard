@@ -1,5 +1,5 @@
 import numpy as np
-from marketcalc import value, events, contracts
+from screener.calc import value, events, contracts
 
 
 def test_one_off_flag():
