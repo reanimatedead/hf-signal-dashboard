@@ -17,8 +17,8 @@ from typing import Any
 
 import numpy as np
 
-from ..calc import events, fund_us, ind
 from .. import labels
+from ..calc import events, fund_us, ind
 from ..config import Config
 from ..dates import jp_anchor_dates, minus
 from ..us import make_value

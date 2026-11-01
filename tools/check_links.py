@@ -110,7 +110,8 @@ def main():
         with open(DATA, encoding="utf-8") as f:
             d = json.load(f)
     except Exception as e:  # noqa: BLE001
-        rep = {"as_of_utc": _now(), "error": f"cannot read {DATA}: {e}",
+        print(f"check_links: cannot read {DATA}: {e}", file=sys.stderr)
+        rep = {"as_of_utc": _now(), "error": "cannot_read_data_json",
                "checked": 0, "results": []}
         with open(OUT, "w", encoding="utf-8") as f:
             json.dump(rep, f, ensure_ascii=False, indent=2)
@@ -150,8 +151,8 @@ def main():
         "equity_constituent_links_skipped": skipped,
         "ok": ok,
         "warn": warn,
-        "policy": "CI warns only; rate-limit(429)/network errors never fail the job. "
-                  "equity constituent Yahoo quote links are sampled (homogeneous), not silent.",
+        # CI warns only; rate-limit(429)/network errors never fail the job. equity constituent links are sampled.
+        "policy": "ci_warn_only_sampled_equity_links",
         "results": results,
     }
     with open(OUT, "w", encoding="utf-8") as f:
