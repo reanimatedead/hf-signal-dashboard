@@ -261,3 +261,20 @@ def test_cci_reference_line_texts_include_200():
 def test_cci_trade_threshold_unchanged():
     from marketcalc import ind
     assert ind.P["cci_th"] == 100, "±200 is display-only; the buy/sell threshold stays CCI48 ±100"
+
+
+# 2026-11: 訳し漏れ対策。辞書の「表示される値」に snake_case（英小文字_英小文字 の形の内部名）を残さない。
+# {placeholder} と HTML タグ・属性は除外。画面側の同じ検査は tools/preview_screens.mjs（本番 data.json でも CI で実行）。
+_SNAKE = re.compile(r"(?<![A-Za-z0-9_./{-])[a-z][a-z0-9]*(?:_[a-z0-9]+)+(?![A-Za-z0-9_./}-])")
+
+
+def test_dictionary_values_have_no_snake_case():
+    d = load_dict()["d"]
+    bad = []
+    for lang in ("ja", "en"):
+        for k, v in d[lang].items():
+            text = re.sub(r"<[^>]+>", "", re.sub(r"\{\w+\}", "", str(v)))
+            hits = sorted(set(_SNAKE.findall(text)))
+            if hits:
+                bad.append(f"{lang} {k}: {hits}")
+    assert not bad, "辞書の値に内部名（snake_case）が残っている:\n" + "\n".join(bad)
