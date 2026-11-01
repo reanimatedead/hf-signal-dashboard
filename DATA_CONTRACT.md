@@ -1596,7 +1596,7 @@ pixel-reference 辞書の「不明 N 件」と同方針で、欠損を隠さず�
 
 ## 21. v8.0 — チャート判定・検証層・全構成銘柄・米国決算（2026-11-01）
 
-計算式は **`marketcalc/`（データを持たない共通パッケージ）だけ**にあり、ここに書く値はすべてその関数の出力。
+計算式は **`src/screener/calc/`（データを持たない共通パッケージ。旧 `marketcalc/`、今は互換の再エクスポートだけ）だけ**にあり、ここに書く値はすべてその関数の出力。
 `fetch_signals.py` は配線のみ（式を複製しない）。
 
 ### 株式4タブの行（`markets.{nikkei225,dow30,nasdaq100,sp500}[]`）に追加
@@ -1653,7 +1653,7 @@ Stats = {n, mean, median, up_pct}
   composite の過去分は `fetch_signals.composite_label_series`（同じ `compute_signal` を 2y の各日に適用。
   表の composite は 6mo 窓で計算するため EMA の初期化だけ異なる＝近似）。
 - `weakened`: 直近 6 か月で**買い系**の判定後の中央値 < 基準の中央値（件数 5 未満は null）。判定ロジックは自動で変えない
-  （表示と Issue のみ）。月次の控えは `data/verify_history/YYYY-MM.json`（verify_monthly.yml）。
+  （表示と Issue のみ）。
 
 ### 構成銘柄（`data/universe/*.json`・週次）
 
@@ -1674,4 +1674,4 @@ Stats = {n, mean, median, up_pct}
 - `tools/contract_check.py` を deploy.yml full の**最初**に実行: Yahoo 主要 20×2 の終値（欠け>10% で止める）・
   構成銘柄件数 ±5%。失敗 → 以降のステップは走らず Pages は前日のまま。Issue はタイトル固定で 1 件（`tools/issue_once.py`）。
 - `assert_gen_health` / `verify_live` / `health_gate` の判定は**変更なし**。
-- 依存は `requirements.lock`（Python 3.11）で固定。最新版の確認は毎月 1 日の deps_latest.yml（`data/ops/deps_latest.json`）。
+- 依存は `requirements.lock`（Python 3.11・deploy.yml）と `uv.lock`（ci.yml・Mac mini）で固定。自動では上げない。

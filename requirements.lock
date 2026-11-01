@@ -1,6 +1,5 @@
 # requirements.lock — GitHub Actions（Python 3.11 / ubuntu x86_64）で使う固定版。deploy.yml はこれを入れる。
-# requirements.txt（下限だけの指定）は残す。更新は手動: 毎月1日の deps_latest.yml が最新版でテストした結果
-# （data/ops/deps_latest.json）を見て、問題なければここを書き換える（自動では上げない）。
+# requirements.txt（下限だけの指定）は残す。更新は手動（自動では上げない）。ci.yml と Mac mini は uv.lock を使う。
 # 生成: pip install --dry-run --ignore-installed --python-version 3.11 --platform manylinux2014_x86_64 \
 #       --only-binary=:all: --report r.json -r requirements.txt pytest  （2026-11-01）
 beautifulsoup4==4.15.0

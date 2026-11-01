@@ -338,7 +338,7 @@ Sample data: [docs/sample-signals.json](docs/sample-signals.json).
 その横に検証結果（`docs/verify.json`: 20営業日後の中央値・上昇割合・件数 vs 基準）。「検証」タブ、
 Nasdaq 100 タブ上の「米国の買い判定一覧」、詳細チャート（BB48/288 ±2σ/±3σ・▲▼・CCI48/288）、
 48h の「データが○時間前のまま」警告。米国は魔法の公式順位・F（`data/us_fundamentals.json`・週次）。
-日経225 の理論株価・割安度・総合判定は「ログイン版のみ」。計算式は `marketcalc/` だけ。
+日経225 の理論株価・割安度・総合判定は公開しない（Mac mini のローカル出力だけ・ADR-002）。計算式は `src/screener/calc/` だけ。
 架空データのプレビュー: `python3 tools/build_preview.py /tmp/site && python3 -m http.server -d /tmp/site`。
 
 All of it is **market context only** — not investment advice, price targets, trade execution,
