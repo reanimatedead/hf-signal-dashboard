@@ -109,13 +109,14 @@ def summary(h, l, c, p=P):
             "cci288": j["cciL"], "cci48": j["cciS"], "bb48_z": j["zS"], "bb288_z": j["zL"]}
 
 
-def chart_series(h, l, c, p=P, tail=None):
-    """銘柄詳細チャート用の系列（終値・BB48/288 ±2σ/±3σ・CCI48/288・判定の印）。"""
+def chart_series(h, l, c, p=P, tail=None, nd=4):
+    """銘柄詳細チャート用の系列（終値・BB48/288 ±2σ/±3σ・CCI48/288・判定の印）。
+    nd は価格系列の小数桁（容量を抑えるため呼ぶ側が株価の桁に合わせて渡す）。"""
     x = compute(h, l, c, p)
     s = signals(x, p); lo = long_oversold(x, p)
     n = len(x["c"]); a = 0 if not tail else max(0, n - tail)
 
-    def arr(v, nd=4):
+    def arr(v, nd=nd):
         return [None if not np.isfinite(t) else round(float(t), nd) for t in v[a:]]
     out = {"close": arr(x["c"]), "cci48": arr(x["cciS"], 1), "cci288": arr(x["cciL"], 1)}
     for k, (m, sd) in (("bb48", (x["mS"], x["sS"])), ("bb288", (x["mL"], x["sL"]))):
@@ -125,3 +126,15 @@ def chart_series(h, l, c, p=P, tail=None):
     out["marks"] += [{"i": i - a, "type": "long_oversold", "code": 1} for i in range(a, n) if lo[i] and s[i] == 0]
     out["index_map"] = np.flatnonzero(x["ok"]).tolist()[a:]
     return out
+
+
+BUY_LABELS = (LABELS[2], LABELS[1], LONG_OVERSOLD_LABEL)   # 買い系（画面の「買い判定一覧」・検証の弱まり判定に使う）
+SELL_LABELS = (LABELS[-1], LABELS[-2])
+
+
+def label_conditions(x, p=P):
+    """判定ラベルごとの日次 bool 配列（検証用）。judge() の最新日の言葉と同じ規則:
+    強い買い / 買い / 買い（長期の売られすぎ: シグナル0 かつ BB288 -2σ 以下）/ 売り / 強い売り。"""
+    s = signals(x, p); lo = long_oversold(x, p)
+    return {LABELS[2]: s == 2, LABELS[1]: s == 1, LONG_OVERSOLD_LABEL: lo & (s == 0),
+            LABELS[-1]: s == -1, LABELS[-2]: s == -2}

@@ -83,3 +83,20 @@ def test_chart_series_shapes(fx):
     s = ind.chart_series(p["h"], p["l"], p["c"], tail=120)
     assert len(s["close"]) == 120 and len(s["bb288"]["p3"]) == 120 and len(s["cci48"]) == 120
     assert any(m["type"] == "buy" for m in s["marks"])
+
+
+def test_label_conditions_match_judge(fx):
+    for t, p in fx["px"].items():
+        x = ind.compute(p["h"], p["l"], p["c"])
+        conds = ind.label_conditions(x)
+        for i in range(ind.MIN_BARS, len(x["c"])):
+            j = ind.judge(x, i=i)["label"]
+            hit = [k for k, v in conds.items() if v[i]]
+            assert hit == ([] if j == ind.LABELS[0] else [j]), (t, i, j, hit)
+
+
+def test_chart_series_nd_rounds_prices(fx):
+    p = fx["px"]["AAA"]
+    s = ind.chart_series(p["h"], p["l"], p["c"], tail=50, nd=1)
+    v = [x for x in s["close"] + s["bb48"]["p2"] if x is not None]
+    assert v and all(round(x, 1) == x for x in v)
