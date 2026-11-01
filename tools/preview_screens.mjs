@@ -5,6 +5,8 @@
 // --offline: 架空データのプレビュー用。外部ホスト（Google Fonts / macro-fx-base）へは出ず、空の応答で代替する
 //            （サンドボックスや CI のプレビューから外へ出られないため。代替した URL は report.stubbed に残す）。
 // ブラウザのコンソールエラー（console.error）と pageerror（未捕捉の例外）が 1 件でもあれば exit 1。
+// 訳し漏れ: 各タブ・各詳細で「見えている文字」(innerText) に snake_case（英小文字_英小文字 の形）が
+// 残っていたら type=snake のエラーにする（data.json のコードが辞書を通らずそのまま出ている印）。
 import { createRequire } from "module";
 import fs from "fs";
 import path from "path";
@@ -25,6 +27,16 @@ fs.mkdirSync(out, { recursive: true });
 const origin = new URL(base).origin;
 const report = { base, offline, errors: [], stubbed: [], shots: [] };
 const browser = await chromium.launch();
+// snake_case: 英小文字/数字の語が _ でつながった形（例 high_vol, n_symbols）。URL・ファイル名は innerText に出ない前提。
+const SNAKE = /(?<![A-Za-z0-9_.\/-])[a-z][a-z0-9]*(?:_[a-z0-9]+)+(?![A-Za-z0-9_.\/-])/g;
+async function scanSnake(page, tag, where, root) {
+  const text = await page.evaluate((sel) => {
+    const el = sel ? document.querySelector(sel) : document.body;
+    return el ? el.innerText : "";
+  }, root || null);
+  const hits = [...new Set(text.match(SNAKE) || [])];
+  if (hits.length) report.errors.push({ tag, type: "snake", text: `${where}: ${hits.join(", ")}` });
+}
 
 async function stub(route) {
   const url = route.request().url();
@@ -56,6 +68,7 @@ for (const lang of langs) {
       await page.click(`.tab[data-tab="${t}"]`);
       await page.waitForTimeout(t === "relations" || t === "moneyflow" ? 900 : 500);
       await shot(`tab_${t}`);
+      await scanSnake(page, tag, `tab_${t}`);
     }
     // 銘柄詳細: 日経225 の 7735.T と FX 1 本（USDJPY があればそれ、無ければ最初のチャートあり行）
     const detail = async (tabKey, pickSym, name) => {
@@ -69,6 +82,7 @@ for (const lang of langs) {
       const det = await page.$("tr.detail-row");
       await det.scrollIntoViewIfNeeded();
       await shot(name, det);
+      await scanSnake(page, tag, name, "tr.detail-row");
     };
     await detail("nikkei225", (s) => (document.querySelector(`#tbody tr[data-sym="${s}"]`) ? s : null), "detail_7735T").catch((e) => report.errors.push({ tag, type: "script", text: String(e) }));
     await detail("fx", () => {

@@ -72,6 +72,9 @@ def build(out, hours_ago=50.0):
                     "rates": [], "volatility": [], "imm": [], "crypto": [], "valuation": []},
     }
     payload["summary"]["fx"] = fs.build_summary(payload["markets"]["fx"])
+    # SURVIVAL タブも本番と同じ組み立てで出す（訳し漏れの確認対象。架空データから作る）
+    from survival.survival_loop import build as build_survival
+    payload["survival_loop"] = build_survival(payload)
     _write_fake_layers(out, frames["AAA"])
     payload = fs._json_safe(payload)
     fs.split_chart_payload(payload, out)

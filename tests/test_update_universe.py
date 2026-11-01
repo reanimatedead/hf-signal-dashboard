@@ -73,3 +73,14 @@ def test_github_output_and_issue_body(tmp_path, monkeypatch):
     assert uu.main(["--issue-body", str(body)]) == 0
     assert "bad=nasdaq100" in out.read_text()
     assert "nasdaq100" in body.read_text()
+
+
+def test_parse_table_handles_exchange_prefix_footnotes_and_multiindex():
+    """2026-11: Wikipedia の Nasdaq-100 / Dow 30 が 0 件になった件の再発防止（形だけの架空 HTML）。"""
+    dow = """<table><tr><th>Company</th><th>Exchange</th><th>Symbol[1]</th></tr>
+      <tr><td>3M</td><td>NYSE</td><td>NYSE: MMM</td></tr>
+      <tr><td>Apple</td><td>NASDAQ</td><td>NASDAQ: AAPL</td></tr></table>"""
+    assert uu.parse_table(dow, sym_cols=("Symbol",), name_cols=("Company",)) == {"MMM": "3M", "AAPL": "Apple"}
+    ndx = """<table><thead><tr><th colspan="2">Constituents</th></tr><tr><th>Ticker</th><th>Company</th></tr></thead>
+      <tr><td>AAPL</td><td>Apple Inc.</td></tr><tr><td>BRK.B</td><td>Berkshire</td></tr></table>"""
+    assert uu.parse_table(ndx) == {"AAPL": "Apple Inc.", "BRK-B": "Berkshire"}

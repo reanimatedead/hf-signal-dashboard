@@ -57,20 +57,42 @@ def _tables(html):
     return pd.read_html(io.StringIO(html))
 
 
+def _norm_col(c):
+    """列名をそろえる: MultiIndex は最後の段、脚注 [1] を除き、前後の空白を取る。"""
+    if isinstance(c, tuple):
+        c = c[-1]
+    return re.sub(r"\[[^\]]*\]", "", str(c)).strip()
+
+
+_TICKER = re.compile(r"(?:^|[\s:])([A-Z][A-Z0-9.\-]{0,6})$")
+
+
+def _ticker(cell):
+    """セル → ティッカー。"NYSE: MMM" / "MMM[1]" / "BRK.B" の形も受ける（"." は Yahoo 形の "-" に）。"""
+    t = re.sub(r"\[[^\]]*\]", "", str(cell)).strip()
+    m = _TICKER.search(t)
+    return m.group(1).replace(".", "-") if m else None
+
+
 def parse_table(html, sym_cols=("Symbol", "Ticker"), name_cols=("Security", "Company", "Company name")):
-    """sym_cols のどれかを列に持つ最初の表 → {ticker: name}（"." は Yahoo 形の "-" にそろえる）。"""
+    """sym_cols のどれかを列に持つ最初の表 → {ticker: name}。
+    2026-11: Wikipedia の Nasdaq-100 / Dow 30 で 0 件になったため、列名の脚注・MultiIndex・大文字小文字、
+    セルの取引所の前置き（"NYSE: MMM"）を許すようにした。"""
+    want_s = [c.lower() for c in sym_cols]
+    want_n = [c.lower() for c in name_cols]
     for df in _tables(html):
-        cols = [str(c).strip() for c in df.columns]
-        sc = next((c for c in sym_cols if c in cols), None)
-        if not sc:
+        cols = [_norm_col(c) for c in df.columns]
+        low = [c.lower() for c in cols]
+        si = next((low.index(c) for c in want_s if c in low), None)
+        if si is None:
             continue
-        nc = next((c for c in name_cols if c in cols), None)
+        ni = next((low.index(c) for c in want_n if c in low), None)
         out = {}
         for _, row in df.iterrows():
-            t = str(row[df.columns[cols.index(sc)]]).strip().replace(".", "-")
-            if not re.fullmatch(r"[A-Z][A-Z0-9\-]{0,6}", t):
+            t = _ticker(row.iloc[si])
+            if not t:
                 continue
-            out[t] = str(row[df.columns[cols.index(nc)]]).strip() if nc else t
+            out[t] = str(row.iloc[ni]).strip() if ni is not None else t
         if out:
             return out
     return {}

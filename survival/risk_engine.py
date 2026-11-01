@@ -199,5 +199,5 @@ def design_daily_risk(realized_vol_pct: float,
         "max_concurrent": HARD_CAPS["MAX_CONCURRENT"],
         "dd_shrink_pct": HARD_CAPS["DD_SHRINK_PCT"],
         "dd_stop_pct": HARD_CAPS["DD_STOP_PCT"],
-        "source": "inverse_vol_scaling, kelly_quarter (Phase 1)",
+        "source": "inverse_vol_kelly_quarter",   # code（逆ボラ調整＋ケリー1/4、Phase 1）。表示は辞書で訳す
     }

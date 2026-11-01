@@ -13,6 +13,8 @@
   // ── i18n: the single dictionary (assets/i18n/dict.js) ------------
   function t(k, v){ return T("sv." + k, v); }
   const code = (f, v) => I18.code(f, v);
+  // pattern = (regime, distortion) のコード 2 つ → 「高ボラ / ゆがみ大」など（辞書で訳す）
+  const patternLabel = (regime, dist) => code("pattern_regime", regime) + " / " + code("pattern_distortion", dist);
 
   // ── localStorage helpers (公開リポに値を書かない) ----------------
   function loadLog(){
@@ -168,8 +170,7 @@
           '<td class="sv-num">' + fmtPct(p.size_pct, 3) + '</td>' +
           '<td class="sv-num sv-pos">' + fmtPct(p.exit && p.exit.take_profit_pct, 2) + '</td>' +
           '<td class="sv-num sv-neg">' + fmtPct(p.exit && p.exit.stop_loss_pct, 2) + '</td>' +
-          '<td>' + esc((p.pattern && p.pattern.regime) || '—') + ' / ' +
-                   esc((p.pattern && p.pattern.distortion) || '—') + '</td>' +
+          '<td>' + esc(patternLabel(p.pattern && p.pattern.regime, p.pattern && p.pattern.distortion)) + '</td>' +
           '<td class="sv-num">' + fmtNum(p.entry_edge_score, 0) + '</td>' +
         '</tr>';
     });
@@ -193,7 +194,7 @@
       const c = pt[k];
       html +=
         '<tr>' +
-          '<td>' + esc(k) + '</td>' +
+          '<td>' + esc(patternLabel(k.split("|")[0], k.split("|")[1])) + '</td>' +
           '<td class="sv-num sv-pos">' + fmtPct(c.take_profit_pct, 2) + '</td>' +
           '<td class="sv-num sv-neg sv-fixed">' + fmtPct(c.stop_loss_pct, 2) + '</td>' +
         '</tr>';
