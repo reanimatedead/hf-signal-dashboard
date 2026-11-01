@@ -1847,7 +1847,7 @@ function cell(c,r){
       break;
     }
     default:{
-      const sg = window.SIG ? SIG.cell(c, r, tab) : null;   // §21: 判定・検証・CCI/BB z・ログイン版のみ
+      const sg = window.SIG ? SIG.cell(c, r, tab) : null;   // §21: 判定・検証・CCI/BB z・ローカル版のみ
       h = sg!=null ? sg : esc(r[c.k]==null?"—":r[c.k]);
     }
   }
