@@ -38,18 +38,24 @@ UA = ("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
 URLS = {
     "sp500": "https://en.wikipedia.org/wiki/List_of_S%26P_500_companies",
     "sp500_csv": "https://raw.githubusercontent.com/datasets/s-and-p-500-companies/main/data/constituents.csv",
-    "nasdaq100": "https://en.wikipedia.org/wiki/Nasdaq-100",
-    "dow30": "https://en.wikipedia.org/wiki/Dow_Jones_Industrial_Average",
+    # 2026-11: Wikipedia の Nasdaq-100 / DJIA のページから構成銘柄の表そのものが消えたため、公式の出典へ。
+    "nasdaq100": "https://api.nasdaq.com/api/quote/list-type/nasdaq100",   # Nasdaq 公式（JSON）
+    "dow30": ("https://www.ssga.com/us/en/intermediary/library-content/products/fund-data/etfs/us/"
+              "holdings-daily-us-en-dia.xlsx"),                            # SPDR DIA（DJIA 連動 ETF）の保有銘柄
     "nikkei225": "https://en.wikipedia.org/wiki/Nikkei_225",
 }
 NAMES = ("nikkei225", "nasdaq100", "sp500", "dow30")
 
 
 def http_get(url):
+    """本文を返す（.xlsx は bytes、それ以外は str）。Nasdaq の API はブラウザの UA と Accept: application/json が要る。"""
     import requests
-    r = requests.get(url, headers={"User-Agent": UA}, timeout=30)
+    headers = {"User-Agent": UA}
+    if "api.nasdaq.com" in url:
+        headers["Accept"] = "application/json"
+    r = requests.get(url, headers=headers, timeout=30)
     r.raise_for_status()
-    return r.text
+    return r.content if url.endswith(".xlsx") else r.text
 
 
 def _tables(html):
@@ -98,6 +104,38 @@ def parse_table(html, sym_cols=("Symbol", "Ticker"), name_cols=("Security", "Com
     return {}
 
 
+_TICKER_RE = re.compile(r"[A-Z][A-Z0-9.\-]{0,6}")
+
+
+def parse_nasdaq_api(text):
+    """Nasdaq 公式 API（list-type/nasdaq100）→ {ticker: name}。data.data.rows[].symbol / companyName。"""
+    rows = (((json.loads(text).get("data") or {}).get("data") or {}).get("rows")) or []
+    out = {}
+    for r in rows:
+        t = str(r.get("symbol") or "").strip()
+        if _TICKER_RE.fullmatch(t):
+            out[t.replace(".", "-")] = str(r.get("companyName") or t).strip()
+    return out
+
+
+def parse_dia_xlsx(data):
+    """SPDR DIA の保有銘柄 xlsx（先頭 4 行は説明、5 行目が見出し）→ {ticker: name}。
+    現金・先物などティッカーの形でない行と、末尾の注記は落とす。"""
+    import pandas as pd
+    df = pd.read_excel(io.BytesIO(data), skiprows=4)
+    cols = {str(c).strip().lower(): c for c in df.columns}
+    tc, nc = cols.get("ticker"), cols.get("name")
+    if tc is None:
+        return {}
+    out = {}
+    for _, row in df.iterrows():
+        t = str(row[tc]).strip()
+        if not _TICKER_RE.fullmatch(t) or t.upper().startswith("CASH"):
+            continue
+        out[t.replace(".", "-")] = str(row[nc]).strip() if nc is not None else t
+    return out
+
+
 def parse_sp500_csv(text):
     rows = list(csv.DictReader(io.StringIO(text)))
     return {r["Symbol"].replace(".", "-"): r.get("Security", r["Symbol"]) for r in rows if r.get("Symbol")}
@@ -130,9 +168,9 @@ def fetch_one(name, fetch, nikkei_dynamic=False):
                 d = parse_sp500_csv(fetch(URLS["sp500_csv"]))
             return d, "wikipedia/datahub"
         if name == "nasdaq100":
-            return parse_table(fetch(URLS["nasdaq100"])), "wikipedia"
+            return parse_nasdaq_api(fetch(URLS["nasdaq100"])), "nasdaq_api"
         if name == "dow30":
-            return parse_table(fetch(URLS["dow30"]), sym_cols=("Symbol",), name_cols=("Company",)), "wikipedia"
+            return parse_dia_xlsx(fetch(URLS["dow30"])), "ssga_dia_holdings"
         if name == "nikkei225":
             if not nikkei_dynamic:
                 return None, "DATA_CONTRACT §19: 機械取得しない（内蔵一覧を件数検査のみ）"

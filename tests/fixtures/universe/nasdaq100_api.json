@@ -1,0 +1,932 @@
+{
+ "data": {
+  "date": "Nov 2, 2026",
+  "data": {
+   "headers": {
+    "symbol": "Symbol",
+    "companyName": "Name",
+    "marketCap": "Market Cap",
+    "lastSalePrice": "Last Sale",
+    "netChange": "Net Change",
+    "percentageChange": "% Change"
+   },
+   "rows": [
+    {
+     "symbol": "AAPL",
+     "companyName": "Apple",
+     "marketCap": "1,000,000,000",
+     "lastSalePrice": "$100.00",
+     "netChange": "0.00",
+     "percentageChange": "0.00%",
+     "deltaIndicator": ""
+    },
+    {
+     "symbol": "ABNB",
+     "companyName": "Airbnb",
+     "marketCap": "1,000,000,000",
+     "lastSalePrice": "$100.00",
+     "netChange": "0.00",
+     "percentageChange": "0.00%",
+     "deltaIndicator": ""
+    },
+    {
+     "symbol": "ADBE",
+     "companyName": "Adobe",
+     "marketCap": "1,000,000,000",
+     "lastSalePrice": "$100.00",
+     "netChange": "0.00",
+     "percentageChange": "0.00%",
+     "deltaIndicator": ""
+    },
+    {
+     "symbol": "ADI",
+     "companyName": "Analog Devices",
+     "marketCap": "1,000,000,000",
+     "lastSalePrice": "$100.00",
+     "netChange": "0.00",
+     "percentageChange": "0.00%",
+     "deltaIndicator": ""
+    },
+    {
+     "symbol": "ADP",
+     "companyName": "ADP",
+     "marketCap": "1,000,000,000",
+     "lastSalePrice": "$100.00",
+     "netChange": "0.00",
+     "percentageChange": "0.00%",
+     "deltaIndicator": ""
+    },
+    {
+     "symbol": "ADSK",
+     "companyName": "Autodesk",
+     "marketCap": "1,000,000,000",
+     "lastSalePrice": "$100.00",
+     "netChange": "0.00",
+     "percentageChange": "0.00%",
+     "deltaIndicator": ""
+    },
+    {
+     "symbol": "AEP",
+     "companyName": "American Electric Power",
+     "marketCap": "1,000,000,000",
+     "lastSalePrice": "$100.00",
+     "netChange": "0.00",
+     "percentageChange": "0.00%",
+     "deltaIndicator": ""
+    },
+    {
+     "symbol": "AMAT",
+     "companyName": "Applied Materials",
+     "marketCap": "1,000,000,000",
+     "lastSalePrice": "$100.00",
+     "netChange": "0.00",
+     "percentageChange": "0.00%",
+     "deltaIndicator": ""
+    },
+    {
+     "symbol": "AMD",
+     "companyName": "AMD",
+     "marketCap": "1,000,000,000",
+     "lastSalePrice": "$100.00",
+     "netChange": "0.00",
+     "percentageChange": "0.00%",
+     "deltaIndicator": ""
+    },
+    {
+     "symbol": "AMGN",
+     "companyName": "Amgen",
+     "marketCap": "1,000,000,000",
+     "lastSalePrice": "$100.00",
+     "netChange": "0.00",
+     "percentageChange": "0.00%",
+     "deltaIndicator": ""
+    },
+    {
+     "symbol": "AMZN",
+     "companyName": "Amazon",
+     "marketCap": "1,000,000,000",
+     "lastSalePrice": "$100.00",
+     "netChange": "0.00",
+     "percentageChange": "0.00%",
+     "deltaIndicator": ""
+    },
+    {
+     "symbol": "APP",
+     "companyName": "AppLovin",
+     "marketCap": "1,000,000,000",
+     "lastSalePrice": "$100.00",
+     "netChange": "0.00",
+     "percentageChange": "0.00%",
+     "deltaIndicator": ""
+    },
+    {
+     "symbol": "ARM",
+     "companyName": "ARM Holdings",
+     "marketCap": "1,000,000,000",
+     "lastSalePrice": "$100.00",
+     "netChange": "0.00",
+     "percentageChange": "0.00%",
+     "deltaIndicator": ""
+    },
+    {
+     "symbol": "ASML",
+     "companyName": "ASML",
+     "marketCap": "1,000,000,000",
+     "lastSalePrice": "$100.00",
+     "netChange": "0.00",
+     "percentageChange": "0.00%",
+     "deltaIndicator": ""
+    },
+    {
+     "symbol": "AVGO",
+     "companyName": "Broadcom",
+     "marketCap": "1,000,000,000",
+     "lastSalePrice": "$100.00",
+     "netChange": "0.00",
+     "percentageChange": "0.00%",
+     "deltaIndicator": ""
+    },
+    {
+     "symbol": "AXON",
+     "companyName": "Axon Enterprise",
+     "marketCap": "1,000,000,000",
+     "lastSalePrice": "$100.00",
+     "netChange": "0.00",
+     "percentageChange": "0.00%",
+     "deltaIndicator": ""
+    },
+    {
+     "symbol": "AZN",
+     "companyName": "AstraZeneca",
+     "marketCap": "1,000,000,000",
+     "lastSalePrice": "$100.00",
+     "netChange": "0.00",
+     "percentageChange": "0.00%",
+     "deltaIndicator": ""
+    },
+    {
+     "symbol": "BIIB",
+     "companyName": "Biogen",
+     "marketCap": "1,000,000,000",
+     "lastSalePrice": "$100.00",
+     "netChange": "0.00",
+     "percentageChange": "0.00%",
+     "deltaIndicator": ""
+    },
+    {
+     "symbol": "BKNG",
+     "companyName": "Booking Holdings",
+     "marketCap": "1,000,000,000",
+     "lastSalePrice": "$100.00",
+     "netChange": "0.00",
+     "percentageChange": "0.00%",
+     "deltaIndicator": ""
+    },
+    {
+     "symbol": "BKR",
+     "companyName": "Baker Hughes",
+     "marketCap": "1,000,000,000",
+     "lastSalePrice": "$100.00",
+     "netChange": "0.00",
+     "percentageChange": "0.00%",
+     "deltaIndicator": ""
+    },
+    {
+     "symbol": "CCEP",
+     "companyName": "Coca-Cola Europacific",
+     "marketCap": "1,000,000,000",
+     "lastSalePrice": "$100.00",
+     "netChange": "0.00",
+     "percentageChange": "0.00%",
+     "deltaIndicator": ""
+    },
+    {
+     "symbol": "CDNS",
+     "companyName": "Cadence Design",
+     "marketCap": "1,000,000,000",
+     "lastSalePrice": "$100.00",
+     "netChange": "0.00",
+     "percentageChange": "0.00%",
+     "deltaIndicator": ""
+    },
+    {
+     "symbol": "CDW",
+     "companyName": "CDW",
+     "marketCap": "1,000,000,000",
+     "lastSalePrice": "$100.00",
+     "netChange": "0.00",
+     "percentageChange": "0.00%",
+     "deltaIndicator": ""
+    },
+    {
+     "symbol": "CEG",
+     "companyName": "Constellation Energy",
+     "marketCap": "1,000,000,000",
+     "lastSalePrice": "$100.00",
+     "netChange": "0.00",
+     "percentageChange": "0.00%",
+     "deltaIndicator": ""
+    },
+    {
+     "symbol": "CHTR",
+     "companyName": "Charter Communications",
+     "marketCap": "1,000,000,000",
+     "lastSalePrice": "$100.00",
+     "netChange": "0.00",
+     "percentageChange": "0.00%",
+     "deltaIndicator": ""
+    },
+    {
+     "symbol": "CMCSA",
+     "companyName": "Comcast",
+     "marketCap": "1,000,000,000",
+     "lastSalePrice": "$100.00",
+     "netChange": "0.00",
+     "percentageChange": "0.00%",
+     "deltaIndicator": ""
+    },
+    {
+     "symbol": "COST",
+     "companyName": "Costco",
+     "marketCap": "1,000,000,000",
+     "lastSalePrice": "$100.00",
+     "netChange": "0.00",
+     "percentageChange": "0.00%",
+     "deltaIndicator": ""
+    },
+    {
+     "symbol": "CPRT",
+     "companyName": "Copart",
+     "marketCap": "1,000,000,000",
+     "lastSalePrice": "$100.00",
+     "netChange": "0.00",
+     "percentageChange": "0.00%",
+     "deltaIndicator": ""
+    },
+    {
+     "symbol": "CRWD",
+     "companyName": "CrowdStrike",
+     "marketCap": "1,000,000,000",
+     "lastSalePrice": "$100.00",
+     "netChange": "0.00",
+     "percentageChange": "0.00%",
+     "deltaIndicator": ""
+    },
+    {
+     "symbol": "CSCO",
+     "companyName": "Cisco",
+     "marketCap": "1,000,000,000",
+     "lastSalePrice": "$100.00",
+     "netChange": "0.00",
+     "percentageChange": "0.00%",
+     "deltaIndicator": ""
+    },
+    {
+     "symbol": "CSGP",
+     "companyName": "CoStar Group",
+     "marketCap": "1,000,000,000",
+     "lastSalePrice": "$100.00",
+     "netChange": "0.00",
+     "percentageChange": "0.00%",
+     "deltaIndicator": ""
+    },
+    {
+     "symbol": "CSX",
+     "companyName": "CSX Corp",
+     "marketCap": "1,000,000,000",
+     "lastSalePrice": "$100.00",
+     "netChange": "0.00",
+     "percentageChange": "0.00%",
+     "deltaIndicator": ""
+    },
+    {
+     "symbol": "CTAS",
+     "companyName": "Cintas",
+     "marketCap": "1,000,000,000",
+     "lastSalePrice": "$100.00",
+     "netChange": "0.00",
+     "percentageChange": "0.00%",
+     "deltaIndicator": ""
+    },
+    {
+     "symbol": "CTSH",
+     "companyName": "Cognizant",
+     "marketCap": "1,000,000,000",
+     "lastSalePrice": "$100.00",
+     "netChange": "0.00",
+     "percentageChange": "0.00%",
+     "deltaIndicator": ""
+    },
+    {
+     "symbol": "DASH",
+     "companyName": "DoorDash",
+     "marketCap": "1,000,000,000",
+     "lastSalePrice": "$100.00",
+     "netChange": "0.00",
+     "percentageChange": "0.00%",
+     "deltaIndicator": ""
+    },
+    {
+     "symbol": "DDOG",
+     "companyName": "Datadog",
+     "marketCap": "1,000,000,000",
+     "lastSalePrice": "$100.00",
+     "netChange": "0.00",
+     "percentageChange": "0.00%",
+     "deltaIndicator": ""
+    },
+    {
+     "symbol": "DXCM",
+     "companyName": "Dexcom",
+     "marketCap": "1,000,000,000",
+     "lastSalePrice": "$100.00",
+     "netChange": "0.00",
+     "percentageChange": "0.00%",
+     "deltaIndicator": ""
+    },
+    {
+     "symbol": "EXC",
+     "companyName": "Exelon",
+     "marketCap": "1,000,000,000",
+     "lastSalePrice": "$100.00",
+     "netChange": "0.00",
+     "percentageChange": "0.00%",
+     "deltaIndicator": ""
+    },
+    {
+     "symbol": "FANG",
+     "companyName": "Diamondback Energy",
+     "marketCap": "1,000,000,000",
+     "lastSalePrice": "$100.00",
+     "netChange": "0.00",
+     "percentageChange": "0.00%",
+     "deltaIndicator": ""
+    },
+    {
+     "symbol": "FAST",
+     "companyName": "Fastenal",
+     "marketCap": "1,000,000,000",
+     "lastSalePrice": "$100.00",
+     "netChange": "0.00",
+     "percentageChange": "0.00%",
+     "deltaIndicator": ""
+    },
+    {
+     "symbol": "FTNT",
+     "companyName": "Fortinet",
+     "marketCap": "1,000,000,000",
+     "lastSalePrice": "$100.00",
+     "netChange": "0.00",
+     "percentageChange": "0.00%",
+     "deltaIndicator": ""
+    },
+    {
+     "symbol": "GEHC",
+     "companyName": "GE HealthCare",
+     "marketCap": "1,000,000,000",
+     "lastSalePrice": "$100.00",
+     "netChange": "0.00",
+     "percentageChange": "0.00%",
+     "deltaIndicator": ""
+    },
+    {
+     "symbol": "GFS",
+     "companyName": "GlobalFoundries",
+     "marketCap": "1,000,000,000",
+     "lastSalePrice": "$100.00",
+     "netChange": "0.00",
+     "percentageChange": "0.00%",
+     "deltaIndicator": ""
+    },
+    {
+     "symbol": "GILD",
+     "companyName": "Gilead Sciences",
+     "marketCap": "1,000,000,000",
+     "lastSalePrice": "$100.00",
+     "netChange": "0.00",
+     "percentageChange": "0.00%",
+     "deltaIndicator": ""
+    },
+    {
+     "symbol": "GOOG",
+     "companyName": "Alphabet (C)",
+     "marketCap": "1,000,000,000",
+     "lastSalePrice": "$100.00",
+     "netChange": "0.00",
+     "percentageChange": "0.00%",
+     "deltaIndicator": ""
+    },
+    {
+     "symbol": "GOOGL",
+     "companyName": "Alphabet (A)",
+     "marketCap": "1,000,000,000",
+     "lastSalePrice": "$100.00",
+     "netChange": "0.00",
+     "percentageChange": "0.00%",
+     "deltaIndicator": ""
+    },
+    {
+     "symbol": "HON",
+     "companyName": "Honeywell",
+     "marketCap": "1,000,000,000",
+     "lastSalePrice": "$100.00",
+     "netChange": "0.00",
+     "percentageChange": "0.00%",
+     "deltaIndicator": ""
+    },
+    {
+     "symbol": "IDXX",
+     "companyName": "IDEXX Laboratories",
+     "marketCap": "1,000,000,000",
+     "lastSalePrice": "$100.00",
+     "netChange": "0.00",
+     "percentageChange": "0.00%",
+     "deltaIndicator": ""
+    },
+    {
+     "symbol": "INTC",
+     "companyName": "Intel",
+     "marketCap": "1,000,000,000",
+     "lastSalePrice": "$100.00",
+     "netChange": "0.00",
+     "percentageChange": "0.00%",
+     "deltaIndicator": ""
+    },
+    {
+     "symbol": "INTU",
+     "companyName": "Intuit",
+     "marketCap": "1,000,000,000",
+     "lastSalePrice": "$100.00",
+     "netChange": "0.00",
+     "percentageChange": "0.00%",
+     "deltaIndicator": ""
+    },
+    {
+     "symbol": "ISRG",
+     "companyName": "Intuitive Surgical",
+     "marketCap": "1,000,000,000",
+     "lastSalePrice": "$100.00",
+     "netChange": "0.00",
+     "percentageChange": "0.00%",
+     "deltaIndicator": ""
+    },
+    {
+     "symbol": "KDP",
+     "companyName": "Keurig Dr Pepper",
+     "marketCap": "1,000,000,000",
+     "lastSalePrice": "$100.00",
+     "netChange": "0.00",
+     "percentageChange": "0.00%",
+     "deltaIndicator": ""
+    },
+    {
+     "symbol": "KHC",
+     "companyName": "Kraft Heinz",
+     "marketCap": "1,000,000,000",
+     "lastSalePrice": "$100.00",
+     "netChange": "0.00",
+     "percentageChange": "0.00%",
+     "deltaIndicator": ""
+    },
+    {
+     "symbol": "KLAC",
+     "companyName": "KLA Corp",
+     "marketCap": "1,000,000,000",
+     "lastSalePrice": "$100.00",
+     "netChange": "0.00",
+     "percentageChange": "0.00%",
+     "deltaIndicator": ""
+    },
+    {
+     "symbol": "LIN",
+     "companyName": "Linde",
+     "marketCap": "1,000,000,000",
+     "lastSalePrice": "$100.00",
+     "netChange": "0.00",
+     "percentageChange": "0.00%",
+     "deltaIndicator": ""
+    },
+    {
+     "symbol": "LRCX",
+     "companyName": "Lam Research",
+     "marketCap": "1,000,000,000",
+     "lastSalePrice": "$100.00",
+     "netChange": "0.00",
+     "percentageChange": "0.00%",
+     "deltaIndicator": ""
+    },
+    {
+     "symbol": "LULU",
+     "companyName": "Lululemon",
+     "marketCap": "1,000,000,000",
+     "lastSalePrice": "$100.00",
+     "netChange": "0.00",
+     "percentageChange": "0.00%",
+     "deltaIndicator": ""
+    },
+    {
+     "symbol": "MAR",
+     "companyName": "Marriott",
+     "marketCap": "1,000,000,000",
+     "lastSalePrice": "$100.00",
+     "netChange": "0.00",
+     "percentageChange": "0.00%",
+     "deltaIndicator": ""
+    },
+    {
+     "symbol": "MCHP",
+     "companyName": "Microchip Technology",
+     "marketCap": "1,000,000,000",
+     "lastSalePrice": "$100.00",
+     "netChange": "0.00",
+     "percentageChange": "0.00%",
+     "deltaIndicator": ""
+    },
+    {
+     "symbol": "MDB",
+     "companyName": "MongoDB",
+     "marketCap": "1,000,000,000",
+     "lastSalePrice": "$100.00",
+     "netChange": "0.00",
+     "percentageChange": "0.00%",
+     "deltaIndicator": ""
+    },
+    {
+     "symbol": "MDLZ",
+     "companyName": "Mondelez",
+     "marketCap": "1,000,000,000",
+     "lastSalePrice": "$100.00",
+     "netChange": "0.00",
+     "percentageChange": "0.00%",
+     "deltaIndicator": ""
+    },
+    {
+     "symbol": "MELI",
+     "companyName": "MercadoLibre",
+     "marketCap": "1,000,000,000",
+     "lastSalePrice": "$100.00",
+     "netChange": "0.00",
+     "percentageChange": "0.00%",
+     "deltaIndicator": ""
+    },
+    {
+     "symbol": "META",
+     "companyName": "Meta Platforms",
+     "marketCap": "1,000,000,000",
+     "lastSalePrice": "$100.00",
+     "netChange": "0.00",
+     "percentageChange": "0.00%",
+     "deltaIndicator": ""
+    },
+    {
+     "symbol": "MNST",
+     "companyName": "Monster Beverage",
+     "marketCap": "1,000,000,000",
+     "lastSalePrice": "$100.00",
+     "netChange": "0.00",
+     "percentageChange": "0.00%",
+     "deltaIndicator": ""
+    },
+    {
+     "symbol": "MRVL",
+     "companyName": "Marvell Technology",
+     "marketCap": "1,000,000,000",
+     "lastSalePrice": "$100.00",
+     "netChange": "0.00",
+     "percentageChange": "0.00%",
+     "deltaIndicator": ""
+    },
+    {
+     "symbol": "MSFT",
+     "companyName": "Microsoft",
+     "marketCap": "1,000,000,000",
+     "lastSalePrice": "$100.00",
+     "netChange": "0.00",
+     "percentageChange": "0.00%",
+     "deltaIndicator": ""
+    },
+    {
+     "symbol": "MSTR",
+     "companyName": "Strategy",
+     "marketCap": "1,000,000,000",
+     "lastSalePrice": "$100.00",
+     "netChange": "0.00",
+     "percentageChange": "0.00%",
+     "deltaIndicator": ""
+    },
+    {
+     "symbol": "MU",
+     "companyName": "Micron Technology",
+     "marketCap": "1,000,000,000",
+     "lastSalePrice": "$100.00",
+     "netChange": "0.00",
+     "percentageChange": "0.00%",
+     "deltaIndicator": ""
+    },
+    {
+     "symbol": "NFLX",
+     "companyName": "Netflix",
+     "marketCap": "1,000,000,000",
+     "lastSalePrice": "$100.00",
+     "netChange": "0.00",
+     "percentageChange": "0.00%",
+     "deltaIndicator": ""
+    },
+    {
+     "symbol": "NVDA",
+     "companyName": "NVIDIA",
+     "marketCap": "1,000,000,000",
+     "lastSalePrice": "$100.00",
+     "netChange": "0.00",
+     "percentageChange": "0.00%",
+     "deltaIndicator": ""
+    },
+    {
+     "symbol": "NXPI",
+     "companyName": "NXP Semiconductors",
+     "marketCap": "1,000,000,000",
+     "lastSalePrice": "$100.00",
+     "netChange": "0.00",
+     "percentageChange": "0.00%",
+     "deltaIndicator": ""
+    },
+    {
+     "symbol": "ODFL",
+     "companyName": "Old Dominion Freight",
+     "marketCap": "1,000,000,000",
+     "lastSalePrice": "$100.00",
+     "netChange": "0.00",
+     "percentageChange": "0.00%",
+     "deltaIndicator": ""
+    },
+    {
+     "symbol": "ON",
+     "companyName": "ON Semiconductor",
+     "marketCap": "1,000,000,000",
+     "lastSalePrice": "$100.00",
+     "netChange": "0.00",
+     "percentageChange": "0.00%",
+     "deltaIndicator": ""
+    },
+    {
+     "symbol": "ORLY",
+     "companyName": "O'Reilly Automotive",
+     "marketCap": "1,000,000,000",
+     "lastSalePrice": "$100.00",
+     "netChange": "0.00",
+     "percentageChange": "0.00%",
+     "deltaIndicator": ""
+    },
+    {
+     "symbol": "PANW",
+     "companyName": "Palo Alto Networks",
+     "marketCap": "1,000,000,000",
+     "lastSalePrice": "$100.00",
+     "netChange": "0.00",
+     "percentageChange": "0.00%",
+     "deltaIndicator": ""
+    },
+    {
+     "symbol": "PAYX",
+     "companyName": "Paychex",
+     "marketCap": "1,000,000,000",
+     "lastSalePrice": "$100.00",
+     "netChange": "0.00",
+     "percentageChange": "0.00%",
+     "deltaIndicator": ""
+    },
+    {
+     "symbol": "PCAR",
+     "companyName": "PACCAR",
+     "marketCap": "1,000,000,000",
+     "lastSalePrice": "$100.00",
+     "netChange": "0.00",
+     "percentageChange": "0.00%",
+     "deltaIndicator": ""
+    },
+    {
+     "symbol": "PDD",
+     "companyName": "PDD Holdings",
+     "marketCap": "1,000,000,000",
+     "lastSalePrice": "$100.00",
+     "netChange": "0.00",
+     "percentageChange": "0.00%",
+     "deltaIndicator": ""
+    },
+    {
+     "symbol": "PEP",
+     "companyName": "PepsiCo",
+     "marketCap": "1,000,000,000",
+     "lastSalePrice": "$100.00",
+     "netChange": "0.00",
+     "percentageChange": "0.00%",
+     "deltaIndicator": ""
+    },
+    {
+     "symbol": "PLTR",
+     "companyName": "Palantir Technologies",
+     "marketCap": "1,000,000,000",
+     "lastSalePrice": "$100.00",
+     "netChange": "0.00",
+     "percentageChange": "0.00%",
+     "deltaIndicator": ""
+    },
+    {
+     "symbol": "PYPL",
+     "companyName": "PayPal",
+     "marketCap": "1,000,000,000",
+     "lastSalePrice": "$100.00",
+     "netChange": "0.00",
+     "percentageChange": "0.00%",
+     "deltaIndicator": ""
+    },
+    {
+     "symbol": "QCOM",
+     "companyName": "Qualcomm",
+     "marketCap": "1,000,000,000",
+     "lastSalePrice": "$100.00",
+     "netChange": "0.00",
+     "percentageChange": "0.00%",
+     "deltaIndicator": ""
+    },
+    {
+     "symbol": "REGN",
+     "companyName": "Regeneron",
+     "marketCap": "1,000,000,000",
+     "lastSalePrice": "$100.00",
+     "netChange": "0.00",
+     "percentageChange": "0.00%",
+     "deltaIndicator": ""
+    },
+    {
+     "symbol": "ROP",
+     "companyName": "Roper Technologies",
+     "marketCap": "1,000,000,000",
+     "lastSalePrice": "$100.00",
+     "netChange": "0.00",
+     "percentageChange": "0.00%",
+     "deltaIndicator": ""
+    },
+    {
+     "symbol": "ROST",
+     "companyName": "Ross Stores",
+     "marketCap": "1,000,000,000",
+     "lastSalePrice": "$100.00",
+     "netChange": "0.00",
+     "percentageChange": "0.00%",
+     "deltaIndicator": ""
+    },
+    {
+     "symbol": "SBUX",
+     "companyName": "Starbucks",
+     "marketCap": "1,000,000,000",
+     "lastSalePrice": "$100.00",
+     "netChange": "0.00",
+     "percentageChange": "0.00%",
+     "deltaIndicator": ""
+    },
+    {
+     "symbol": "SHOP",
+     "companyName": "Shopify",
+     "marketCap": "1,000,000,000",
+     "lastSalePrice": "$100.00",
+     "netChange": "0.00",
+     "percentageChange": "0.00%",
+     "deltaIndicator": ""
+    },
+    {
+     "symbol": "SNPS",
+     "companyName": "Synopsys",
+     "marketCap": "1,000,000,000",
+     "lastSalePrice": "$100.00",
+     "netChange": "0.00",
+     "percentageChange": "0.00%",
+     "deltaIndicator": ""
+    },
+    {
+     "symbol": "TEAM",
+     "companyName": "Atlassian",
+     "marketCap": "1,000,000,000",
+     "lastSalePrice": "$100.00",
+     "netChange": "0.00",
+     "percentageChange": "0.00%",
+     "deltaIndicator": ""
+    },
+    {
+     "symbol": "TMUS",
+     "companyName": "T-Mobile",
+     "marketCap": "1,000,000,000",
+     "lastSalePrice": "$100.00",
+     "netChange": "0.00",
+     "percentageChange": "0.00%",
+     "deltaIndicator": ""
+    },
+    {
+     "symbol": "TRI",
+     "companyName": "Thomson Reuters",
+     "marketCap": "1,000,000,000",
+     "lastSalePrice": "$100.00",
+     "netChange": "0.00",
+     "percentageChange": "0.00%",
+     "deltaIndicator": ""
+    },
+    {
+     "symbol": "TSLA",
+     "companyName": "Tesla",
+     "marketCap": "1,000,000,000",
+     "lastSalePrice": "$100.00",
+     "netChange": "0.00",
+     "percentageChange": "0.00%",
+     "deltaIndicator": ""
+    },
+    {
+     "symbol": "TTD",
+     "companyName": "The Trade Desk",
+     "marketCap": "1,000,000,000",
+     "lastSalePrice": "$100.00",
+     "netChange": "0.00",
+     "percentageChange": "0.00%",
+     "deltaIndicator": ""
+    },
+    {
+     "symbol": "TTWO",
+     "companyName": "Take-Two Interactive",
+     "marketCap": "1,000,000,000",
+     "lastSalePrice": "$100.00",
+     "netChange": "0.00",
+     "percentageChange": "0.00%",
+     "deltaIndicator": ""
+    },
+    {
+     "symbol": "TXN",
+     "companyName": "Texas Instruments",
+     "marketCap": "1,000,000,000",
+     "lastSalePrice": "$100.00",
+     "netChange": "0.00",
+     "percentageChange": "0.00%",
+     "deltaIndicator": ""
+    },
+    {
+     "symbol": "VRSK",
+     "companyName": "Verisk Analytics",
+     "marketCap": "1,000,000,000",
+     "lastSalePrice": "$100.00",
+     "netChange": "0.00",
+     "percentageChange": "0.00%",
+     "deltaIndicator": ""
+    },
+    {
+     "symbol": "VRTX",
+     "companyName": "Vertex Pharmaceuticals",
+     "marketCap": "1,000,000,000",
+     "lastSalePrice": "$100.00",
+     "netChange": "0.00",
+     "percentageChange": "0.00%",
+     "deltaIndicator": ""
+    },
+    {
+     "symbol": "WBD",
+     "companyName": "Warner Bros. Discovery",
+     "marketCap": "1,000,000,000",
+     "lastSalePrice": "$100.00",
+     "netChange": "0.00",
+     "percentageChange": "0.00%",
+     "deltaIndicator": ""
+    },
+    {
+     "symbol": "WDAY",
+     "companyName": "Workday",
+     "marketCap": "1,000,000,000",
+     "lastSalePrice": "$100.00",
+     "netChange": "0.00",
+     "percentageChange": "0.00%",
+     "deltaIndicator": ""
+    },
+    {
+     "symbol": "XEL",
+     "companyName": "Xcel Energy",
+     "marketCap": "1,000,000,000",
+     "lastSalePrice": "$100.00",
+     "netChange": "0.00",
+     "percentageChange": "0.00%",
+     "deltaIndicator": ""
+    },
+    {
+     "symbol": "ZS",
+     "companyName": "Zscaler",
+     "marketCap": "1,000,000,000",
+     "lastSalePrice": "$100.00",
+     "netChange": "0.00",
+     "percentageChange": "0.00%",
+     "deltaIndicator": ""
+    }
+   ]
+  }
+ },
+ "message": null,
+ "status": {
+  "rCode": 200,
+  "bCodeMessage": null,
+  "developerMessage": null
+ }
+}

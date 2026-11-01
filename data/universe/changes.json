@@ -510,6 +510,58 @@
     "ZTS"
    ],
    "removed": []
+  },
+  {
+   "date": "2026-11-01",
+   "name": "nasdaq100",
+   "count": 101,
+   "added": [
+    "ALAB",
+    "ALNY",
+    "CRWV",
+    "FER",
+    "HONA",
+    "LITE",
+    "MPWR",
+    "MRNA",
+    "NBIS",
+    "RKLB",
+    "SNDK",
+    "SPCX",
+    "STX",
+    "TER",
+    "WDC",
+    "WMT"
+   ],
+   "removed": [
+    "AZN",
+    "BIIB",
+    "CDW",
+    "CHTR",
+    "CSGP",
+    "CTSH",
+    "GFS",
+    "KHC",
+    "LULU",
+    "MDB",
+    "ON",
+    "TEAM",
+    "TTD",
+    "VRSK",
+    "WBD",
+    "ZS"
+   ]
+  },
+  {
+   "date": "2026-11-01",
+   "name": "dow30",
+   "count": 30,
+   "added": [
+    "GOOGL"
+   ],
+   "removed": [
+    "VZ"
+   ]
   }
  ],
  "last_run": {
@@ -523,12 +575,10 @@
     "check": "nikkei225: 225 件（想定 225 ±5%）"
    },
    "nasdaq100": {
-    "status": "kept",
+    "status": "updated",
     "count": 101,
-    "source": "builtin",
-    "fetched": 0,
-    "reason": "nasdaq100: 0 件（想定 100 ±5%） → 外れ",
-    "check": "nasdaq100: 0 件（想定 100 ±5%） → 外れ"
+    "source": "nasdaq_api",
+    "check": "nasdaq100: 101 件（想定 100 ±5%）"
    },
    "sp500": {
     "status": "updated",
@@ -537,17 +587,12 @@
     "check": "sp500: 503 件（想定 500 ±5%）"
    },
    "dow30": {
-    "status": "kept",
+    "status": "updated",
     "count": 30,
-    "source": "builtin",
-    "fetched": 0,
-    "reason": "dow30: 0 件（想定 30 ±5%） → 外れ",
-    "check": "dow30: 0 件（想定 30 ±5%） → 外れ"
+    "source": "ssga_dia_holdings",
+    "check": "dow30: 30 件（想定 30 ±5%）"
    }
   },
-  "bad": [
-   "nasdaq100",
-   "dow30"
-  ]
+  "bad": []
  }
 }

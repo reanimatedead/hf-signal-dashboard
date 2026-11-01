@@ -13,17 +13,27 @@ def _html_table(rows, cols=("Symbol", "Security")):
     return f"<html><body><table><tr>{head}</tr>{body}</table></body></html>"
 
 
-def _fake_fetch(n_ndx=101, n_sp=503, n_dow=30, fail=()):
+FIX = pathlib.Path(__file__).resolve().parent / "fixtures" / "universe"
+
+
+def _ndx_api(n):
+    """Nasdaq 公式 API の応答（形は fixtures/universe/nasdaq100_api.json に固定）。先頭 n 件だけにする。"""
+    j = json.loads((FIX / "nasdaq100_api.json").read_text(encoding="utf-8"))
+    j["data"]["data"]["rows"] = j["data"]["data"]["rows"][:n]
+    return json.dumps(j)
+
+
+def _fake_fetch(n_ndx=101, n_sp=503, fail=()):
     def fetch(url):
         for k in fail:
             if uu.URLS[k] == url:
                 raise OSError("offline")
         if url == uu.URLS["nasdaq100"]:
-            return _html_table([(f"Ndx {i}", f"N{i:03d}") for i in range(n_ndx)], ("Company", "Ticker"))
+            return _ndx_api(n_ndx)
         if url == uu.URLS["sp500"]:
             return _html_table([(f"S{i:03d}" if i else "BRK.B", f"Sp {i}") for i in range(n_sp)])
         if url == uu.URLS["dow30"]:
-            return _html_table([(f"Dow {i}", "NYSE", f"D{i:02d}") for i in range(n_dow)], ("Company", "Exchange", "Symbol"))
+            return (FIX / "dia_holdings.xlsx").read_bytes()
         raise AssertionError(url)
     return fetch
 
@@ -35,7 +45,9 @@ def test_update_writes_files_and_changes(tmp_path):
     r = uu.update(fetch=_fake_fetch(), udir=tmp_path, builtin=BUILTIN, today="2026-11-02")
     assert r["bad"] == []
     ndx = json.loads((tmp_path / "nasdaq100.json").read_text())
-    assert ndx["count"] == 101 and "N000" in ndx["members"]
+    assert ndx["count"] == 101 and "AAPL" in ndx["members"] and ndx["source"] == "nasdaq_api"
+    dow = json.loads((tmp_path / "dow30.json").read_text())
+    assert dow["count"] == 30 and "CASH_USD" not in dow["members"] and dow["source"] == "ssga_dia_holdings"
     sp = json.loads((tmp_path / "sp500.json").read_text())
     assert "BRK-B" in sp["members"]                          # "." → Yahoo 形 "-"
     assert not (tmp_path / "nikkei225.json").exists()        # §19: 既定では取得しない
@@ -84,3 +96,30 @@ def test_parse_table_handles_exchange_prefix_footnotes_and_multiindex():
     ndx = """<table><thead><tr><th colspan="2">Constituents</th></tr><tr><th>Ticker</th><th>Company</th></tr></thead>
       <tr><td>AAPL</td><td>Apple Inc.</td></tr><tr><td>BRK.B</td><td>Berkshire</td></tr></table>"""
     assert uu.parse_table(ndx) == {"AAPL": "Apple Inc.", "BRK-B": "Berkshire"}
+
+
+# ── 2026-11: 公式の出典（Nasdaq API / SPDR DIA 保有銘柄 xlsx）の形を固定したファイルで確かめる ──
+def test_parse_nasdaq_api_fixture():
+    d = uu.parse_nasdaq_api((FIX / "nasdaq100_api.json").read_text(encoding="utf-8"))
+    assert len(d) == 101 and d["AAPL"] and all(uu._TICKER_RE.fullmatch(t) for t in d)
+
+
+def test_parse_nasdaq_api_dot_ticker_and_bad_rows():
+    j = json.dumps({"data": {"data": {"rows": [{"symbol": "BRK.B", "companyName": "Berkshire"},
+                                               {"symbol": "", "companyName": "blank"},
+                                               {"symbol": "not a ticker", "companyName": "x"}]}}})
+    assert uu.parse_nasdaq_api(j) == {"BRK-B": "Berkshire"}
+    assert uu.parse_nasdaq_api(json.dumps({"data": None})) == {}
+
+
+def test_parse_dia_xlsx_fixture_skips_header_cash_and_notes():
+    d = uu.parse_dia_xlsx((FIX / "dia_holdings.xlsx").read_bytes())
+    assert len(d) == 30 and "AAPL" in d and "CASH_USD" not in d
+
+
+def test_nasdaq_or_dia_unreachable_keeps_previous(tmp_path):
+    uu.update(fetch=_fake_fetch(), udir=tmp_path, builtin=BUILTIN, today="2026-11-02")
+    before = {n: (tmp_path / f"{n}.json").read_text() for n in ("nasdaq100", "dow30")}
+    r = uu.update(fetch=_fake_fetch(fail=("nasdaq100", "dow30")), udir=tmp_path, builtin=BUILTIN, today="2026-11-09")
+    assert set(r["bad"]) == {"nasdaq100", "dow30"}
+    assert {n: (tmp_path / f"{n}.json").read_text() for n in ("nasdaq100", "dow30")} == before   # 前回のまま
