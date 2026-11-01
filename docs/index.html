@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>HF Signal Scanner Pro</title>
+<title></title>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&family=Barlow+Condensed:wght@300;400;600;700;800&display=swap" rel="stylesheet">
 <style>
 /* ══════════════════════════════════════════════════
@@ -583,16 +583,16 @@ tbody tr.mrow-normal:hover{opacity:1}
 
 <!-- Loading -->
 <div id="loading">
-  <div class="ll"><span>▸</span> HF Signal Scanner Pro</div>
+  <div class="ll"><span>▸</span> <span data-i18n="app.title"></span></div>
   <div class="lb"><div class="lf"></div></div>
-  <div class="ls" id="lst">Loading market data…</div>
+  <div class="ls" id="lst" data-i18n="load.loading"></div>
 </div>
 
 <!-- Header -->
 <div id="header" style="display:none">
-  <div id="logo"><span>▸</span>HF Signal Scanner Pro</div>
+  <div id="logo"><span>▸</span><span data-i18n="app.title"></span></div>
   <div id="clock"></div>
-  <div id="mkt" class="mkt-badge mkt-closed">○ CLOSED</div>
+  <div id="mkt" class="mkt-badge mkt-closed"></div>
   <div id="hdr-sp"></div>
   <div id="upd-bar">
     <div class="upd-dot"></div>
@@ -600,11 +600,11 @@ tbody tr.mrow-normal:hover{opacity:1}
     <span style="color:var(--text-faint)">|</span>
     <span id="nxt-upd" style="color:var(--text-faint)">—</span>
   </div>
-  <button class="hbtn" id="lngbtn" onclick="toggleLang()" title="Language">JA</button>
-  <button class="hbtn" id="bgbtn"  onclick="cycleBg()"    title="Background [B]">背景 ○</button>
-  <button class="hbtn" onclick="exportCSV()" title="Export CSV [E]">⬇ CSV</button>
-  <button class="hbtn" id="thbtn" onclick="toggleTheme()" title="Toggle theme [D]">☀ Light</button>
-  <button class="hbtn" onclick="location.reload()" title="Refresh">↺</button>
+  <button class="hbtn" id="lngbtn" onclick="toggleLang()" data-i18n="hdr.lang_btn" data-i18n-title="hdr.lang_title" data-i18n-aria="hdr.lang_title"></button>
+  <button class="hbtn" id="bgbtn"  onclick="cycleBg()" data-i18n-title="hdr.bg_title" data-i18n-aria="hdr.bg_title"></button>
+  <button class="hbtn" onclick="exportCSV()" data-i18n="hdr.csv" data-i18n-title="hdr.csv_title" data-i18n-aria="hdr.csv_title"></button>
+  <button class="hbtn" id="thbtn" onclick="toggleTheme()" data-i18n-title="hdr.theme_title" data-i18n-aria="hdr.theme_title"></button>
+  <button class="hbtn" onclick="location.reload()" data-i18n="hdr.refresh" data-i18n-title="hdr.refresh_title" data-i18n-aria="hdr.refresh_title"></button>
 </div>
 
 <!-- Summary -->
@@ -612,35 +612,35 @@ tbody tr.mrow-normal:hover{opacity:1}
 
 <!-- Main -->
 <div id="main" style="display:none">
-  <div id="tabs">
-    <button class="tab active" data-tab="survival"  onclick="sw('survival',this)">SURVIVAL</button>
-    <button class="tab" data-tab="nikkei225" onclick="sw('nikkei225',this)">日経 225</button>
-    <button class="tab" data-tab="dow30"     onclick="sw('dow30',this)">Dow 30</button>
-    <button class="tab" data-tab="nasdaq100" onclick="sw('nasdaq100',this)">Nasdaq 100</button>
-    <button class="tab" data-tab="sp500"     onclick="sw('sp500',this)">S&amp;P 500</button>
-    <button class="tab" data-tab="fx"        onclick="sw('fx',this)">FX / 商品</button>
-    <button class="tab" data-tab="rates_vol" onclick="sw('rates_vol',this)">金利・債券・VOL</button>
-    <button class="tab" data-tab="pos_val"   onclick="sw('pos_val',this)">ポジション/割安度</button>
-    <button class="tab" data-tab="relations" onclick="sw('relations',this)">利回り×株価</button>
-    <button class="tab" data-tab="moneyflow" onclick="sw('moneyflow',this)">お金の流れ</button>
-    <button class="tab" data-tab="verify" onclick="sw('verify',this)">検証</button>
+  <div id="tabs" role="tablist">
+    <button class="tab active" data-tab="survival"  onclick="sw('survival',this)" data-i18n="tab.survival"></button>
+    <button class="tab" data-tab="nikkei225" onclick="sw('nikkei225',this)" data-i18n="tab.nikkei225"></button>
+    <button class="tab" data-tab="dow30"     onclick="sw('dow30',this)" data-i18n="tab.dow30"></button>
+    <button class="tab" data-tab="nasdaq100" onclick="sw('nasdaq100',this)" data-i18n="tab.nasdaq100"></button>
+    <button class="tab" data-tab="sp500"     onclick="sw('sp500',this)" data-i18n="tab.sp500"></button>
+    <button class="tab" data-tab="fx"        onclick="sw('fx',this)" data-i18n="tab.fx"></button>
+    <button class="tab" data-tab="rates_vol" onclick="sw('rates_vol',this)" data-i18n="tab.rates_vol"></button>
+    <button class="tab" data-tab="pos_val"   onclick="sw('pos_val',this)" data-i18n="tab.pos_val"></button>
+    <button class="tab" data-tab="relations" onclick="sw('relations',this)" data-i18n="tab.relations"></button>
+    <button class="tab" data-tab="moneyflow" onclick="sw('moneyflow',this)" data-i18n="tab.moneyflow"></button>
+    <button class="tab" data-tab="verify" onclick="sw('verify',this)" data-i18n="tab.verify"></button>
   </div>
   <div id="data-notice" style="display:none;padding:6px 16px 0"></div>
   <div id="weak-banner"></div>
   <div id="toolbar">
     <div id="srch-wrap">
-      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
         <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
       </svg>
-      <input type="text" id="search" placeholder="Search… [/]" oninput="applyF()">
+      <input type="text" id="search" data-i18n-placeholder="tb.search" data-i18n-aria="tb.search_aria" oninput="applyF()">
     </div>
     <div class="fgrp" id="fgrp"></div>
-    <button class="fbtn" id="wlbtn" onclick="toggleWL()">☆ Watchlist</button>
+    <button class="fbtn" id="wlbtn" onclick="toggleWL()"></button>
     <div id="rowcount"></div>
   </div>
   <!-- ─── SURVIVAL / 生存ループ (Phase 1, v4.2) ─── -->
   <div id="survival-pane" style="display:none">
-    <div class="sv-disc">⚠ <b>Macro environment visualization / not investment advice</b>. Phase 1: 学習しない・固定天井で殺さない。</div>
+    <div class="sv-disc" data-i18n-html="sv.disc_top"></div>
     <div id="sv-risk-gate"></div>
     <div class="sv-grid">
       <div class="sv-card" id="sv-candidates"></div>
@@ -656,9 +656,7 @@ tbody tr.mrow-normal:hover{opacity:1}
       <div class="sv-card" id="sv-backfill" style="grid-column:1/-1"></div>
     </div>
     <div class="sv-notes" id="sv-notes"></div>
-    <div class="sv-empty-msg" style="display:none;color:var(--text-faint);padding:20px;text-align:center">
-      survival_loop データがロードされていません。data.json を確認してください。
-    </div>
+    <div class="sv-empty-msg" style="display:none;color:var(--text-faint);padding:20px;text-align:center" data-i18n="sv.no_loop_data"></div>
   </div>
 
   <!-- ─── 利回り×株価 / Relations (yield-equity balance, v6.4) ─── -->
@@ -670,11 +668,11 @@ tbody tr.mrow-normal:hover{opacity:1}
   <!-- ─── お金の流れ / Money Flow (3-region, v4.1) ─── -->
   <div id="mf-pane" style="display:none">
     <div class="mf-disc">
-      ⚠ <b id="mf-disc-text">相場「環境」の可視化 / not investment advice</b>
+      ⚠ <b id="mf-disc-text" data-i18n="common.disc_env"></b>
     </div>
     <div class="mf-grid">
       <article class="mf-region" data-region="us">
-        <div class="mf-head"><span id="mf-head-us">米国</span><span class="mf-badge stale" id="mf-fresh-us">—</span></div>
+        <div class="mf-head"><span id="mf-head-us" data-i18n="region.us"></span><span class="mf-badge stale" id="mf-fresh-us">—</span></div>
         <div class="mf-counter" id="mf-counter-us"></div>
         <div class="mf-real" id="mf-real-us" style="display:none"></div>
         <div class="mf-cv-wrap"><canvas id="mf-cv-us"></canvas></div>
@@ -682,7 +680,7 @@ tbody tr.mrow-normal:hover{opacity:1}
         <div class="mf-meta" id="mf-meta-us"></div>
       </article>
       <article class="mf-region" data-region="eu">
-        <div class="mf-head"><span id="mf-head-eu">欧州</span><span class="mf-badge stale" id="mf-fresh-eu">—</span></div>
+        <div class="mf-head"><span id="mf-head-eu" data-i18n="region.eu"></span><span class="mf-badge stale" id="mf-fresh-eu">—</span></div>
         <div class="mf-counter" id="mf-counter-eu"></div>
         <div class="mf-real" id="mf-real-eu" style="display:none"></div>
         <div class="mf-cv-wrap"><canvas id="mf-cv-eu"></canvas></div>
@@ -690,7 +688,7 @@ tbody tr.mrow-normal:hover{opacity:1}
         <div class="mf-meta" id="mf-meta-eu"></div>
       </article>
       <article class="mf-region" data-region="jp">
-        <div class="mf-head"><span id="mf-head-jp">日本</span><span class="mf-badge stale" id="mf-fresh-jp">—</span></div>
+        <div class="mf-head"><span id="mf-head-jp" data-i18n="region.jp"></span><span class="mf-badge stale" id="mf-fresh-jp">—</span></div>
         <div class="mf-counter" id="mf-counter-jp"></div>
         <div class="mf-real" id="mf-real-jp" style="display:none"></div>
         <div class="mf-cv-wrap"><canvas id="mf-cv-jp"></canvas></div>
@@ -705,19 +703,15 @@ tbody tr.mrow-normal:hover{opacity:1}
   <div class="tbl-wrap">
     <table><thead id="thead"></thead><tbody id="tbody"></tbody></table>
     <div id="errmsg">
-      <h2>⚠ No signal data available</h2>
-      <p>Run <strong>fetch_signals.py</strong> via GitHub Actions to generate data.json.</p>
+      <h2 data-i18n="err.no_data_title"></h2>
+      <p data-i18n-html="err.no_data_run"></p>
       <p style="margin-top:8px;font-size:11px;color:var(--text-faint)">
-        Analysis engine: <a href="https://github.com/reanimatedead/fx-analysis-system" target="_blank" rel="noopener" style="color:var(--accent)">fx-analysis-system</a>
+        <span data-i18n="common.engine"></span> <a href="https://github.com/reanimatedead/fx-analysis-system" target="_blank" rel="noopener" style="color:var(--accent)">fx-analysis-system</a>
         &nbsp;·&nbsp;
-        <a href="https://github.com/reanimatedead/hf-signal-dashboard/blob/main/DATA_CONTRACT.md" target="_blank" rel="noopener" style="color:var(--text-dim)">Data contract</a>
+        <a href="https://github.com/reanimatedead/hf-signal-dashboard/blob/main/DATA_CONTRACT.md" target="_blank" rel="noopener" style="color:var(--text-dim)" data-i18n="err.data_contract"></a>
       </p>
-      <p style="margin-top:8px;font-size:10px;color:var(--text-faint)">
-        For data visualization purposes only. Not investment advice.
-      </p>
-      <p style="margin-top:12px;font-size:11px;color:var(--text-faint)">
-        Keys: [1-8] tabs · [/] search · [D] theme · [B] bg · [L] lang · [E] export · [W] watchlist · [Esc] clear
-      </p>
+      <p style="margin-top:8px;font-size:10px;color:var(--text-faint)" data-i18n="common.disc_viz"></p>
+      <p style="margin-top:12px;font-size:11px;color:var(--text-faint)" data-i18n="err.keys"></p>
     </div>
   </div>
   <!-- v5.x additive: マクロFXシナリオ帯グラフ（macro-fx-base/scenario が単独所有する scenarios.json を live 参照。
@@ -726,10 +720,12 @@ tbody tr.mrow-normal:hover{opacity:1}
 </div>
 
 <div id="footer" style="padding:10px 16px;font-size:10px;color:var(--text-faint);border-top:1px solid var(--border);text-align:center;display:none">
-  For data visualization purposes only. Not investment advice. No buy/sell recommendation. &nbsp;|&nbsp;
-  Analysis engine: <a href="https://github.com/reanimatedead/fx-analysis-system" target="_blank" rel="noopener" style="color:var(--text-faint)">fx-analysis-system</a>
+  <span data-i18n="common.disc_footer"></span> &nbsp;|&nbsp;
+  <span data-i18n="common.engine"></span> <a href="https://github.com/reanimatedead/fx-analysis-system" target="_blank" rel="noopener" style="color:var(--text-faint)">fx-analysis-system</a>
 </div>
 
+<script src="assets/i18n/dict.js"></script>
+<script src="assets/i18n/i18n.js"></script>
 <script src="assets/signal/signal_ui.js"></script>
 <script>
 // ══ State ══════════════════════════════════════════
@@ -746,98 +742,98 @@ let light=localStorage.getItem("hf_theme")==="light";
 
 // ══ Columns ════════════════════════════════════════
 const C_STOCK=[
-  {k:"signal",      l:"Signal",   a:"center",w:112},
-  {k:"composite_score",l:"Score", a:"center",w:88},
-  {k:"symbol",      l:"Symbol",   a:"left",  w:138},
-  {k:"name",        l:"Name",     a:"left",  w:148},
-  {k:"range_pct",   l:"6M Pos",   a:"center",w:80},
-  {k:"price",       l:"Price",    a:"right", w:88},
-  {k:"change_pct",  l:"Chg%",     a:"right", w:65},
-  {k:"rsi",         l:"RSI",      a:"center",w:88},
-  {k:"macd_direction",l:"MACD",   a:"center",w:52},
-  {k:"ema_signal",  l:"EMA",      a:"center",w:68},
-  {k:"bb_pct",      l:"BB%",      a:"center",w:76},
-  {k:"vol_ratio",   l:"Vol×",     a:"right", w:55},
-  {k:"atr",         l:"ATR",      a:"right", w:65},
+  {k:"signal",      l:"col.signal",   a:"center",w:112},
+  {k:"composite_score",l:"col.score", a:"center",w:88},
+  {k:"symbol",      l:"col.symbol",   a:"left",  w:138},
+  {k:"name",        l:"col.name",     a:"left",  w:148},
+  {k:"range_pct",   l:"col.pos6m",   a:"center",w:80},
+  {k:"price",       l:"col.price",    a:"right", w:88},
+  {k:"change_pct",  l:"col.chg",     a:"right", w:65},
+  {k:"rsi",         l:"col.rsi",      a:"center",w:88},
+  {k:"macd_direction",l:"col.macd",   a:"center",w:52},
+  {k:"ema_signal",  l:"col.ema",      a:"center",w:68},
+  {k:"bb_pct",      l:"col.bb",      a:"center",w:76},
+  {k:"vol_ratio",   l:"col.vol",     a:"right", w:55},
+  {k:"atr",         l:"col.atr",      a:"right", w:65},
 ];
 const C_FX=[
-  {k:"signal",        l:"Signal",   a:"center",w:120},
-  {k:"mc_probability",l:"MC Prob",  a:"center",w:88},
-  {k:"symbol",        l:"Symbol",   a:"left",  w:128},
-  {k:"name",          l:"Pair",     a:"left",  w:135},
-  {k:"price",         l:"Price",    a:"right", w:92},
-  {k:"change_pct",    l:"Chg%",     a:"right", w:65},
-  {k:"cci_daily",     l:"CCI(D)",   a:"right", w:82},
-  {k:"cci_4h",        l:"CCI(4H)",  a:"right", w:82},
-  {k:"bb_pct",        l:"BB%",      a:"center",w:76},
-  {k:"rsi",           l:"RSI",      a:"center",w:88},
-  {k:"ema_signal",    l:"EMA",      a:"center",w:68},
-  {k:"atr",           l:"ATR",      a:"right", w:65},
+  {k:"signal",        l:"col.signal",   a:"center",w:120},
+  {k:"mc_probability",l:"col.mc_prob",  a:"center",w:88},
+  {k:"symbol",        l:"col.symbol",   a:"left",  w:128},
+  {k:"name",          l:"col.pair",     a:"left",  w:135},
+  {k:"price",         l:"col.price",    a:"right", w:92},
+  {k:"change_pct",    l:"col.chg",     a:"right", w:65},
+  {k:"cci_daily",     l:"col.cci_d",   a:"right", w:82},
+  {k:"cci_4h",        l:"col.cci_4h",  a:"right", w:82},
+  {k:"bb_pct",        l:"col.bb",      a:"center",w:76},
+  {k:"rsi",           l:"col.rsi",      a:"center",w:88},
+  {k:"ema_signal",    l:"col.ema",      a:"center",w:68},
+  {k:"atr",           l:"col.atr",      a:"right", w:65},
 ];
 const C_RATES=[
-  {k:"symbol",     l:"Symbol",   a:"left",  w:120},
-  {k:"name",       l:"Name",     a:"left",  w:200},
-  {k:"region",     l:"Region",   a:"center",w:68},
-  {k:"tenor",      l:"Tenor",    a:"center",w:64},
-  {k:"yield",      l:"Yield",    a:"right", w:84},
-  {k:"change",     l:"Δ",        a:"right", w:64},
-  {k:"curve_role", l:"Curve",    a:"center",w:104},
-  {k:"risk",       l:"Risk",     a:"center",w:82},
-  {k:"data_status",l:"Data",     a:"center",w:90},
+  {k:"symbol",     l:"col.symbol",   a:"left",  w:120},
+  {k:"name",       l:"col.name",     a:"left",  w:200},
+  {k:"region",     l:"col.region",   a:"center",w:68},
+  {k:"tenor",      l:"col.tenor",    a:"center",w:64},
+  {k:"yield",      l:"col.yield",    a:"right", w:84},
+  {k:"change",     l:"col.delta",        a:"right", w:64},
+  {k:"curve_role", l:"col.curve",    a:"center",w:104},
+  {k:"risk",       l:"col.risk",     a:"center",w:82},
+  {k:"data_status",l:"col.data",     a:"center",w:90},
 ];
 const C_VOL=[
-  {k:"symbol",     l:"Symbol",   a:"left",  w:100},
-  {k:"name",       l:"Name",     a:"left",  w:220},
-  {k:"price",      l:"Value",    a:"right", w:100},
-  {k:"change_pct", l:"Chg%",     a:"right", w:80},
-  {k:"risk",       l:"Risk",     a:"center",w:100},
+  {k:"symbol",     l:"col.symbol",   a:"left",  w:100},
+  {k:"name",       l:"col.name",     a:"left",  w:220},
+  {k:"price",      l:"col.value",    a:"right", w:100},
+  {k:"change_pct", l:"col.chg",     a:"right", w:80},
+  {k:"risk",       l:"col.risk",     a:"center",w:100},
 ];
 const C_IMM=[
-  {k:"symbol",            l:"Symbol",   a:"left",  w:118},
-  {k:"name",              l:"Name",     a:"left",  w:190},
-  {k:"currency",          l:"Ccy",      a:"center",w:64},
-  {k:"net_position",      l:"Net Pos",  a:"right", w:96},
-  {k:"weekly_change",     l:"Δ wk",     a:"right", w:84},
-  {k:"positioning_state", l:"State",    a:"center",w:130},
-  {k:"crowding_risk",     l:"Crowding", a:"center",w:96},
-  {k:"data_status",       l:"Data",     a:"center",w:90},
+  {k:"symbol",            l:"col.symbol",   a:"left",  w:118},
+  {k:"name",              l:"col.name",     a:"left",  w:190},
+  {k:"currency",          l:"col.ccy",      a:"center",w:64},
+  {k:"net_position",      l:"col.net_pos",  a:"right", w:96},
+  {k:"weekly_change",     l:"col.delta_wk",     a:"right", w:84},
+  {k:"positioning_state", l:"col.state",    a:"center",w:130},
+  {k:"crowding_risk",     l:"col.crowding", a:"center",w:96},
+  {k:"data_status",       l:"col.data",     a:"center",w:90},
 ];
 const C_CRYPTO=[
-  {k:"symbol",     l:"Symbol",   a:"left",  w:120},
-  {k:"name",       l:"Name",     a:"left",  w:160},
-  {k:"price",      l:"Price",    a:"right", w:120},
-  {k:"change_pct", l:"Chg%",     a:"right", w:80},
-  {k:"risk",       l:"Risk",     a:"center",w:100},
+  {k:"symbol",     l:"col.symbol",   a:"left",  w:120},
+  {k:"name",       l:"col.name",     a:"left",  w:160},
+  {k:"price",      l:"col.price",    a:"right", w:120},
+  {k:"change_pct", l:"col.chg",     a:"right", w:80},
+  {k:"risk",       l:"col.risk",     a:"center",w:100},
 ];
 const C_VALUATION=[
-  {k:"symbol",            l:"Symbol",   a:"left",  w:200},
-  {k:"region",            l:"Region",   a:"center",w:84},
-  {k:"metric",            l:"Metric",   a:"left",  w:160},
-  {k:"value",             l:"Value",    a:"right", w:96},
-  {k:"valuation_context", l:"Context",  a:"center",w:210},
-  {k:"data_status",       l:"Data",     a:"center",w:104},
-  {k:"source",            l:"Source",   a:"left",  w:160},
+  {k:"symbol",            l:"col.symbol",   a:"left",  w:200},
+  {k:"region",            l:"col.region",   a:"center",w:84},
+  {k:"metric",            l:"col.metric",   a:"left",  w:160},
+  {k:"value",             l:"col.value",    a:"right", w:96},
+  {k:"valuation_context", l:"col.context",  a:"center",w:210},
+  {k:"data_status",       l:"col.data",     a:"center",w:104},
+  {k:"source",            l:"col.source",   a:"left",  w:160},
 ];
 // v4.1 combined-tab unified column sets (rates_vol / pos_val).
 // Rows from sub-sections are mapped to these columns; missing fields render as "—".
 const C_RATES_VOL=[
-  {k:"symbol",      l:"Symbol",   a:"left",  w:120},
-  {k:"name",        l:"Name",     a:"left",  w:210},
-  {k:"type_label",  l:"Type",     a:"center",w:76},
-  {k:"value",       l:"Value",    a:"right", w:96},
-  {k:"delta",       l:"Δ",        a:"right", w:72},
-  {k:"meaning",     l:"Meaning",  a:"left",  w:240},
-  {k:"risk",        l:"Risk",     a:"center",w:82},
-  {k:"data_status", l:"Data",     a:"center",w:104},
+  {k:"symbol",      l:"col.symbol",   a:"left",  w:120},
+  {k:"name",        l:"col.name",     a:"left",  w:210},
+  {k:"type_label",  l:"col.type",     a:"center",w:76},
+  {k:"value",       l:"col.value",    a:"right", w:96},
+  {k:"delta",       l:"col.delta",        a:"right", w:72},
+  {k:"meaning",     l:"col.meaning",  a:"left",  w:240},
+  {k:"risk",        l:"col.risk",     a:"center",w:82},
+  {k:"data_status", l:"col.data",     a:"center",w:104},
 ];
 const C_POS_VAL=[
-  {k:"symbol",      l:"Symbol",   a:"left",  w:160},
-  {k:"name",        l:"Name",     a:"left",  w:210},
-  {k:"type_label",  l:"Type",     a:"left",  w:130},
-  {k:"value",       l:"Value",    a:"right", w:110},
-  {k:"delta",       l:"Δ",        a:"right", w:84},
-  {k:"context",     l:"Context",  a:"left",  w:200},
-  {k:"data_status", l:"Data",     a:"center",w:100},
+  {k:"symbol",      l:"col.symbol",   a:"left",  w:160},
+  {k:"name",        l:"col.name",     a:"left",  w:210},
+  {k:"type_label",  l:"col.type",     a:"left",  w:130},
+  {k:"value",       l:"col.value",    a:"right", w:110},
+  {k:"delta",       l:"col.delta",        a:"right", w:84},
+  {k:"context",     l:"col.context",  a:"left",  w:200},
+  {k:"data_status", l:"col.data",     a:"center",w:100},
 ];
 const cols=()=>{
   if (tab === "rates_vol") return C_RATES_VOL;
@@ -848,7 +844,8 @@ const cols=()=>{
 
 // ══ Boot ═══════════════════════════════════════════
 window.addEventListener("DOMContentLoaded",()=>{
-  if(light){document.body.classList.add("light");updThBtn();}
+  if(light){document.body.classList.add("light");}
+  updThBtn(); updWLBtn();
   tick(); setInterval(tick,1000);
   updMkt(); setInterval(updMkt,60000);
   keys();
@@ -859,8 +856,8 @@ window.addEventListener("DOMContentLoaded",()=>{
 function tick(){
   const jst=new Date(new Date().toLocaleString("en-US",{timeZone:"Asia/Tokyo"}));
   document.getElementById("clock").textContent=
-    jst.toLocaleString("ja-JP",{year:"numeric",month:"2-digit",day:"2-digit",
-      hour:"2-digit",minute:"2-digit",second:"2-digit",hour12:false})+" JST";
+    jst.toLocaleString(I18.locale(),{year:"numeric",month:"2-digit",day:"2-digit",
+      hour:"2-digit",minute:"2-digit",second:"2-digit",hour12:false})+" "+T("hdr.jst");
 }
 
 // ══ Market status ══════════════════════════════════
@@ -868,13 +865,13 @@ function updMkt(){
   const jst=new Date(new Date().toLocaleString("en-US",{timeZone:"Asia/Tokyo"}));
   const d=jst.getDay(), m=jst.getHours()*60+jst.getMinutes();
   const el=document.getElementById("mkt");
-  let st="CLOSED", on=false;
+  let st="mkt.closed", on=false;
   if(d>=1&&d<=5){
-    if((m>=540&&m<690)||(m>=750&&m<930)){st="TSE OPEN";on=true;}
-    else if(m>=23*60+30||m<6*60){st="NYSE OPEN";on=true;}
-    else{st="FX OPEN";on=true;}
+    if((m>=540&&m<690)||(m>=750&&m<930)){st="mkt.tse_open";on=true;}
+    else if(m>=23*60+30||m<6*60){st="mkt.nyse_open";on=true;}
+    else{st="mkt.fx_open";on=true;}
   }
-  el.textContent=(on?"● ":"○ ")+st;
+  el.textContent=(on?"● ":"○ ")+T(st);
   el.className="mkt-badge "+(on?"mkt-open":"mkt-closed");
 }
 
@@ -886,7 +883,7 @@ function toggleTheme(){
   updThBtn();
 }
 function updThBtn(){
-  document.getElementById("thbtn").textContent=light?"🌙 Dark":"☀ Light";
+  document.getElementById("thbtn").textContent=T(light?"hdr.theme_dark":"hdr.theme_light");
 }
 
 // ══ Keyboard shortcuts ═════════════════════════════
@@ -922,17 +919,17 @@ function keys(){
 async function loadData(){
   const st=document.getElementById("lst");
   try{
-    st.textContent="Fetching data.json…";
+    st.textContent=T("load.fetching");
     const r=await fetch("data.json?t="+Date.now());
     if(!r.ok) throw new Error("HTTP "+r.status);
     DATA=await r.json();
     window.DATA = DATA;   // v4.1: expose to the money-flow IIFE
-    st.textContent="Rendering…";
+    st.textContent=T("load.rendering");
     await new Promise(r=>setTimeout(r,300));
     init();
     loadMacroFx();   // v4.x: 別リポの14派生指標を非ブロッキングで読み込み（失敗しても既存は無影響）
   }catch(e){
-    st.textContent="Error: "+e.message;
+    st.textContent=T("load.error",{msg:e.message});
     setTimeout(()=>{
       document.getElementById("loading").style.display="none";
       document.getElementById("header").style.display="flex";
@@ -944,8 +941,7 @@ async function loadData(){
 }
 
 function init(){
-  document.getElementById("upd-at").textContent="Updated: "+(DATA.meta?.updated_at_str||"—");
-  document.getElementById("nxt-upd").textContent="Next: "+(DATA.meta?.next_update_str||"—");
+  renderUpdBar();
   renderSum();
   updateTabLabels();
   renderDataNotice();
@@ -972,20 +968,28 @@ window.__sigRerender=function(){
   else if(SIG.EQ_TABS.includes(tab)) renderTbl();
 };
 
+// 更新時刻: updated_at（ISO）を言語の書式で。無ければ updated_at_str をそのまま。
+function renderUpdBar(){
+  const m=(DATA&&DATA.meta)||{};
+  const u=m.updated_at?I18.fmtDate(m.updated_at,"ymdhm"):(m.updated_at_str||"—");
+  document.getElementById("upd-at").textContent=T("hdr.updated",{t:u});
+  document.getElementById("nxt-upd").textContent=T("hdr.next",{t:m.next_update_str||"—"});
+}
 // ラベル整合: 取得率100%でない equity タブ名に実数を併記（「S&P 500（102/500）」）。
 // 「S&P 500」の名称で500未満の集合を表示している状態を残さない（母集団を偽らない）。
-const TAB_BASE_LABEL={nikkei225:"日経 225",dow30:"Dow 30",nasdaq100:"Nasdaq 100",sp500:"S&P 500"};
+const TAB_BASE_LABEL=["nikkei225","dow30","nasdaq100","sp500"];
 function updateTabLabels(){
-  const uni=(DATA.meta&&DATA.meta.universe)||{};
-  for(const t in TAB_BASE_LABEL){
-    const btn=document.querySelector(`.tab[data-tab="${t}"]`); if(!btn) continue;
-    const rec=uni[t]; let label=TAB_BASE_LABEL[t];
-    if(rec&&typeof rec.count==="number"&&typeof rec.target==="number"&&rec.count<rec.target){
-      label+=`（${rec.count}/${rec.target}）`;
+  const uni=(DATA&&DATA.meta&&DATA.meta.universe)||{};
+  document.querySelectorAll('#tabs .tab[data-tab]').forEach(btn=>{
+    const t=btn.getAttribute("data-tab");
+    let label=T("tab."+t);
+    const rec=uni[t];
+    if(TAB_BASE_LABEL.includes(t)&&rec&&typeof rec.count==="number"&&typeof rec.target==="number"&&rec.count<rec.target){
+      label=T("tab.partial",{label,count:I18.fmtNum(rec.count,0),target:I18.fmtNum(rec.target,0)});
       btn.style.color="#e5a23d";   // 母数が満たない＝注意色
     }
     btn.textContent=label;
-  }
+  });
 }
 
 // サイレント fallback 禁止(UI側): fallback 発動時に「代替データ使用中」を明示。
@@ -993,33 +997,38 @@ function renderDataNotice(){
   const el=document.getElementById("data-notice"); if(!el) return;
   const fbs=(DATA.meta&&DATA.meta.fallbacks)||[];
   if(!fbs.length){ el.style.display="none"; return; }
-  const items=fbs.map(f=>`${esc2(f.source)}（${esc2(f.reason)}${f.fallback_size!=null?` / ${f.fallback_size}件`:""}）`).join(" ・ ");
+  const items=fbs.map(f=>T("notice.fallback_item",{src:esc2(f.source),reason:esc2(I18.code("fallback_reason",f.reason)),
+    size:f.fallback_size!=null?T("notice.fallback_size",{n:I18.fmtNum(f.fallback_size,0)}):""})).join(T("common.sep_list"));
   el.style.display="block";
   el.innerHTML=`<span style="display:inline-block;padding:4px 10px;border-radius:4px;font-size:12px;`
     +`background:rgba(229,72,77,0.12);color:#e5484d;border:1px solid #e5484d">`
-    +`⚠ 代替データ使用中: ${items}</span>`;
+    +T("notice.fallback",{items})+`</span>`;
 }
 function esc2(s){return String(s==null?"":s).replace(/[&<>]/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[m]));}
 
 // ══ Summary bar ════════════════════════════════════
-const MKT_LBL={nikkei225:"日経 225",dow30:"Dow 30",nasdaq100:"Nasdaq 100",sp500:"S&P 500",fx:"FX"};
-const S_STK=["STRONG BUY","BUY","HOLD","WATCH","AVOID"];
-const S_FX =["STRONG LONG","LONG","NEUTRAL","SHORT","STRONG SHORT"];
+const MKT_LBL=["nikkei225","dow30","nasdaq100","sp500","fx"];
+// data.json の signal はコード（strong_buy 等）。旧形式（"STRONG BUY"）も同じコードに読み替える。
+const S_STK=["strong_buy","buy","hold","watch","avoid"];
+const S_FX =["strong_long","long","neutral","short","strong_short"];
 const PC={
-  "STRONG BUY":"sb","BUY":"b","HOLD":"h","WATCH":"w","AVOID":"av",
-  "STRONG LONG":"sl","LONG":"l","NEUTRAL":"n","SHORT":"sh","STRONG SHORT":"ssl"
+  strong_buy:"sb",buy:"b",hold:"h",watch:"w",avoid:"av",
+  strong_long:"sl",long:"l",neutral:"n",short:"sh",strong_short:"ssl"
 };
+function sigCode(v){ return v==null?null:String(v).trim().toLowerCase().replace(/\s+/g,"_"); }
+function sigLabel(v){ const c=sigCode(v); return c?I18.code("signal",c):"—"; }
+function sumCount(c,code){ return c[code]||c[code.toUpperCase().replace(/_/g," ")]||0; }
 
 function renderSum(){
   const bar=document.getElementById("sum-bar");
   bar.innerHTML="";
-  Object.entries(MKT_LBL).forEach(([k,lbl])=>{
+  MKT_LBL.forEach(k=>{
     const c=DATA.summary?.[k]||{};
     const ord=k==="fx"?S_FX:S_STK;
     const el=document.createElement("div");
     el.className="s-card";
-    el.innerHTML=`<div class="s-label">${lbl}</div><div class="s-pills">${
-      ord.filter(s=>c[s]).map(s=>`<span class="sp ${PC[s]||"h"}">${s.replace("STRONG ","S.")}\u00a0${c[s]}</span>`).join("")
+    el.innerHTML=`<div class="s-label">${T(k==="fx"?"sum.fx":"tab."+k)}</div><div class="s-pills">${
+      ord.filter(s=>sumCount(c,s)).map(s=>`<span class="sp ${PC[s]||"h"}">${T("sig.short."+s)}\u00a0${I18.fmtNum(sumCount(c,s),0)}</span>`).join("")
     }</div>`;
     bar.appendChild(el);
   });
@@ -1066,10 +1075,9 @@ function renderFBtns(){
   const fg=document.getElementById("fgrp");
   const EQ=["nikkei225","dow30","nasdaq100","sp500"];
   const sigs=tab==="fx"?S_FX:(EQ.includes(tab)?S_STK:[]);
-  fg.innerHTML=`<button class="fbtn${fsig===null?" active":""}" onclick="setF(null,this)">ALL</button>`;
+  fg.innerHTML=`<button class="fbtn${fsig===null?" active":""}" onclick="setF(null,this)">${T("tb.all")}</button>`;
   sigs.forEach(s=>{
-    const sh=s.replace("STRONG ","S.").replace(" ","\u00a0");
-    fg.innerHTML+=`<button class="fbtn${fsig===s?" active":""}" onclick="setF('${s}',this)">${sh}</button>`;
+    fg.innerHTML+=`<button class="fbtn${fsig===s?" active":""}" onclick="setF('${s}',this)">${T("sig.short."+s)}</button>`;
   });
 }
 function setF(sig,btn){
@@ -1089,7 +1097,7 @@ function toggleWL(){
 }
 function updWLBtn(){
   const b=document.getElementById("wlbtn");
-  b.textContent=(WL.size>0?"★":"☆")+" Watchlist"+(WL.size>0?" ("+WL.size+")":"");
+  b.textContent=(WL.size>0?"★":"☆")+" "+(WL.size>0?T("tb.watchlist_n",{n:I18.fmtNum(WL.size,0)}):T("tb.watchlist"));
 }
 
 // ══ Table ══════════════════════════════════════════
@@ -1106,7 +1114,6 @@ function renderTbl(){
 // 銘柄ユニバースの取得率をタブ上部に表示（劣化を隠さない・pixel辞書「不明N件」と同方針）。
 // 構成銘柄のみ（各 equity タブに1本 pin される ^index proxy は除外）。取得率<50%は警告色。
 const UNIVERSE_TARGETS={nikkei225:225,dow30:30,nasdaq100:100,sp500:500};
-const UNIVERSE_LABEL={nikkei225:"日経225",dow30:"Dow30",nasdaq100:"Nasdaq100",sp500:"S&P500"};
 function renderUniverseBadge(){
   const el=document.getElementById("universe-badge");
   if(!el) return;
@@ -1124,17 +1131,17 @@ function renderUniverseBadge(){
   el.innerHTML=
     `<span style="display:inline-block;padding:3px 10px;border-radius:4px;font-size:12px;`
     +`background:${bg};color:${col};border:1px solid ${col}">`
-    +`取得 ${UNIVERSE_LABEL[tab]}: <b>${count}/${target}</b> (${pct}%)`
-    +(warn?" ⚠ 取得率50%未満":"")+`</span>`
+    +T("uni.badge",{label:T("tab."+tab),count:I18.fmtNum(count,0),target:I18.fmtNum(target,0),pct})
+    +(warn?" "+T("uni.warn"):"")+`</span>`
     +`<span style="font-size:11px;color:var(--text-faint,#666);margin-left:8px">`
-    +`構成銘柄のみ（指数本体 ^ は別枠）。取得率は隠さず表示。</span>`;
+    +T("uni.note")+`</span>`;
 }
 
 function getRows(){
   if (tab === "rates_vol" || tab === "pos_val") return getCombinedRows();
   const market=DATA.markets?.[tab]||[];
   return market.filter(r=>{
-    if(fsig&&r.signal!==fsig) return false;
+    if(fsig&&sigCode(r.signal)!==fsig) return false;
     if(wlOnly&&!WL.has(r.symbol)) return false;
     if(sv){const s=(r.symbol||"").toLowerCase(),n=(r.name||"").toLowerCase(); if(!s.includes(sv)&&!n.includes(sv)) return false;}
     return true;
@@ -1169,7 +1176,7 @@ function getCombinedRows(){
       return {
         __orig: "volatility",
         symbol: r.symbol, name: r.name, link: r.link,
-        type_label: "Vol",
+        type_label: T("rv.type_vol"),
         value: r.price, delta,
         meaning: mn.text, tone: mn.tone,
         moved: Math.abs(delta||0) >= 3,
@@ -1177,35 +1184,35 @@ function getCombinedRows(){
         data_status: r.data_status || (r.error ? "placeholder" : "live"),
       };
     });
-    sections.push({title: "Rates / Bonds", rows: secSort(rates)});
-    sections.push({title: "Volatility (VIX / MOVE)", rows: secSort(vol)});
+    sections.push({title: T("rv.sec_rates"), rows: secSort(rates)});
+    sections.push({title: T("rv.sec_vol"), rows: secSort(vol)});
     // v5: macro-fx-base 14 派生指標。loading/error/ok の3状態を明示（要件3：古い値を最新と誤認させない）。
     if (MACRO_FX_STATE === "loading") {
-      sections.push({title: "Macro-FX Derived · 14", rows: [macroStateRow("loading","読み込み中…")]});
+      sections.push({title: T("rv.sec_macro"), rows: [macroStateRow("loading",T("common.loading"))]});
     } else if (MACRO_FX_STATE === "error") {
-      sections.push({title: "Macro-FX Derived · 14", rows: [macroStateRow("error","取得に失敗（最新値は表示しません）")]});
+      sections.push({title: T("rv.sec_macro"), rows: [macroStateRow("error",T("common.fetch_failed_no_latest"))]});
     } else {
       const macroRows = secSort(buildMacroFxRows());
       if (macroRows.length) {
-        sections.push({title: "Macro-FX Derived · 14 (yield curve / real yield / FX-rate corr)", rows: macroRows});
+        sections.push({title: T("rv.sec_macro_full"), rows: macroRows});
       }
     }
   } else if (tab === "pos_val") {
     const imm = (DATA.markets?.imm||[]).map(r => ({
       __orig: "imm",
       symbol: r.symbol, name: r.name, link: r.link,
-      type_label: "IMM " + (r.currency||""),
+      type_label: T("pv.type_imm",{ccy:r.currency||""}),
       value: r.net_position, delta: r.weekly_change,
-      context: r.positioning_state,
+      context: I18.code("positioning_state", r.positioning_state),
       risk: r.crowding_risk,
       data_status: r.data_status,
     }));
     const crypto = (DATA.markets?.crypto||[]).map(r => ({
       __orig: "crypto",
       symbol: r.symbol, name: r.name, link: r.link,
-      type_label: "Crypto",
+      type_label: T("pv.type_crypto"),
       value: r.price, delta: r.change_pct,
-      context: r.risk || "—",
+      context: r.risk ? I18.code("risk", r.risk) : "—",
       risk: r.risk,
       data_status: r.data_status || (r.error ? "placeholder" : "live"),
     }));
@@ -1214,13 +1221,13 @@ function getCombinedRows(){
       symbol: r.symbol, name: r.name, link: r.link,
       type_label: r.metric || "—",
       value: r.value, delta: null,
-      context: r.valuation_context,
+      context: valCtxLabel(r.valuation_context),
       risk: "—",
       data_status: r.data_status,
     }));
-    sections.push({title: "IMM Positioning (CFTC)", rows: imm});
-    sections.push({title: "Crypto",                 rows: crypto});
-    sections.push({title: "Valuation",              rows: val});
+    sections.push({title: T("pv.sec_imm"),       rows: imm});
+    sections.push({title: T("pv.sec_crypto"),    rows: crypto});
+    sections.push({title: T("pv.sec_valuation"), rows: val});
   }
   const out = [];
   sections.forEach(sec => {
@@ -1280,18 +1287,13 @@ function secSort(rows){
   }).map(x=>x.r);
 }
 // (2) RATES/VOL 行の簡潔な意味ラベル（HF 自前データ＝macro-fx とは無関係・再計算ではない静的ラベル）
-const RATES_MEANING={
-  US2Y:{text:"米2年金利（政策金利の織り込み）",tone:"normal"},
-  US10Y:{text:"米長期金利（景気・インフレ期待）",tone:"normal"},
-  JP2Y:{text:"日本2年金利",tone:"normal"},
-  JP10Y:{text:"日本長期金利（緩和の出口観測）",tone:"normal"},
-};
-function ratesMeaning(sym){ return RATES_MEANING[sym] || {text:"国債利回り",tone:"normal"}; }
+const RATES_MEANING=["US2Y","US10Y","JP2Y","JP10Y"];
+function ratesMeaning(sym){ return {text:T(RATES_MEANING.includes(sym)?"rv.mean_"+sym:"rv.mean_yield"),tone:"normal"}; }
 function volMeaning(sym, price){
   const s=(sym||"").toUpperCase();
-  if(s.includes("VIX"))  return {text: (price>=25?"株式の恐怖指数（高VOL・警戒）":"株式の恐怖指数（VIX）"), tone:(price>=25?"warn":"normal")};
-  if(s.includes("MOVE")) return {text:"債券市場のVOL（MOVE）", tone:"normal"};
-  return {text:"ボラティリティ指標", tone:"normal"};
+  if(s.includes("VIX"))  return {text: T(price>=25?"rv.mean_vix_high":"rv.mean_vix"), tone:(price>=25?"warn":"normal")};
+  if(s.includes("MOVE")) return {text:T("rv.mean_move"), tone:"normal"};
+  return {text:T("rv.mean_vol"), tone:"normal"};
 }
 // (3) macro-fx セクションの loading/error 表示用の擬似行
 function macroStateRow(state, msg){
@@ -1316,19 +1318,19 @@ function buildMacroFxRows(){
     const valStr = (v>0?"+":"") + Number(v).toFixed(isCorr?3:2);
     const delta = prev ? (v - prev.value) : null;
     const movedThresh = isCorr ? 0.1 : 0.05;
-    const ip = interps[id] || {text:"", tone:"normal"};   // (2) 解釈は macro-fx が算出済み＝読むだけ
+    const ip = interps[id] || {text:"", tone:"normal"};   // (2) 解釈は macro-fx が算出済み＝読むだけ（外部データ。英語版が無ければ原文）
     const ageDays = Math.floor((now - Date.parse(String(last.observed_at).slice(0,10)+"T00:00:00Z"))/86400000);
     rows.push({
       __orig: "macro_fx",
       symbol: macroFxSymbol(id),
-      name: m.label_ja || id,
-      type_label: m.family === "slope" ? "Slope" : m.family === "real_yield" ? "Real" : "Corr",
+      name: I18.lang()==="en" ? (m.label_en || m.label || id) : (m.label_ja || id),   // 外部データ: 英語名が無ければ id
+      type_label: T(m.family === "slope" ? "rv.type_slope" : m.family === "real_yield" ? "rv.type_real" : "rv.type_corr"),
       value: valStr, unit,
       delta: (delta!=null && isFinite(delta)) ? delta : null,
-      meaning: ip.text, tone: ip.tone || "normal",
+      meaning: I18.lang()==="en" ? (ip.text_en || "") : ip.text, tone: ip.tone || "normal",
       moved: (delta!=null && Math.abs(delta) >= movedThresh),
       risk: macroFxRisk(m.family, v),
-      age_label: (ageDays<=0?"today":ageDays+"d"),
+      age_label: (ageDays<=0?T("rv.age_today"):T("rv.age_days",{n:ageDays})),
       data_status: ageDays > 3 ? "stale" : "live",   // (3) 3日超で STALE 警告
     });
   }
@@ -1353,7 +1355,7 @@ async function loadMacroFx(){
 function renderHead(){
   document.getElementById("thead").innerHTML=`<tr>${cols().map(c=>{
     const cl=scol===c.k?(sdir<0?"sd":"sa"):"";
-    return`<th class="${cl}" style="width:${c.w}px;min-width:${c.w}px;text-align:${c.a}" onclick="sortBy('${c.k}')">${c.l}</th>`;
+    return`<th class="${cl}" style="width:${c.w}px;min-width:${c.w}px;text-align:${c.a}" onclick="sortBy('${c.k}')">${T(c.l)}</th>`;
   }).join("")}</tr>`;
 }
 
@@ -1363,7 +1365,7 @@ let ROWMAP={};
 function renderBody(rows){
   const tb=document.getElementById("tbody");
   if(!rows.length){
-    tb.innerHTML=`<tr><td colspan="${cols().length}" style="text-align:center;padding:40px;color:var(--text-dim)">No results<br><small style="color:var(--text-faint)">[Esc] to clear filters</small></td></tr>`;
+    tb.innerHTML=`<tr><td colspan="${cols().length}" style="text-align:center;padding:40px;color:var(--text-dim)">${T("tbl.no_results")}<br><small style="color:var(--text-faint)">${T("tbl.esc_clear")}</small></td></tr>`;
     return;
   }
   ROWMAP={};
@@ -1389,7 +1391,7 @@ function renderBody(rows){
   const wrap = document.querySelector(".tbl-wrap");
   if (wrap) wrap.classList.toggle("rv-cards", tab === "rates_vol");
   const rc = document.getElementById("rowcount");
-  if (rc) rc.textContent = dataRowCount + " symbols";
+  if (rc) rc.textContent = T("tbl.rowcount",{n:I18.fmtNum(dataRowCount,0)});
 }
 
 // ══ v6.0 lazy chart loading ════════════════════════
@@ -1405,17 +1407,27 @@ async function loadCharts(tabKey){
     CHART_CACHE[tabKey] = await res.json();
   }catch(e){
     CHART_CACHE[tabKey] = {};
-    console.warn("chart load failed", tabKey, e);
+    console.warn("chart-load", tabKey, e);
   }
   return CHART_CACHE[tabKey];
 }
 // Never leave a chart area silently blank — say WHY it is empty.
 const CHART_MSG = {
-  pending:     "この銘柄のチャートは容量方針により未生成です（指数・FX・金利は生成済み）",
-  unavailable: "データ元にこの時間足の系列がありません",
+  pending:     "chart.msg_pending",
+  unavailable: "chart.msg_unavailable",
   // 「取得はできたが返ってきたデータが劣化」＝未生成/系列なしとは別物。混同させない。
-  degraded:    "取得はできましたが返ってきたデータが劣化していたため表示しません（一時的な取得不良・次回更新で回復見込み）"
+  degraded:    "chart.msg_degraded"
 };
+// data.json の文言はコード。{code, vars} 形式・旧形式（英文/和文）もここで吸収する。
+function codeV(field, x){
+  if (x && typeof x === "object") return T("code."+field+"."+x.code, x.vars||x);
+  if (x === "jpy_imm_available") {
+    const j=((DATA&&DATA.markets&&DATA.markets.imm)||[]).find(r=>/JPY/.test(r.symbol||""))||{};
+    return T("code.edge_factor.jpy_imm_available",{positioning_state:I18.code("positioning_state",j.positioning_state),
+      crowding_risk:I18.code("risk",j.crowding_risk)});
+  }
+  return I18.code(field, x);
+}
 
 // ══ Symbol detail panel ════════════════════════════
 async function toggleDetail(ev,sym){
@@ -1441,80 +1453,81 @@ async function toggleDetail(ev,sym){
   tr.appendChild(td);
   row.after(tr);
 }
+// 表の数値: 0 未満（BB の下限など）は「—（範囲外）」。チャートにも描かない。
+function fNonNeg(f){ return (v,d)=> (typeof v==="number" && v<0) ? T("common.out_of_range") : f(v,d); }
+function detailF(){ return (v,d=2)=> (v==null||v==="")?"—":(typeof v==="number"?I18.fmtNum(v,d):esc(v)); }
 function detailHTML(r){
-  const f=(v,d=2)=> (v==null||v==="")?"—":(typeof v==="number"?v.toFixed(d):v);
+  const f=detailF();
   if(r.market==="Valuation"||r.metric==="market_cap_to_gdp") return valuationDetailHTML(r, f);
   const score=r.composite_score??r.score;
   const cci=(r.cci_daily!==undefined||r.cci_4h!==undefined)
-    ? `<div class="dt-tf"><b>CCI(288)</b>&nbsp;&nbsp;Daily ${f(r.cci_daily,0)}&nbsp;&middot;&nbsp;4H ${f(r.cci_4h,0)}</div>` : "";
+    ? `<div class="dt-tf"><b>CCI(288)</b>&nbsp;&nbsp;${T("dt.daily")} ${f(r.cci_daily,0)}&nbsp;&middot;&nbsp;${T("dt.h4")} ${f(r.cci_4h,0)}</div>` : "";
   // v3.2: interactive timeframe tabs (4h / 1d / 1w); default 1d.
   const sym = r.symbol || "";
-  const tab = (tf,label,active)=> `<span class="dt-tab${active?" dt-tab-on":""}" onclick="showTF('${sym}','${tf}',this)">${label}</span>`;
+  const tab = (tf,active)=> `<span class="dt-tab${active?" dt-tab-on":""}" onclick="showTF('${sym}','${tf}',this)">${T("tf.short_"+tf)}</span>`;
   return `<div class="dt-wrap">
-    <div class="dt-hd"><b>${r.symbol||"—"}</b> &nbsp;${r.name||""}&nbsp;&middot;&nbsp;${r.signal||"—"}&nbsp;&middot;&nbsp;Score ${f(score,0)}&nbsp;&middot;&nbsp;${r.error?'<span style="color:var(--red)">data error</span>':"ok"}</div>
-    <div class="dt-tabs">${tab("4h","4時間足",false)}${tab("1d","日足",true)}${tab("1w","週足",false)}</div>
+    <div class="dt-hd"><b>${esc(r.symbol||"—")}</b> &nbsp;${esc(r.name||"")}&nbsp;&middot;&nbsp;${sigLabel(r.signal)}&nbsp;&middot;&nbsp;${T("dt.score",{v:f(score,0)})}&nbsp;&middot;&nbsp;${r.error?`<span style="color:var(--red)">${T("dt.data_error")}</span>`:T("dt.ok")}</div>
+    <div class="dt-tabs">${tab("4h",false)}${tab("1d",true)}${tab("1w",false)}</div>
     <div class="dt-grid">
       <span><b>RSI(14)</b> ${f(r.rsi,1)}</span>
-      <span><b>MACD</b> ${r.macd_direction||"—"}</span>
-      <span><b>EMA</b> ${r.ema_signal||"—"}</span>
+      <span><b>MACD</b> ${r.macd_direction?I18.code("macd_direction",r.macd_direction):"—"}</span>
+      <span><b>EMA</b> ${r.ema_signal?I18.code("ema_signal",r.ema_signal):"—"}</span>
       <span><b>BB %B</b> ${f(r.bb_pct,2)}</span>
       <span><b>ATR</b> ${f(r.atr)}</span>
-      <span><b>Chg%</b> ${f(r.change_pct,2)}</span>
+      <span><b>${T("col.chg")}</b> ${f(r.change_pct,2)}</span>
     </div>
     ${cci}
     <div class="dt-tfwrap">${tfChartHTML(r,"1d",f)}</div>
     ${edgeHTML(r.edge_context)}
-    <div class="dt-disc">Charts, indicators, Elliott candidates, and edge context are provided for market context and portfolio demonstration only. They are not investment advice or trading signals.</div>
+    <div class="dt-disc">${T("dt.disc")}</div>
   </div>`;
 }
 // v4.0 Buffett Indicator detail panel + v4.1 optional long-term valuation chart.
 function valuationDetailHTML(r, f){
-  f = f || ((v,d=2)=> (v==null||v==="")?"—":(typeof v==="number"?v.toFixed(d):v));
-  const big=v=>v==null?"—":Number(v).toLocaleString();
-  const val=(r.value==null)?"—":`${Number(r.value).toFixed(1)}${esc(r.unit||"%")}`;
+  f = f || detailF();
+  const big=v=>v==null?"—":I18.fmtNum(v,0);
+  const val=(r.value==null)?"—":`${I18.fmtNum(r.value,1)}${esc(r.unit||"%")}`;
   const ph=(r.data_status==="placeholder");
-  const note=ph
-    ? "Verified market cap / GDP data is not configured yet (manual CSV). Showing a placeholder — no fabricated values."
-    : "";
+  const note=ph ? T("val.placeholder_note") : "";
   // v4.1: long-term valuation context chart when a verified multi-date series exists.
   const c1d=(r.charts&&r.charts["1d"])||null;
   const chartBlock=(c1d&&c1d.available)
-    ? `<div class="dt-note" style="margin-top:8px;color:var(--text)"><b style="color:var(--accent)">Valuation series — Buffett Indicator (1d)</b></div>
-       <div class="dt-cap">The line is the Buffett Indicator value (market cap &divide; GDP &times; 100) over time — long-term valuation context, not a price and not a timing signal.</div>
-       <div class="dt-tfwrap">${chart1dHTML(c1d, f, "Valuation series (1d)")}</div>`
-    : `<div class="dt-note" style="margin-top:8px">Valuation chart — ${esc((c1d&&c1d.note)||"not available.")}<br>A verified multi-date <code>data/valuation_metrics.csv</code> (two or more dated points) enables a long-term context chart.</div>`;
+    ? `<div class="dt-note" style="margin-top:8px;color:var(--text)"><b style="color:var(--accent)">${T("val.series_title")}</b></div>
+       <div class="dt-cap">${T("val.series_cap")}</div>
+       <div class="dt-tfwrap">${chart1dHTML(c1d, f, T("val.series_tf"))}</div>`
+    : `<div class="dt-note" style="margin-top:8px">${T("val.chart_na",{note:(c1d&&c1d.note)?esc(I18.code("chart_note",c1d.note)):T("val.not_available")})}</div>`;
   return `<div class="dt-wrap">
-    <div class="dt-hd"><b>${esc(r.symbol||"—")}</b> &nbsp;${esc(r.name||"")}&nbsp;&middot;&nbsp;${esc(r.region||"")}&nbsp;&middot;&nbsp;${ph?"placeholder":"manual CSV"}</div>
-    <div class="dt-note" style="margin-top:8px">The <b>Buffett Indicator</b> = total stock-market capitalization &divide; GDP &times; 100. It is a long-term equity-market <b>valuation context</b> measure — a big-picture gauge of how richly a whole market is valued relative to the size of its economy. It is slow-moving and is not a timing tool.</div>
+    <div class="dt-hd"><b>${esc(r.symbol||"—")}</b> &nbsp;${esc(r.name||"")}&nbsp;&middot;&nbsp;${esc(r.region?I18.code("region",r.region):"")}&nbsp;&middot;&nbsp;${T(ph?"val.placeholder":"val.manual_csv")}</div>
+    <div class="dt-note" style="margin-top:8px">${T("val.explain")}</div>
     <div class="dt-grid" style="margin-top:8px">
-      <span><b>Value</b> ${val}</span>
-      <span><b>Context</b> ${esc(valCtxLabel(r.valuation_context))}</span>
-      <span><b>Market cap</b> ${big(r.market_cap)}</span>
-      <span><b>GDP</b> ${big(r.gdp)}</span>
-      <span><b>Data</b> ${esc(r.data_status||"—")}</span>
-      <span><b>Source</b> ${esc(r.source||"—")}</span>
+      <span><b>${T("col.value")}</b> ${val}</span>
+      <span><b>${T("col.context")}</b> ${esc(valCtxLabel(r.valuation_context))}</span>
+      <span><b>${T("val.market_cap")}</b> ${big(r.market_cap)}</span>
+      <span><b>${T("val.gdp")}</b> ${big(r.gdp)}</span>
+      <span><b>${T("col.data")}</b> ${esc(r.data_status?I18.code("data_status",r.data_status):"—")}</span>
+      <span><b>${T("col.source")}</b> ${esc(r.source?I18.code("source",r.source):"—")}</span>
     </div>
     ${note?`<div class="dt-note" style="margin-top:8px">${esc(note)}</div>`:""}
     ${chartBlock}
-    <div class="dt-disc">Buffett Indicator chart is shown as long-term equity market valuation context only. It is not a trading signal, a market timing tool, or investment advice. No buy/sell recommendation, and no entry/exit, take-profit, or stop-loss.</div>
+    <div class="dt-disc">${T("val.disc")}</div>
   </div>`;
 }
 // Render the chart block for a given timeframe (4h / 1d / 1w); graceful fallback.
 function tfChartHTML(r, tf, f){
-  const label = {"4h":"4時間足 4h","1d":"日足 1d","1w":"週足 1w"}[tf]||tf;
+  const label = T("tf.long_"+tf);
   const c = r.charts && r.charts[tf];
   if(c && c.available) return chart1dHTML(c, f, label);
   // v6.0: explain the empty state instead of a silent blank.
-  const degraded = r.chart_status === "unavailable" && /degraded/i.test(r.chart_error || "");
-  const note = (c && c.note) ? c.note
-             : degraded ? CHART_MSG.degraded
-             : (CHART_MSG[r.chart_status] || "Chart data is not available for this timeframe.");
+  const degraded = r.chart_status === "unavailable" && (r.chart_error === "degraded_close_nan" || /degraded/i.test(r.chart_error || ""));
+  const note = (c && c.note) ? I18.code("chart_note", c.note)
+             : degraded ? T(CHART_MSG.degraded)
+             : (CHART_MSG[r.chart_status] ? T(CHART_MSG[r.chart_status]) : T("chart.msg_tf_na"));
   return `<div class="dt-note">${label} — ${esc(note)}</div>`;
 }
 // Swap the chart area to the selected timeframe (re-renders from ROWMAP).
 function showTF(sym, tf, btn){
   const r = ROWMAP[sym]; if(!r) return;
-  const f=(v,d=2)=> (v==null||v==="")?"—":(typeof v==="number"?v.toFixed(d):v);
+  const f=detailF();
   const wrap = btn.closest(".dt-wrap");
   const area = wrap && wrap.querySelector(".dt-tfwrap");
   if(area) area.innerHTML = tfChartHTML(r, tf, f);
@@ -1525,59 +1538,44 @@ function esc(s){ return String(s==null?"":s).replace(/[&<>]/g,m=>({"&":"&amp;","
 // Render edge_context (v2.4) when present and meaningful. Analytical summary only.
 function edgeHTML(e){
   if(!e) return "";
-  const disc0="Edge context is an analytical summary for market review only. It is not investment advice or a trading signal.";
   const meaningful = (e.overall && e.overall!=="unknown" && e.overall!=="unclear_context")
     || (e.supporting_factors&&e.supporting_factors.length)
     || (e.conflicting_factors&&e.conflicting_factors.length);
   if(!meaningful)
-    return `<div class="dt-edge"><div class="dt-edge-hd"><b>Edge context</b> <span class="dt-edge-conf">No clear edge context.</span></div></div>`;
-  const dim=(label,o)=> o?`<div><b>${label}</b> ${esc(o.state||"unknown")}</div>`:"";
-  const list=(arr)=> (arr&&arr.length)?arr.map(x=>`<li>${esc(x)}</li>`).join(""):`<li style="color:var(--text-faint)">—</li>`;
-  const disc="Edge context is an analytical summary for market review only. It is not investment advice, a trading signal, or an instruction to enter or exit positions.";
+    return `<div class="dt-edge"><div class="dt-edge-hd"><b>${T("edge.title")}</b> <span class="dt-edge-conf">${T("edge.none")}</span></div></div>`;
+  const dim=(key,o)=> o?`<div><b>${T(key)}</b> ${esc(I18.code("edge_state",o.state||"unknown"))}</div>`:"";
+  const list=(arr)=> (arr&&arr.length)?arr.map(x=>`<li>${esc(codeV("edge_factor",x))}</li>`).join(""):`<li style="color:var(--text-faint)">—</li>`;
   return `<div class="dt-edge">
-    <div class="dt-edge-hd"><b>Edge context</b> <span class="dt-edge-badge">${esc(e.overall||"unknown")}</span> <span class="dt-edge-conf">confidence: ${esc(e.confidence||"low")}</span></div>
+    <div class="dt-edge-hd"><b>${T("edge.title")}</b> <span class="dt-edge-badge">${esc(I18.code("edge_state",e.overall||"unknown"))}</span> <span class="dt-edge-conf">${T("edge.confidence",{v:esc(I18.code("edge_state",e.confidence||"low"))})}</span></div>
     <div class="dt-edge-grid">
-      ${dim("Technical", e.technical)}
-      ${dim("Macro", e.macro)}
-      ${dim("Cross-asset", e.cross_asset)}
-      ${dim("Risk-adjusted", e.risk_adjusted)}
+      ${dim("edge.technical", e.technical)}
+      ${dim("edge.macro", e.macro)}
+      ${dim("edge.cross_asset", e.cross_asset)}
+      ${dim("edge.risk_adjusted", e.risk_adjusted)}
     </div>
     <div class="dt-edge-facs">
-      <div><b style="color:var(--green)">Supporting</b><ul>${list(e.supporting_factors)}</ul></div>
-      <div><b style="color:var(--yellow)">Conflicting</b><ul>${list(e.conflicting_factors)}</ul></div>
+      <div><b style="color:var(--green)">${T("edge.supporting")}</b><ul>${list(e.supporting_factors)}</ul></div>
+      <div><b style="color:var(--yellow)">${T("edge.conflicting")}</b><ul>${list(e.conflicting_factors)}</ul></div>
     </div>
-    <div class="dt-disc">${esc(e.note||disc)}</div>
+    <div class="dt-disc">${esc(e.note?I18.code("edge_note",e.note):T("code.edge_note.edge_context_not_advice"))}</div>
   </div>`;
 }
-// Render computed 1d chart (Close + Bollinger overlay), CCI panel, readouts.
+// Render a chart block (FX / equity / index / valuation all go through SIG.drawPriceCciChart).
 function chart1dHTML(c, f, tfLabel){
-  tfLabel = tfLabel || "日足 1d";
+  tfLabel = tfLabel || T("tf.long_1d");
+  const fb = fNonNeg(f);
   const ind=c.indicators||{};
   const bb=ind.bollinger_bands||{};
   const cci=ind.cci||{};
-  const band=(o)=> o ? `mid ${f(o.basis)} · up ${f(o.upper)} · low ${f(o.lower)} <span style="color:var(--text-faint)">[${o.state||"—"}]</span>` : "—";
-  const cciCell=(o)=> o ? `${f(o.value,1)} <span style="color:var(--text-faint)">[${o.state||"—"}]</span>` : "—";
+  const band=(o)=> o ? `${T("dt.bb_mid")} ${fb(o.basis)} · ${T("dt.bb_up")} ${fb(o.upper)} · ${T("dt.bb_low")} ${fb(o.lower)} <span style="color:var(--text-faint)">[${esc(I18.code("ind_state",o.state||"—"))}]</span>` : "—";
+  const cciCell=(o)=> o ? `${f(o.value,1)} <span style="color:var(--text-faint)">[${esc(I18.code("ind_state",o.state||"—"))}]</span>` : "—";
   const el=c.elliott||{};
-  let priceSVG="",cciSVG="";
-  try{ priceSVG=priceChartSVG(c); cciSVG=cciChartSVG(c); }catch(e){ priceSVG=""; cciSVG=""; }
-  // §21: 株式の 1d は marketcalc.ind.chart_series の系列で描く（BB48/288 ±2σ/±3σ・▲▼・CCI48/288）
-  if(c.series && window.SIG){
-    let sg=""; try{ sg=SIG.chartHTML(c.series); }catch(e){ sg=""; }
-    if(sg){ priceSVG=sg; cciSVG=""; c.__sg=true; }
-  }
-  const hasBB=!!(bb["288"]&&bb["288"].std_2&&_n(bb["288"].std_2.upper)!=null);
-  const hasCCI=!!((cci["48"]&&_n(cci["48"].value)!=null)||(cci["288"]&&_n(cci["288"].value)!=null));
-  const legend = (priceSVG && !c.__sg) ? `<div class="dt-legend">
-      <span class="dt-leg"><i style="background:var(--accent)"></i>Close</span>
-      <span class="dt-leg"><i style="background:var(--yellow)"></i>BB288 2&sigma;</span>
-      <span class="dt-leg"><i style="background:var(--text-faint)"></i>BB288 3&sigma; faint</span>
-    </div>` : "";
-  const bbCap = (priceSVG && !c.__sg) ? `<div class="dt-cap">Bollinger Bands are long-cycle volatility context only. BB 288 / 2&sigma; = standard zone; BB 288 / 3&sigma; = extreme deviation zone. Not trading signals.</div>` : "";
-  const indNote = (priceSVG && !hasBB && !hasCCI) ? `<div class="dt-cap">Indicators unavailable for this symbol/timeframe — close price shown only.</div>` : "";
-  const chartBlock = priceSVG
-    ? `<div class="dt-chart">${priceSVG}${legend}${bbCap}${indNote}${cciSVG}</div>`
-    : `<div class="dt-cap">Chart data is not available for this symbol/timeframe.</div>`;
-  return `<div class="dt-note" style="color:var(--text)"><b style="color:var(--accent)">${tfLabel} — chart</b></div>
+  let chart="";
+  try{ chart = window.SIG ? SIG.drawPriceCciChart(c) : ""; }catch(e){ console.error(e); chart=""; }
+  const chartBlock = chart
+    ? `<div class="dt-chart">${chart}</div>`
+    : `<div class="dt-cap">${T("chart.msg_symbol_na")}</div>`;
+  return `<div class="dt-note" style="color:var(--text)"><b style="color:var(--accent)">${T("chart.tf_title",{tf:tfLabel})}</b></div>
     ${chartBlock}
     <div class="dt-bb">
       <div><b>BB 48 / 2&sigma;</b> ${band(bb["48"]&&bb["48"].std_2)}</div>
@@ -1586,96 +1584,8 @@ function chart1dHTML(c, f, tfLabel){
       <div><b>BB 288 / 3&sigma;</b> ${band(bb["288"]&&bb["288"].std_3)}</div>
       <div><b>CCI 48</b> ${cciCell(cci["48"])}</div>
       <div><b>CCI 288</b> ${cciCell(cci["288"])}</div>
-      <div><b>Elliott</b> ${el.candidate||"unknown"} <span style="color:var(--text-faint)">(${el.confidence||"low"})</span></div>
+      <div><b>${T("dt.elliott")}</b> ${esc(I18.code("edge_state",el.candidate||"unknown"))} <span style="color:var(--text-faint)">(${esc(I18.code("edge_state",el.confidence||"low"))})</span></div>
     </div>`;
-}
-// ── Lightweight inline-SVG chart helpers (no external library) ──
-function _n(v){ return (typeof v==="number" && isFinite(v)) ? v : null; }
-function _rollingBB(closes, period, dev){
-  const up=[], lo=[];
-  for(let i=0;i<closes.length;i++){
-    const w=closes.slice(i-period+1,i+1);
-    if(i<period-1 || w.some(x=>x==null)){ up.push(null); lo.push(null); continue; }
-    const m=w.reduce((a,b)=>a+b,0)/period;
-    const sd=Math.sqrt(w.reduce((a,b)=>a+(b-m)*(b-m),0)/period); // population (ddof=0)
-    up.push(m+dev*sd); lo.push(m-dev*sd);
-  }
-  return {up,lo};
-}
-function _bandSeries(closes, period, dev, latest){
-  if(closes.length>=period) return _rollingBB(closes,period,dev);
-  if(latest && _n(latest.upper)!=null && _n(latest.lower)!=null)
-    return {up:closes.map(()=>latest.upper), lo:closes.map(()=>latest.lower)};
-  return null;
-}
-function _rollingCCI(ohlc, period){
-  const tp=ohlc.map(o=>{ const h=_n(o&&o.high),l=_n(o&&o.low),cl=_n(o&&o.close); return (h!=null&&l!=null&&cl!=null)?(h+l+cl)/3:null; });
-  const out=[];
-  for(let i=0;i<tp.length;i++){
-    const w=tp.slice(i-period+1,i+1);
-    if(i<period-1 || w.some(x=>x==null)){ out.push(null); continue; }
-    const m=w.reduce((a,b)=>a+b,0)/period;
-    const mad=w.reduce((a,b)=>a+Math.abs(b-m),0)/period;
-    out.push(mad===0?0:(tp[i]-m)/(0.015*mad));
-  }
-  return out;
-}
-function priceChartSVG(c){
-  const ohlc=(c&&c.ohlc)||[];
-  const closes=ohlc.map(o=>_n(o&&o.close));
-  const valid=closes.filter(x=>x!=null);
-  if(valid.length<2) return "";
-  const bb=(c.indicators&&c.indicators.bollinger_bands)||{};
-  const b288=bb["288"]||{};
-  // Chart overlays BB288 only — BB48 is intentionally excluded from rendering.
-  const s288_2=_bandSeries(closes,288,2,b288.std_2);
-  const s288_3=_bandSeries(closes,288,3,b288.std_3);
-  let ys=valid.slice();                       // y-range from close + BB288 2σ (3σ may clip)
-  if(s288_2){ s288_2.up.concat(s288_2.lo).forEach(v=>{ if(v!=null) ys.push(v); }); }
-  let yMin=Math.min(...ys), yMax=Math.max(...ys);
-  if(yMin===yMax){ yMin-=1; yMax+=1; }
-  const pad=(yMax-yMin)*0.05; yMin-=pad; yMax+=pad;
-  const W=320,H=120,L=2,R=2,T=6,B=6, n=closes.length;
-  const X=i=> L+(n<=1?0:i/(n-1)*(W-L-R));
-  const Y=v=> T+(1-(v-yMin)/(yMax-yMin))*(H-T-B);
-  const poly=(arr)=> arr.map((v,i)=> v==null?null:`${X(i).toFixed(1)},${Y(v).toFixed(1)}`).filter(Boolean).join(" ");
-  // Colours go in `style` (CSS) so var() resolves — presentation attrs do not resolve var().
-  const ln=(pts,css)=> pts?`<polyline points="${pts}" style="fill:none;${css}"/>`:"";
-  let svg=`<svg class="dt-svg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="1d close price with Bollinger Band 288 context">`;
-  if(s288_3){ svg+=ln(poly(s288_3.up),"stroke:var(--text-faint);stroke-width:0.8;opacity:0.55;stroke-dasharray:3 2")+ln(poly(s288_3.lo),"stroke:var(--text-faint);stroke-width:0.8;opacity:0.55;stroke-dasharray:3 2"); }
-  if(s288_2){ svg+=ln(poly(s288_2.up),"stroke:var(--yellow);stroke-width:1;opacity:0.9")+ln(poly(s288_2.lo),"stroke:var(--yellow);stroke-width:1;opacity:0.9"); }
-  svg+=ln(poly(closes),"stroke:var(--accent);stroke-width:1.5");
-  return svg+`</svg>`;
-}
-function cciChartSVG(c){
-  const ohlc=(c&&c.ohlc)||[];
-  const cciInd=(c.indicators&&c.indicators.cci)||{};
-  const l48=cciInd["48"]?_n(cciInd["48"].value):null;
-  const l288=cciInd["288"]?_n(cciInd["288"].value):null;
-  const ser48 = ohlc.length>=48 ? _rollingCCI(ohlc,48) : null;
-  let vals=[200,-200];
-  if(ser48) ser48.forEach(v=>{ if(v!=null) vals.push(v); });
-  if(l48!=null) vals.push(l48);
-  if(l288!=null) vals.push(l288);
-  const cap=Math.max(220, Math.ceil(Math.max.apply(null,vals.map(Math.abs))/50)*50);
-  if(l48==null && l288==null && !ser48) return "";   // nothing to show
-  const W=320,H=70,L=2,R=2,T=4,B=4, n=Math.max(ohlc.length,2);
-  const X=i=> L+(n<=1?0:i/(n-1)*(W-L-R));
-  const Y=v=>{ const cv=Math.max(-cap,Math.min(cap,v)); return T+(1-(cv+cap)/(2*cap))*(H-T-B); };
-  const hl=(yv,css)=>`<line x1="${L}" y1="${yv}" x2="${W-R}" y2="${yv}" style="${css}"/>`;
-  let svg=`<svg class="dt-cci-svg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="1d CCI momentum context">`;
-  svg+=hl(Y(0).toFixed(1),"stroke:var(--border2);stroke-width:0.6");
-  [200,-200].forEach(g=>{ svg+=hl(Y(g).toFixed(1),"stroke:var(--text-faint);stroke-width:0.5;stroke-dasharray:3 2"); });
-  if(l288!=null) svg+=hl(Y(l288).toFixed(1),"stroke:var(--yellow);stroke-width:0.8;opacity:0.75;stroke-dasharray:2 2");
-  if(ser48){
-    const pts=ser48.map((v,i)=> v==null?null:`${X(i).toFixed(1)},${Y(v).toFixed(1)}`).filter(Boolean).join(" ");
-    if(pts) svg+=`<polyline points="${pts}" style="fill:none;stroke:var(--accent);stroke-width:1.3"/>`;
-  } else if(l48!=null){
-    const yv=Y(l48).toFixed(1);
-    svg+=`<line x1="${(W-R-7).toFixed(1)}" y1="${yv}" x2="${(W-R).toFixed(1)}" y2="${yv}" style="stroke:var(--accent);stroke-width:2"/>`;
-  }
-  svg+=`</svg><div class="dt-cap">CCI 48 ${l48==null?"—":l48.toFixed(0)} &middot; CCI 288 ${l288==null?"—":l288.toFixed(0)} &middot; guides &plusmn;200 &middot; scale &plusmn;${cap} &middot; CCI &plusmn;200 is extended momentum context only, not a trading signal</div>`;
-  return svg;
 }
 
 // ══ Company links ══════════════════════════════════
@@ -1686,9 +1596,10 @@ function cciChartSVG(c){
 function symLink(r){
   const L=r.link||{kind:"none",url:"",label:""};
   if(!L.url)
-    return`<span class="sym-a nolink" title="外部リンクなし"><span class="sym-t">${r.symbol}</span></span>`;
-  const badge=L.kind==="source"?`<span class="sym-src" title="一次出典: ${esc(L.label||"")}">src</span>`:"";
-  return`<a class="sym-a" href="${L.url}" target="_blank" rel="noopener" title="${esc(L.label||"")}">`
+    return`<span class="sym-a nolink" title="${T("link.none")}"><span class="sym-t">${esc(r.symbol)}</span></span>`;
+  const lbl=L.label?I18.code("link_label",L.label):"";
+  const badge=L.kind==="source"?`<span class="sym-src" title="${T("link.primary",{label:esc(lbl)})}">${T("link.src")}</span>`:"";
+  return`<a class="sym-a" href="${L.url}" target="_blank" rel="noopener" title="${esc(lbl)}" aria-label="${T("link.open",{sym:esc(r.symbol),label:esc(lbl)})}">`
        +`<span class="sym-t">${r.symbol}</span>${badge}<span class="sym-arrow">↗</span></a>`;
 }
 
@@ -1705,16 +1616,16 @@ function toggleStar(sym,el){
 function cell(c,r){
   const al=`text-align:${c.a}`;
   if(r.error&&!["symbol","name","signal"].includes(c.k))
-    return`<td style="${al}" data-label="${esc(c.l)}"><span style="color:var(--text-faint)">—</span></td>`;
+    return`<td style="${al}" data-label="${esc(T(c.l))}"><span style="color:var(--text-faint)">—</span></td>`;
 
   let h="";
   switch(c.k){
     case"signal":
-      h=`<span class="sig sig-${SC[r.signal]||"err"}">${r.signal||"—"}</span>`;
+      h=`<span class="sig sig-${SC[sigCode(r.signal)]||"err"}">${sigLabel(r.signal)}</span>`;
       break;
     case"composite_score":{
       const v=r.composite_score,co=scColor(v);
-      h=`<div class="sc-w" style="justify-content:center"><span class="sc-v" style="color:${co}">${v}</span><div class="sc-b"><div class="sc-f" style="width:${v}%;background:${co}"></div></div></div>`;
+      h=`<div class="sc-w" style="justify-content:center"><span class="sc-v" style="color:${co}">${v==null?"—":I18.fmtNum(v,0)}</span><div class="sc-b"><div class="sc-f" style="width:${v}%;background:${co}"></div></div></div>`;
       break;
     }
     case"mc_probability":{
@@ -1726,16 +1637,16 @@ function cell(c,r){
     case"symbol":{
       const on=WL.has(r.symbol);
       h=`<div class="sym-cell">
-        <span class="star ${on?"on":""}" onclick="toggleStar('${r.symbol}',this)">${on?"★":"☆"}</span>
+        <span class="star ${on?"on":""}" onclick="toggleStar('${r.symbol}',this)" role="button" title="${T("tbl.star")}" aria-label="${T("tbl.star")}">${on?"★":"☆"}</span>
         ${symLink(r)}
       </div>`;
       break;
     }
-    case"name": h=`<span class="cname" title="${r.name||""}">${r.name||"—"}</span>`; break;
+    case"name": h=`<span class="cname" title="${esc(r.name||"")}">${esc(r.name||"—")}</span>`; break;
     case"price": h=`<span class="price">${fmt(r.price)}</span>`; break;
     case"change_pct":{
       const v=r.change_pct,cl=v>0?"cp":v<0?"cn":"cz";
-      h=`<span class="${cl}">${v>0?"+":""}${v?.toFixed(2)}%</span>`;
+      h=`<span class="${cl}">${v==null?"—":I18.fmtSigned(v,2)+"%"}</span>`;
       break;
     }
     case"rsi":{
@@ -1746,8 +1657,8 @@ function cell(c,r){
     case"macd_direction": h=r.macd_direction==="UP"?`<span class="mu">▲</span>`:`<span class="md">▼</span>`; break;
     case"ema_signal":{
       const cl=r.ema_signal==="BULLISH"?"ebull":r.ema_signal==="BEARISH"?"ebear":"emix";
-      const lb=r.ema_signal==="BULLISH"?"BULL":r.ema_signal==="BEARISH"?"BEAR":"MIX";
-      h=`<span class="${cl}">${lb}</span>`;
+      const lb=r.ema_signal==="BULLISH"?"ema.bull":r.ema_signal==="BEARISH"?"ema.bear":"ema.mix";
+      h=`<span class="${cl}">${T(lb)}</span>`;
       break;
     }
     case"bb_pct":{
@@ -1791,9 +1702,9 @@ function cell(c,r){
       if (typeof v === "number") {
         const isYield = r.__orig === "rates";
         const isLarge = Math.abs(v) >= 1000;
-        const formatted = isYield ? v.toFixed(3) + "%"
-                       : isLarge ? Math.round(v).toLocaleString()
-                       : v.toFixed(2);
+        const formatted = isYield ? I18.fmtNum(v,3) + "%"
+                       : isLarge ? I18.fmtNum(Math.round(v),0)
+                       : I18.fmtNum(v,2);
         h=`<span class="price">${formatted}${esc(r.unit||"")}</span>`;
       } else {
         h=`<span class="price">${esc(v)}${esc(r.unit||"")}</span>`;
@@ -1805,7 +1716,7 @@ function cell(c,r){
       if (v==null) { h=`<span class="cz">—</span>`; break; }
       const cl = v>0?"cp":v<0?"cn":"cz";
       const sign = v>0?"+":"";
-      const formatted = Math.abs(v) >= 1000 ? Math.round(v).toLocaleString() : v.toFixed(2);
+      const formatted = Math.abs(v) >= 1000 ? I18.fmtNum(Math.round(v),0) : I18.fmtNum(v,2);
       h=`<span class="${cl}">${sign}${formatted}</span>`;
       break;
     }
@@ -1814,7 +1725,7 @@ function cell(c,r){
     case"meaning":{
       // (2) 数字→意味の翻訳。tone で強調（alert/warn/normal）。移動マーカーも表示。
       const t = r.tone || "normal";
-      const mv = r.moved ? `<span class="mv-dot" title="今日Δが動いた">●</span>` : "";
+      const mv = r.moved ? `<span class="mv-dot" title="${T("rv.moved")}" aria-label="${T("rv.moved")}">●</span>` : "";
       h=`<span class="rv-meaning t-${esc(t)}">${esc(r.meaning||"—")}</span>${mv}`;
       break;
     }
@@ -1825,20 +1736,20 @@ function cell(c,r){
       if (cls || r.age_label){
         const warn = s==="stale" ? " ⚠" : "";
         const age = r.age_label ? `<span class="age">${esc(r.age_label)}</span>` : "";
-        h=`<span class="dstat ${cls||"dstat-live"}">${esc(String(s).toUpperCase())}${warn}${age}</span>`;
+        h=`<span class="dstat ${cls||"dstat-live"}">${esc(I18.code("data_status",s))}${warn}${age}</span>`;
         break;
       }
       // legacy tokens（他タブ：weekly/monthly/placeholder/auto_cftc 等）は従来表示を維持
       const col = s==="weekly" || s==="monthly" ? "var(--blue)"
               : s==="placeholder" ? "var(--text-faint)"
               : "var(--text-dim)";
-      h=`<span style="color:${col};font-family:var(--cond);font-weight:700;font-size:10px;letter-spacing:0.05em;text-transform:uppercase">${esc(s)}</span>`;
+      h=`<span style="color:${col};font-family:var(--cond);font-weight:700;font-size:10px;letter-spacing:0.05em;text-transform:uppercase">${esc(I18.code("data_status",s))}</span>`;
       break;
     }
     case"risk":{
       const v = r.risk || "—";
       const col = v==="low"?"var(--green)":v==="medium"?"var(--yellow)":v==="high"?"var(--red)":"var(--text-dim)";
-      h=`<span style="color:${col};font-size:11px;font-family:var(--cond);font-weight:700;text-transform:uppercase">${esc(v)}</span>`;
+      h=`<span style="color:${col};font-size:11px;font-family:var(--cond);font-weight:700;text-transform:uppercase">${esc(v==="—"?v:I18.code("risk",v))}</span>`;
       break;
     }
     case"valuation_context":{
@@ -1848,34 +1759,24 @@ function cell(c,r){
     }
     default:{
       const sg = window.SIG ? SIG.cell(c, r, tab) : null;   // §21: 判定・検証・CCI/BB z・ローカル版のみ
-      h = sg!=null ? sg : esc(r[c.k]==null?"—":r[c.k]);
+      h = sg!=null ? sg : esc(r[c.k]==null?"—":I18.code(c.k, r[c.k]));
     }
   }
-  return`<td style="${al}" data-label="${esc(c.l)}">${h}</td>`;
+  return`<td style="${al}" data-label="${esc(T(c.l))}">${h}</td>`;
 }
 // Long-term valuation-regime label (v4.0). Context only — no buy/sell semantics.
 function valCtxLabel(c){
-  return ({
-    placeholder:"Placeholder",
-    historically_extreme_context:"Historically extreme (context)",
-    elevated_context:"Elevated (context)",
-    neutral_to_elevated_context:"Neutral–elevated (context)",
-    moderate_context:"Moderate (context)",
-    low_valuation_context:"Low valuation (context)"
-  })[c] || (c?String(c).replace(/_/g," "):"—");
+  return c ? I18.code("valuation_context", c) : "—";
 }
 
 // ══ Signal class map ═══════════════════════════════
-const SC={
-  "STRONG BUY":"sb","BUY":"b","HOLD":"h","WATCH":"w","AVOID":"av",
-  "STRONG LONG":"sl","LONG":"l","NEUTRAL":"n","SHORT":"sh","STRONG SHORT":"ssl","ERROR":"err"
-};
+const SC=Object.assign({error:"err"}, PC);
 
 // ══ CSV Export ═════════════════════════════════════
 function exportCSV(){
   if(!DATA)return;
   const rows=getRows(),cs=cols();
-  const hdr=cs.map(c=>c.l).join(",");
+  const hdr=cs.map(c=>`"${String(T(c.l)).replace(/"/g,'""')}"`).join(",");
   const lines=rows.map(r=>cs.map(c=>{
     const v=r[c.k];
     if(v==null)return"";
@@ -1893,11 +1794,10 @@ function exportCSV(){
 function fmt(v){
   if(v==null)return"—";
   const a=Math.abs(v);
-  if(a>=10000)return v.toLocaleString(undefined,{maximumFractionDigits:0});
-  if(a>=1000) return v.toLocaleString(undefined,{maximumFractionDigits:0});
-  if(a>=10)   return v.toFixed(2);
-  if(a>=1)    return v.toFixed(3);
-  return v.toFixed(5);
+  if(a>=1000) return I18.fmtNum(v,0);
+  if(a>=10)   return I18.fmtNum(v,2);
+  if(a>=1)    return I18.fmtNum(v,3);
+  return I18.fmtNum(v,5);
 }
 function scColor(s){
   if(s>=75)return"var(--green)";
@@ -1944,6 +1844,9 @@ async function loadScenarios(){
   renderScenarioPanel();
 }
 
+// 外部（macro-fx-base）の文言: 英語版のフィールドがあれば使い、無ければ id の辞書訳 → 原文。
+function scenName(s){ return I18.lang()==="en" ? (s.name_en || (I18.has("scen.id."+s.id)?T("scen.id."+s.id):s.id)) : (s.name_ja || s.id); }
+function scenMemo(s){ return (I18.lang()==="en" ? s.memo_en : s.memo_ja) || ""; }
 function scenEsc(s){ return String(s==null?"":s).replace(/[&<>"]/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
 
 function renderScenarioPanel(){
@@ -1957,15 +1860,15 @@ function renderScenarioPanel(){
   const pad = (hi-lo)*0.05 || 1; lo -= pad; hi += pad;
   const W=760, LBL=104, RGT=12, ROWH=46, TOP=18, H=TOP+scs.length*ROWH+24;
   const x = v => LBL + (v-lo)/(hi-lo)*(W-LBL-RGT);
-  let svg = `<svg viewBox="0 0 ${W} ${H}" style="width:100%;max-width:900px;height:auto;display:block" role="img" aria-label="USD/JPY scenario ranges">`;
+  let svg = `<svg viewBox="0 0 ${W} ${H}" style="width:100%;max-width:900px;height:auto;display:block" role="img" aria-label="${T("scen.aria")}">`;
   if (isFinite(base.usdjpy)){
     svg += `<line x1="${x(base.usdjpy)}" y1="${TOP-6}" x2="${x(base.usdjpy)}" y2="${H-20}" stroke="var(--text-dim)" stroke-dasharray="3,3" stroke-width="1"/>`
-        + `<text x="${x(base.usdjpy)}" y="${TOP-8}" text-anchor="middle" font-size="9" style="fill:var(--text-dim)">現在 ${base.usdjpy}</text>`;
+        + `<text x="${x(base.usdjpy)}" y="${TOP-8}" text-anchor="middle" font-size="9" style="fill:var(--text-dim)">${T("scen.now",{v:base.usdjpy})}</text>`;
   }
   scs.forEach((s,i)=>{
     const y = TOP + i*ROWH, c = SCENARIO_COLORS[s.id] || "#888";
     const x0 = x(s.usdjpy_range[0]), x1 = x(s.usdjpy_range[1]);
-    svg += `<text x="${LBL-8}" y="${y+17}" text-anchor="end" font-size="11" style="fill:var(--text)">${scenEsc(s.name_ja||s.id)}</text>`
+    svg += `<text x="${LBL-8}" y="${y+17}" text-anchor="end" font-size="11" style="fill:var(--text)">${scenEsc(scenName(s))}</text>`
         + `<rect x="${x0}" y="${y+6}" width="${Math.max(x1-x0,2)}" height="16" rx="3" fill="${c}" opacity="0.55"/>`
         + `<text x="${x0-4}" y="${y+17}" text-anchor="end" font-size="9" style="fill:var(--text-faint)">${s.usdjpy_range[0]}</text>`
         + `<text x="${x1+4}" y="${y+17}" text-anchor="start" font-size="9" style="fill:var(--text-faint)">${s.usdjpy_range[1]}</text>`;
@@ -1973,14 +1876,14 @@ function renderScenarioPanel(){
     if (jgb) svg += `<text x="${LBL}" y="${y+34}" font-size="9" style="fill:var(--text-faint)">${jgb}</text>`;
   });
   svg += `</svg>`;
-  const memos = scs.filter(s=>s.memo_ja).map(s =>
-    `<div style="margin-top:4px;font-size:10px;color:var(--text-faint)"><b style="color:var(--text-dim)">${scenEsc(s.name_ja)}</b>: ${scenEsc(s.memo_ja).replace(/\n/g," ")}</div>`
+  const memos = scs.filter(s=>scenMemo(s)).map(s =>
+    `<div style="margin-top:4px;font-size:10px;color:var(--text-faint)"><b style="color:var(--text-dim)">${scenEsc(scenName(s))}</b>: ${scenEsc(scenMemo(s)).replace(/\n/g," ")}</div>`
   ).join("");
   el.innerHTML =
-    `<div style="font-size:12px;color:var(--text-dim);margin-bottom:6px">USD/JPY シナリオレンジ`
-    + `<span style="font-size:9px;color:var(--text-faint);margin-left:8px">generated ${scenEsc(String(SCENARIOS.generated_at||"").slice(0,10))} · macro-fx-base/scenario</span></div>`
+    `<div style="font-size:12px;color:var(--text-dim);margin-bottom:6px">${T("scen.title")}`
+    + `<span style="font-size:9px;color:var(--text-faint);margin-left:8px">${T("scen.generated",{d:scenEsc(I18.fmtDate(String(SCENARIOS.generated_at||"").slice(0,10),"ymd"))})}</span></div>`
     + svg + memos
-    + `<div style="margin-top:6px;font-size:9px;color:var(--text-faint)">${scenEsc(SCENARIOS.disclaimer||"")} · 幅（レンジ）のみ表示・一点予測なし</div>`;
+    + `<div style="margin-top:6px;font-size:9px;color:var(--text-faint)">${scenEsc(I18.lang()==="en"?(SCENARIOS.disclaimer_en||T("common.disc_viz")):(SCENARIOS.disclaimer||""))} · ${T("scen.range_only")}</div>`;
   el.style.display = "block";
 }
 
@@ -1989,6 +1892,15 @@ const __swBeforeScenario = sw;
 sw = function(key, btn){ __swBeforeScenario(key, btn); renderScenarioPanel(); };
 
 loadScenarios();
+
+// 言語切替: 静的部分（data-i18n）は I18.apply が埋める。動的に描いた部分はここで描き直す。
+I18.onChange(()=>{
+  updThBtn(); updMkt(); tick(); updWLBtn();
+  if(!DATA) return;
+  renderUpdBar(); renderSum(); updateTabLabels(); renderDataNotice();
+  if(window.SIG) SIG.renderStaleBanner(DATA);
+  sw(tab, document.querySelector(".tab.active"));
+});
 </script>
 
 <!-- Shared particle engine (Agent A + Agent C / SPEC §4.1) -->
@@ -2009,90 +1921,19 @@ loadScenarios();
    既存 sw / renderTbl と協調動作する。
 ═════════════════════════════════════════════════════════════════ */
 (function(){
-  // ── i18n -------------------------------------------------------
-  const I18N = {
-    ja: {
-      tabs: {nikkei225:"日経 225", dow30:"Dow 30", nasdaq100:"Nasdaq 100",
-             sp500:"S&P 500", fx:"FX / 商品",
-             rates_vol:"金利・債券・VOL", pos_val:"ポジション/割安度",
-             moneyflow:"お金の流れ"},
-      region: {us:"米国", eu:"欧州", jp:"日本"},
-      sink:   {stocks:"株", gold:"金", crypto:"暗号資産", cash:"現金"},
-      disc: "相場「環境」の可視化 / not investment advice",
-      debt: "政府債務", cb_assets: "中央銀行総資産",
-      as_of: "as_of", source: "出典", elapsed: "経過",
-      cb_short: "中央銀行", supply: "供給↑", absorb: "吸収↓",
-      bg_btn: "背景", lng_btn: "JA", days: "日",
-      real_actual: "実データ", real_na: "実額データなし",
-      sink_weekly: "週次変化", sink_note: "粒の到着%は演出値（実測フローではない）",
-      corr_title: "クロスアセット相関", corr_asof: "as_of", corr_lag: "遅延",
-      corr_w60: "60日", corr_w20: "20日", corr_nobs: "観測数",
-      corr_method_label: "算出方法",
-      corr_missing: "相関データ未生成 (placeholder)",
-      corr_foot1: "FX×米金利の相関は金利・債券・VOLタブ参照",
-      corr_foot2: "For data visualization purposes only. Not investment advice.",
-      corr_rolling: "日ローリング",
-      corr_net_foot: "|r|<0.25 のペアは非表示。0.25〜0.35 は減光表示(崖効果の排除)",
-      corr_net_empty: "データ不足",
-      corr_net_legend_pos: "正 (実線/青)",
-      corr_net_legend_neg: "負 (破線/橙)",
-      corr_net_labels: {N225:"日経225", SPX:"S&P500", US5Y:"米5年", US10Y:"米10年", US30Y:"米30年",
-                         JGB5Y:"日5年", JGB10Y:"日10年", JGB30Y:"日30年", USDJPY:"ドル円",
-                         "US-JP10Yspread":"日米10年差"},
-    },
-    en: {
-      tabs: {nikkei225:"Nikkei 225", dow30:"Dow 30", nasdaq100:"Nasdaq 100",
-             sp500:"S&P 500", fx:"FX / Commodities",
-             rates_vol:"Rates / Bonds / Vol", pos_val:"Positioning / Value",
-             moneyflow:"Money Flow"},
-      region: {us:"United States", eu:"Eurozone", jp:"Japan"},
-      sink:   {stocks:"Stocks", gold:"Gold", crypto:"Crypto", cash:"Cash"},
-      disc: "Macro environment visualization / not investment advice",
-      debt: "Gov debt", cb_assets: "CB total assets",
-      as_of: "as_of", source: "source", elapsed: "elapsed",
-      cb_short: "CB", supply: "supply↑", absorb: "absorb↓",
-      bg_btn: "BG", lng_btn: "EN", days: "d",
-      real_actual: "actual data", real_na: "no actual-value data",
-      sink_weekly: "weekly change", sink_note: "particle arrival % is a visual effect, not measured flow",
-      corr_title: "Cross-Asset Correlations", corr_asof: "as_of", corr_lag: "lag",
-      corr_w60: "60d", corr_w20: "20d", corr_nobs: "n_obs",
-      corr_method_label: "method",
-      corr_missing: "Correlation data not yet generated (placeholder)",
-      corr_foot1: "For FX × US-rates correlations, see the Rates/Bonds/Vol tab.",
-      corr_foot2: "For data visualization purposes only. Not investment advice.",
-      corr_rolling: "d rolling",
-      corr_net_foot: "Pairs with |r|<0.25 are hidden. 0.25–0.35 fade in linearly (no hard cliff).",
-      corr_net_empty: "Insufficient data",
-      corr_net_legend_pos: "Positive (solid/blue)",
-      corr_net_legend_neg: "Negative (dashed/orange)",
-      corr_net_labels: {},
-    },
-  };
-  let lang = (localStorage.getItem("hf_lang") || "ja");
-  if (!(lang in I18N)) lang = "ja";
-  function tr(k){ return (I18N[lang] && I18N[lang][k]) || k; }
-  function trSink(k){ return I18N[lang].sink[k] || k; }
-  function trRegion(k){ return I18N[lang].region[k] || k; }
+  // ── i18n: the single dictionary (assets/i18n/dict.js) via window.T --------
+  function tr(k){ return T("mf."+k); }
+  function trSink(k){ return T("mf.sink."+k); }
+  function trRegion(k){ return T("region."+k); }
 
   function applyLang(){
-    document.documentElement.lang = lang;
-    document.querySelectorAll('#tabs .tab[data-tab]').forEach(btn=>{
-      const k = btn.getAttribute('data-tab');
-      const t = I18N[lang].tabs[k]; if (t) btn.textContent = t;
-    });
-    const lb = document.getElementById('lngbtn'); if (lb) lb.textContent = tr('lng_btn');
     const bg = document.getElementById('bgbtn');  if (bg) bg.textContent = tr('bg_btn') + ' ' + bgIcon();
-    ["us","eu","jp"].forEach(r=>{
-      const h = document.getElementById('mf-head-'+r); if (h) h.textContent = trRegion(r);
-    });
-    const dt = document.getElementById('mf-disc-text'); if (dt) dt.textContent = tr('disc');
+    // particle engines bake their labels at creation → rebuild them in the new language
+    Object.keys(mfEngines).forEach(r=>{ const e=mfEngines[r]; if (e && e.destroy) e.destroy(); mfEngines[r]=null; });
     if (window.__mfRefresh) window.__mfRefresh();   // re-render labels
   }
-  window.toggleLang = function(){
-    lang = (lang === "ja") ? "en" : "ja";
-    localStorage.setItem("hf_lang", lang);
-    applyLang();
-  };
+  window.toggleLang = function(){ I18.toggle(); };
+  I18.onChange(applyLang);
 
   // ── Background animation -------------------------------------
   let bgMode = localStorage.getItem("hf_bg_mode") || "clean";
@@ -2130,15 +1971,13 @@ loadScenarios();
   function fmtNum(v, d){
     if (v === null || v === undefined || Number.isNaN(v)) return "—";
     try {
-      return new Intl.NumberFormat(lang==='ja'?'ja-JP':'en-US',
+      return new Intl.NumberFormat(I18.locale(),
         {maximumFractionDigits: d!=null?d:2}).format(v);
     } catch(e) { return String(v); }
   }
   function unitTn(unit){
-    if (!unit) return "T";
-    if (unit === "USD_TN") return "T USD";
-    if (unit === "EUR_TN") return "T EUR";
-    if (unit === "JPY_TN") return "T JPY";
+    if (!unit) return T("mf.unit_tn");
+    if (unit === "USD_TN" || unit === "EUR_TN" || unit === "JPY_TN") return T("mf.unit_"+unit.slice(0,3).toLowerCase());
     return unit;
   }
 
@@ -2148,7 +1987,7 @@ loadScenarios();
     const fb = document.getElementById('mf-fresh-'+r);
     if (fb){
       fb.className = 'mf-badge ' + (block.freshness_badge||'stale');
-      fb.textContent = (block.freshness_badge||'stale');
+      fb.textContent = I18.code('freshness_badge', block.freshness_badge||'stale');
     }
     // counter
     const c = document.getElementById('mf-counter-'+r);
@@ -2165,7 +2004,7 @@ loadScenarios();
         html += '<div class="mf-counter-delta '+cls+'">Δ '+sign+fmtNum(d,4)+' '+lblUnit+'</div>';
       } else {
         const lag = debt.lag_days;
-        html += '<div class="mf-counter-delta">'+(debt.as_of||'—')+
+        html += '<div class="mf-counter-delta">'+(debt.as_of?I18.fmtDate(debt.as_of,'ymd'):'—')+
                 ' ('+(lag!=null?lag+tr('days'):'—')+')</div>';
       }
       c.innerHTML = html;
@@ -2228,11 +2067,11 @@ loadScenarios();
       const nl = block.net_liquidity;
       const parts = [];
       parts.push('<span><b>'+tr('cb_assets')+':</b> '+(cb.value_usd_tn!=null?fmtNum(cb.value_usd_tn,3):'—')+' '+unitTn(cb.unit)+'</span>');
-      parts.push('<span><b>'+tr('as_of')+':</b> '+(cb.as_of||'—')+' ('+(cb.lag_days!=null?cb.lag_days+tr('days'):'—')+')</span>');
-      parts.push('<span><b>'+tr('source')+':</b> '+(cb.source||'—')+'</span>');
-      parts.push('<span class="mf-status">'+(cb.data_status||'—')+'</span>');
+      parts.push('<span><b>'+tr('as_of')+':</b> '+(cb.as_of?I18.fmtDate(cb.as_of,'ymd'):'—')+' ('+(cb.lag_days!=null?cb.lag_days+tr('days'):'—')+')</span>');
+      parts.push('<span><b>'+tr('source')+':</b> '+(cb.source?I18.code('source',cb.source):'—')+'</span>');
+      parts.push('<span class="mf-status">'+(cb.data_status?I18.code('data_status',cb.data_status):'—')+'</span>');
       if (r==='us' && nl){
-        parts.push('<span><b>Net Liq:</b> '+(nl.value_usd_tn!=null?fmtNum(nl.value_usd_tn,3):'—')+' T USD</span>');
+        parts.push('<span><b>'+tr('net_liq')+':</b> '+(nl.value_usd_tn!=null?fmtNum(nl.value_usd_tn,3):'—')+' '+unitTn('USD_TN')+'</span>');
       }
       m.innerHTML = parts.join(' ');
     }
@@ -2284,7 +2123,7 @@ loadScenarios();
     const band30Top = Y(0.3), band30Bot = Y(-0.3);
     const pts = vals.map((v,i)=> v==null?null:`${X(i).toFixed(1)},${Y(v).toFixed(1)}`).filter(Boolean).join(' ');
     const zero = Y(0);
-    let svg = `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="rolling correlation sparkline">`;
+    let svg = `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="${tr('corr_aria_spark')}">`;
     svg += `<rect x="${L}" y="${band30Top.toFixed(1)}" width="${W-L-R}" height="${(band30Bot-band30Top).toFixed(1)}" style="fill:var(--text-faint);opacity:0.14"/>`;
     svg += `<line x1="${L}" y1="${zero.toFixed(1)}" x2="${W-R}" y2="${zero.toFixed(1)}" style="stroke:var(--border2);stroke-width:0.6"/>`;
     if (pts){
@@ -2311,9 +2150,7 @@ loadScenarios();
   let corrNetLastGeom = null; // cached for hit-testing on mousemove without full recompute
 
   function corrNetLabel(lb){
-    const dict = I18N[lang] && I18N[lang].corr_net_labels;
-    if (lang === 'ja' && dict && dict[lb]) return dict[lb];
-    return lb;
+    return I18.has("corr.node."+lb) ? T("corr.node."+lb) : lb;
   }
 
   function corrNetLayout(labels, w, h){
@@ -2638,7 +2475,7 @@ loadScenarios();
     if (status === 'placeholder'){
       panel.innerHTML =
         '<div class="cp-head"><span class="cp-title">'+tr('corr_title')+'</span>'+
-        '<span class="mf-badge stale">'+status+'</span></div>'+
+        '<span class="mf-badge stale">'+I18.code('data_status',status)+'</span></div>'+
         '<div class="cp-empty">'+tr('corr_missing')+'</div>';
       return;
     }
@@ -2651,16 +2488,16 @@ loadScenarios();
     let html = '';
     html += '<div class="cp-head">';
     html += '<span class="cp-title">'+tr('corr_title')+'</span>';
-    html += '<span class="mf-badge '+badgeCls+'">'+status+'</span>';
-    html += '<span class="cp-asof">'+tr('corr_asof')+' '+(corr.as_of ? String(corr.as_of).slice(0,10) : '—')+
+    html += '<span class="mf-badge '+badgeCls+'">'+I18.code('data_status',status)+'</span>';
+    html += '<span class="cp-asof">'+tr('corr_asof')+' '+(corr.as_of ? I18.fmtDate(String(corr.as_of).slice(0,10),'ymd') : '—')+
             ' ('+tr('corr_lag')+' '+(lag!=null?lag+tr('days'):'—')+')</span>';
     const srcs = Array.isArray(corr.sources) ? corr.sources.filter(Boolean) : [];
     if (srcs.length){
-      html += '<span class="cp-asof"><b>'+tr('source')+':</b> '+srcs.join(' · ')+'</span>';
+      html += '<span class="cp-asof"><b>'+tr('source')+':</b> '+srcs.map(s=>I18.code('source',s)).join(' · ')+'</span>';
     }
     html += '</div>';
     if (corr.method){
-      html += '<div class="cp-method">'+tr('corr_method_label')+': '+corr.method+'</div>';
+      html += '<div class="cp-method">'+tr('corr_method_label')+': '+I18.code('corr_method',corr.method)+'</div>';
     }
 
     // window toggle
@@ -2783,14 +2620,14 @@ loadScenarios();
   const $=id=>document.getElementById(id);
   const esc=s=>String(s==null?"":s).replace(/[&<>]/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[m]));
   const nz=v=>(typeof v==="number"&&isFinite(v));
-  const f=(v,d=2)=>nz(v)?v.toFixed(d):"—";
-  const pct=(v,d=2)=>nz(v)?(v>=0?"+":"")+v.toFixed(d)+"%":"—";
-  const BAD='<div class="rel-bad">取得に失敗しています。表示中の値はありません（最新値は表示しません）。</div>';
+  const f=(v,d=2)=>nz(v)?I18.fmtNum(v,d):"—";
+  const pct=(v,d=2)=>nz(v)?(v>=0?"+":"")+I18.fmtNum(v,d)+"%":"—";
+  const BAD=()=>`<div class="rel-bad">${T("rel.bad")}</div>`;
 
   async function grab(url){
     try{ const r=await fetch(url+"?t="+Date.now(),{cache:"no-cache"});
       if(!r.ok) throw new Error(r.status); return {ok:true,data:await r.json()}; }
-    catch(e){ console.warn("rel fetch failed",url,e); return {ok:false,data:null}; }
+    catch(e){ console.warn("rel-fetch",url,e); return {ok:false,data:null}; }
   }
 
   // ── inline SVG helpers (no external lib) ──
@@ -2812,7 +2649,7 @@ loadScenarios();
     const [emn,emx]=minmax(eq);
     const ylist=hasReal?real.concat(showNominal?nom:[]):nom;
     const [ymn,ymx]=minmax(ylist.length?ylist:nom);
-    let s=`<svg class="rel-svg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="price and yield">`;
+    let s=`<svg class="rel-svg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="${T("rel.aria_dual")}">`;
     s+=poly(eq,W,H,6,emn,emx,"stroke:var(--accent);stroke-width:1.6");
     if(hasReal) s+=poly(real,W,H,6,ymn,ymx,"stroke:var(--yellow);stroke-width:1.4");
     else        s+=poly(nom,W,H,6,ymn,ymx,"stroke:var(--yellow);stroke-width:1.4");
@@ -2822,21 +2659,21 @@ loadScenarios();
   // regime gauge: r in [-1,1] with history markers + zones
   function regimeGauge(r,hist){
     const W=460,H=64,pad=8, X=v=>pad+(v+1)/2*(W-2*pad);
-    let s=`<svg class="rel-svg" style="height:64px" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="stock-bond correlation regime">`;
+    let s=`<svg class="rel-svg" style="height:64px" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="${T("rel.aria_regime")}">`;
     // zones: <=-0.2 green(機能) / >=0.2 red(壊れる) / mid gray
     s+=`<rect x="${pad}" y="24" width="${X(-0.2)-pad}" height="12" style="fill:var(--green);opacity:.25"/>`;
     s+=`<rect x="${X(-0.2)}" y="24" width="${X(0.2)-X(-0.2)}" height="12" style="fill:var(--text-faint);opacity:.2"/>`;
     s+=`<rect x="${X(0.2)}" y="24" width="${W-pad-X(0.2)}" height="12" style="fill:var(--red);opacity:.25"/>`;
     s+=`<line x1="${X(0)}" y1="20" x2="${X(0)}" y2="40" style="stroke:var(--border2);stroke-width:1"/>`;
-    const hm=[["covid",hist&&hist.covid_2020_03_2021_06,"var(--text-faint)"],
+    const hm=[[T("rel.h_covid"),hist&&hist.covid_2020_03_2021_06,"var(--text-faint)"],
               ["2022",hist&&hist.inflation_2022,"var(--text-faint)"],
-              ["1y",hist&&hist.last_1y,"var(--text-dim)"]];
+              [T("rel.h_1y"),hist&&hist.last_1y,"var(--text-dim)"]];
     hm.forEach(([lb,v])=>{ if(nz(v)){ s+=`<circle cx="${X(v).toFixed(1)}" cy="30" r="2.5" style="fill:var(--text-dim)"/>`+
         `<text x="${X(v).toFixed(1)}" y="18" style="fill:var(--text-faint);font-size:8px" text-anchor="middle">${lb}</text>`; }});
     if(nz(r)) s+=`<circle cx="${X(r).toFixed(1)}" cy="30" r="4" style="fill:var(--accent)"/>`+
-        `<text x="${X(r).toFixed(1)}" y="52" style="fill:var(--accent);font-size:9px;font-weight:700" text-anchor="middle">${r.toFixed(2)}</text>`;
-    s+=`<text x="${pad}" y="52" style="fill:var(--green);font-size:8px">−1 天秤機能</text>`;
-    s+=`<text x="${W-pad}" y="52" style="fill:var(--red);font-size:8px" text-anchor="end">+1 天秤崩壊</text>`;
+        `<text x="${X(r).toFixed(1)}" y="52" style="fill:var(--accent);font-size:9px;font-weight:700" text-anchor="middle">${f(r,2)}</text>`;
+    s+=`<text x="${pad}" y="52" style="fill:var(--green);font-size:8px">${T("rel.g_works")}</text>`;
+    s+=`<text x="${W-pad}" y="52" style="fill:var(--red);font-size:8px" text-anchor="end">${T("rel.g_breaks")}</text>`;
     return s+"</svg>";
   }
   function betaBars(b){
@@ -2853,140 +2690,127 @@ loadScenarios();
   // ── section renderers ──
   function renderBalance(){
     const R=REL.data;
-    if(!R) return `<div class="rel-sec"><div class="rel-h">天秤（利回り×株価）</div>${BAD}</div>`;
+    if(!R) return `<div class="rel-sec"><div class="rel-h">${T("rel.balance_h")}</div>${BAD()}</div>`;
     const b=R.balance, rg=b.regime, be=b.beta, rb=b.rebalance, cx=(b.context||{}).us_10y_nominal||{}, cxr=(b.context||{}).us_10y_real||{};
     const reg=R.regions||{};
     // upper: 3-region charts
     let charts="";
-    [["us","米国",true],["eu","欧州",false],["jp","日本",false]].forEach(([k,nm,hasReal])=>{
+    [["us",true],["eu",false],["jp",false]].forEach(([k,hasReal])=>{
+      const nm=T("region."+k);
       const rr=reg[k]||{}; const bad=rr.data_status!=="live"||!(rr.series&&rr.series.length);
       const last=(rr.series&&rr.series.length)?rr.series[rr.series.length-1]:null;
-      charts+=`<div class="rel-col"><div class="rel-sub">${nm} <span class="rel-badge">${esc(rr.source||"")}</span></div>`;
-      if(bad){ charts+=BAD; }
+      charts+=`<div class="rel-col"><div class="rel-sub">${nm} <span class="rel-badge">${esc(I18.code("source",rr.source||""))}</span></div>`;
+      if(bad){ charts+=BAD(); }
       else{
         charts+=dualChart(rr.series, hasReal);
-        charts+=cap(
-          `<b>この図</b>: ${nm}の株価（青の実線）と${hasReal?"実質金利（黄の実線・名目は破線トグル）":"名目金利（黄の実線）"}を重ねたもの。`+
-          `<br><b>読み方</b>: 金利が上がると債券が有利になり株から資金が抜けやすい（下向き圧力）。`+
-          `<br><b>現在</b>: 株価 ${f(last&&last.equity,0)}、${hasReal?`実質金利 ${f(last&&last.real_yield,2)}%（名目 ${f(last&&last.nominal,2)}%）`:`名目金利 ${f(last&&last.nominal,2)}%`}。`+
-          `<br><b>出典・算出</b>: <span class="k">株価 ${esc(rr.equity_source||"")}、利回り ${esc(rr.source||"")}。共通営業日で突き合わせ（inner join・前方補完なし）。</span>`+
-          `<br><b>前提・限界</b>: <span class="k">${hasReal?"米国は実質金利あり。":"欧州/日本は実質金利の無料日次系列がないため名目のみ＝米国と非対称。"}</span>`);
+        charts+=cap(T("rel.cap_region",{
+          region:nm, lines:T(hasReal?"rel.lines_real":"rel.lines_nominal"),
+          now:hasReal?T("rel.now_real",{eq:f(last&&last.equity,0),real:f(last&&last.real_yield,2),nom:f(last&&last.nominal,2)})
+                     :T("rel.now_nominal",{eq:f(last&&last.equity,0),nom:f(last&&last.nominal,2)}),
+          eqsrc:esc(I18.code("source",rr.equity_source||"")), src:esc(I18.code("source",rr.source||"")),
+          limit:T(hasReal?"rel.limit_us":"rel.limit_eujp")}));
       }
       charts+=`</div>`;
     });
-    const nomTgl=`<span class="rel-toggle" onclick="window.__relToggleNom&&window.__relToggleNom()">名目を${showNominal?"隠す":"重ねる"}（破線）</span>`;
+    const nomTgl=`<span class="rel-toggle" role="button" onclick="window.__relToggleNom&&window.__relToggleNom()">${T(showNominal?"rel.nom_hide":"rel.nom_show")}</span>`;
     // middle: regime
     const regBad=!nz(rg&&rg.r_120d);
-    const mid=`<div class="rel-sub">相関レジーム（天秤が機能しているか）</div>`+
-      (regBad?BAD:regimeGauge(rg.r_120d,rg.history)+cap(
-        `<b>この図</b>: 「株と債券が逆に動いているか」を示します。`+
-        `<br><b>読み方</b>: マイナスなら金利上昇時に株が下がる（天秤が機能）、プラスなら株と債券が同時に落ちる（天秤が壊れる）。`+
-        `<br><b>現在</b>: r = <b>${f(rg.r_120d,2)}</b>（${esc(rg.label||"")}）。<span class="k">履歴 covid ${f(rg.history&&rg.history.covid_2020_03_2021_06,2)} / 2022 ${f(rg.history&&rg.history.inflation_2022,2)} / 直近1年 ${f(rg.history&&rg.history.last_1y,2)}。</span>`+
-        `<br><b>出典・算出</b>: <span class="k">株価の日次対数リターン × 利回りの日次変化(bp)、120日ローリング。水準ではなく変化率で取る（水準はトレンドで見かけの相関が高く出るため）。n=${rg.n_obs}。</span>`+
-        `<br><b>前提・限界</b>: <span class="k">60/40 の前提はこの符号に依存する。US(SP500×DGS10)で算出。</span>`));
+    const h=(rg&&rg.history)||{};
+    const mid=`<div class="rel-sub">${T("rel.regime_h")}</div>`+
+      (regBad?BAD():regimeGauge(rg.r_120d,rg.history)+cap(T("rel.cap_regime",{
+        r:f(rg.r_120d,2), label:esc(I18.code("regime",rg.label||"")),
+        covid:f(h.covid_2020_03_2021_06,2), y2022:f(h.inflation_2022,2), y1:f(h.last_1y,2), n:I18.fmtNum(rg.n_obs,0)})));
     // lower: beta
     const mxdz=nz(cx.d20_z)?cx.d20_z:0;
-    const low=`<div class="rel-sub">感応度ベータ（腕の長さ）</div>`+
-      (be&&(nz(be.nasdaq100)||nz(be.sp500))? betaBars(be)+cap(
-        `<b>この図</b>: 金利が10bp上がったとき各指数が何%動くかを示します。`+
-        `<br><b>読み方</b>: 数値（絶対値）が大きいほど金利に敏感です。`+
-        `<br><b>現在</b>: Nasdaq100 ${f(be.nasdaq100,3)}% / Dow30 ${f(be.dow30,3)}% / S&P500 ${f(be.sp500,3)}%。Nasdaq が最も敏感なのは利益が遠い将来にあるため。`+
-        `<br><b>出典・算出</b>: <span class="k">各指数の日次対数リターン × DGS10 の日次変化(bp)、直近${be.lookback_days}日の OLS 傾き。FRED。</span>`+
-        `<br><b>前提・限界</b>: <span class="k">Dow が S&P500 より敏感なのは教科書と逆。断定せず観測対象として置いています。</span>`)
-      :BAD);
+    const low=`<div class="rel-sub">${T("rel.beta_h")}</div>`+
+      (be&&(nz(be.nasdaq100)||nz(be.sp500))? betaBars(be)+cap(T("rel.cap_beta",{
+        ndx:f(be.nasdaq100,3), dow:f(be.dow30,3), spx:f(be.sp500,3), days:I18.fmtNum(be.lookback_days,0)}))
+      :BAD());
     // sidebar
-    const side=`<div class="rel-side"><div class="rel-sub">サイドバー</div>`+
-      `<div class="kv"><span>四半期末リバランス</span><span>${rb&&rb.data_status==="live"?esc(rb.pressure):"—"}</span></div>`+
-      `<div class="kv"><span>株式 / 債券リターン</span><span>${rb?pct(rb.eq_ret_pct)+" / "+pct(rb.bond_ret_pct):"—"}</span></div>`+
-      `<div class="kv"><span>乖離 gap</span><span>${rb?pct(rb.gap_pct):"—"}</span></div>`+
-      `<div class="kv"><span>米10年 水準</span><span>${f(cx.value,2)}%</span></div>`+
-      `<div class="kv"><span>パーセンタイル(5年)</span><span>${nz(cx.pct_rank)?cx.pct_rank+"%tile":"—"}</span></div>`+
-      `<div class="kv"><span>20日変化 z (速度)</span><span class="${mxdz>=2?"rel-warn":""}">${f(cx.d20_z,2)}${mxdz>=2?" ⚠速い":""}</span></div>`+
-      `<div class="rel-disc">天秤を壊すのは水準ではなく速度。d20_z が +2 を超えたら警告。リバランスはデュレーション8での近似（年金比率・規模は非公開）。</div></div>`;
+    const side=`<div class="rel-side"><div class="rel-sub">${T("rel.side_h")}</div>`+
+      `<div class="kv"><span>${T("rel.side_rebal")}</span><span>${rb&&rb.data_status==="live"?esc(I18.code("rebalance_pressure",rb.pressure)):"—"}</span></div>`+
+      `<div class="kv"><span>${T("rel.side_ret")}</span><span>${rb?pct(rb.eq_ret_pct)+" / "+pct(rb.bond_ret_pct):"—"}</span></div>`+
+      `<div class="kv"><span>${T("rel.side_gap")}</span><span>${rb?pct(rb.gap_pct):"—"}</span></div>`+
+      `<div class="kv"><span>${T("rel.side_us10y")}</span><span>${f(cx.value,2)}%</span></div>`+
+      `<div class="kv"><span>${T("rel.side_pctile")}</span><span>${nz(cx.pct_rank)?T("rel.pctile",{v:I18.fmtNum(cx.pct_rank,0)}):"—"}</span></div>`+
+      `<div class="kv"><span>${T("rel.side_d20z")}</span><span class="${mxdz>=2?"rel-warn":""}">${f(cx.d20_z,2)}${mxdz>=2?" "+T("rel.fast"):""}</span></div>`+
+      `<div class="rel-disc">${T("rel.side_disc")}</div></div>`;
     // ERP unavailable
     const erp=b.erp||{};
-    const erpBox=`<div class="rel-sub">ERP（株式リスクプレミアム）<span class="rel-badge">未実装</span></div>`+
-      `<div class="rel-bad">未実装: ${esc(erp.reason||"指数の日次EPSに無料の信頼ソースがない。")}<br>部品2・3・4（相関/ベータ/リバランス）だけで天秤の動作状態は判定できます。空欄にはしていません。</div>`;
+    const erpBox=`<div class="rel-sub">${T("rel.erp_h")}<span class="rel-badge">${T("rel.not_impl")}</span></div>`+
+      `<div class="rel-bad">${T("rel.erp_body",{reason:esc(erp.reason?I18.code("erp_reason",erp.reason):T("rel.erp_reason_default"))})}</div>`;
 
-    return `<div class="rel-sec"><div class="rel-h">天秤（利回り×株価）— 3地域 ${nomTgl}</div>`+
+    return `<div class="rel-sec"><div class="rel-h">${T("rel.balance_h3")} ${nomTgl}</div>`+
       `<div class="rel-flex">${charts}</div>${mid}`+
       `<div class="rel-flex"><div class="rel-col">${low}</div>${side}</div>${erpBox}`+
-      `<div class="rel-disc">For data visualization purposes only. Not investment advice.</div></div>`;
+      `<div class="rel-disc">${T("common.disc_viz")}</div></div>`;
   }
 
   function ctxLine(id,S){ const s=(S&&S[id])||{}; const c=s.context||{};
-    if(s.data_status!=="live") return `<div><b>${id}</b> <span class="k">取得失敗（最新値なし）</span></div>`;
+    if(s.data_status!=="live") return `<div><b>${esc(id)}</b> <span class="k">${T("rel.ctx_failed")}</span></div>`;
     const warn=nz(c.d20_z)&&Math.abs(c.d20_z)>=2;
-    return `<div><b>${id}</b> ${f(s.value,4)} <span class="k">[${esc(s.label||"")}]</span> `+
-      `<span class="k">%tile ${nz(c.pct_rank)?c.pct_rank:"—"} · z ${f(c.z,2)} · d20z <span class="${warn?"rel-warn":""}">${f(c.d20_z,2)}${warn?"⚠":""}</span></span></div>`;
+    return `<div><b>${esc(id)}</b> ${f(s.value,4)} <span class="k">[${esc(I18.code("macro_label",s.label||""))}]</span> `+
+      `<span class="k">${T("rel.ctx_stats",{pct:nz(c.pct_rank)?I18.fmtNum(c.pct_rank,0):"—",z:f(c.z,2)})} <span class="${warn?"rel-warn":""}">${f(c.d20_z,2)}${warn?"⚠":""}</span></span></div>`;
   }
   function renderMacro(){
     const M=MAC.data;
-    if(!M) return `<div class="rel-sec"><div class="rel-h">金利の分解・信用・資金・環境（macro_v2）</div>${BAD}</div>`;
+    if(!M) return `<div class="rel-sec"><div class="rel-h">${T("rel.macro_h")}</div>${BAD()}</div>`;
     const S=M.series||{}, id=M.identities||{}, fi=id.fisher||{}, ex=id.expectations||{}, nl=M.net_liquidity||{};
     const byCat=c=>Object.keys(S).filter(k=>S[k].category===c);
     const grid=cats=>`<div class="rel-grid">${cats.map(k=>ctxLine(k,S)).join("")}</div>`;
-    // decomposition caption (example 5)
-    const decompCap=cap(
-      `<b>この図</b>: 名目金利 = 実質金利 + 期待インフレ という恒等式の内訳です。`+
-      `<br><b>読み方</b>: 同じ金利でも、実質が上がったのか期待インフレが上がったのかで株への影響が逆になります。`+
-      `<br><b>現在</b>: 名目 ${f(fi.nominal,2)}% = 実質 ${f(fi.real,2)}% + 期待インフレ ${f(fi.breakeven,2)}%（検算誤差 ${f(fi.gap,2)}）。さらに ${f(ex.nominal,2)}% のうち ${f(ex.term_premium,2)}% はターム・プレミアム（リスク料）、残り <b>${f(ex.value,2)}%</b> が将来の政策金利の予想です。`+
-      `<br><b>出典・算出</b>: <span class="k">FRED DGS10 / DFII10 / T10YIE / THREEFYTP10。名目−ターム・プレミアム=予想。</span>`+
-      `<br><b>前提・限界</b>: <span class="k">米国のみ。EU/JP は実質金利・ターム・プレミアムの無料日次系列がありません。</span>`);
-    const nlCap=cap(
-      `<b>この図</b>: 市場に出回るお金（ネット流動性）の大きさです。`+
-      `<br><b>読み方</b>: 大きいほど株などリスク資産に追い風になりやすい。`+
-      `<br><b>現在</b>: 第一指標 準備預金(WRESBAL) <b>${f(nl.primary&&nl.primary.value_tn,2)}兆ドル</b>。参考の簡易式(WALCL−TGA−RRP) ${f(nl.reference&&nl.reference.value_tn,2)}兆ドル。`+
-      `<br><b>出典・算出</b>: <span class="k">FRED。RRP はほぼ枯渇（${f(nl.reference&&nl.reference.components_tn&&nl.reference.components_tn.RRP,4)}兆ドル）で情報量が乏しいため WRESBAL を主指標に格上げ。</span>`+
-      `<br><b>前提・限界</b>: <span class="k">簡易式は SNS 由来の参考値。主はあくまで WRESBAL。</span>`);
-    return `<div class="rel-sec"><div class="rel-h">金利の分解・信用・資金・環境（macro_v2）</div>`+
-      `<div class="rel-sub">分解（名目 = 実質 + 期待インフレ / ターム・プレミアム）</div>${grid(byCat("rates_decomp"))}${decompCap}`+
-      `<div class="rel-sub">信用スプレッド（HY / IG OAS）</div>${grid(byCat("credit"))}`+
-      cap(`<b>この図</b>: 社債の上乗せ金利（信用不安の温度計）。<br><b>読み方</b>: 上がるほど信用不安。<br><b>現在</b>: HY ${f((S.BAMLH0A0HYM2||{}).value,2)} / IG ${f((S.BAMLC0A0CM||{}).value,2)}。<br><b>出典・算出</b>: <span class="k">FRED BAMLH0A0HYM2 / BAMLC0A0CM。</span><br><b>前提・限界</b>: <span class="k">米国のみ。</span>`)+
-      `<div class="rel-sub">資金繰り（SOFR / IORB / SOFR99 / 準備預金）</div>${grid(byCat("funding"))}${nlCap}`+
-      `<div class="rel-sub">金融環境・景気（NFCI / ANFCI / StL Stress / ドル指数 / 10Y-3M / Sahm）</div>${grid(byCat("conditions").concat(byCat("recession")))}`+
-      cap(`<b>この図</b>: 金融環境の緩和/引き締めと景気後退の温度計。<br><b>読み方</b>: NFCI/ANFCI は負＝緩和、10Y-3M が負＝逆イールド（後退シグナル）、Sahm は 0.5 で発火。<br><b>現在</b>: NFCI ${f((S.NFCI||{}).value,3)} / 10Y-3M ${f((S.T10Y3M||{}).value,2)} / Sahm ${f((S.SAHMREALTIME||{}).value,2)}。<br><b>出典・算出</b>: <span class="k">FRED。各系列に5年パーセンタイル文脈(%tile / z / d20z)を付与。</span><br><b>前提・限界</b>: <span class="k">米国のみ。weekly/monthly 系列は d20 が20週/月換算。</span>`)+
-      `<div class="rel-disc">出典: FRED（keyless）。For data visualization purposes only. Not investment advice.</div></div>`;
+    const decompCap=cap(T("rel.cap_decomp",{nom:f(fi.nominal,2),real:f(fi.real,2),be:f(fi.breakeven,2),gap:f(fi.gap,2),
+      exnom:f(ex.nominal,2),tp:f(ex.term_premium,2),exp:f(ex.value,2)}));
+    const nlCap=cap(T("rel.cap_netliq",{p:f(nl.primary&&nl.primary.value_tn,2),ref:f(nl.reference&&nl.reference.value_tn,2),
+      rrp:f(nl.reference&&nl.reference.components_tn&&nl.reference.components_tn.RRP,4)}));
+    return `<div class="rel-sec"><div class="rel-h">${T("rel.macro_h")}</div>`+
+      `<div class="rel-sub">${T("rel.decomp_h")}</div>${grid(byCat("rates_decomp"))}${decompCap}`+
+      `<div class="rel-sub">${T("rel.credit_h")}</div>${grid(byCat("credit"))}`+
+      cap(T("rel.cap_credit",{hy:f((S.BAMLH0A0HYM2||{}).value,2),ig:f((S.BAMLC0A0CM||{}).value,2)}))+
+      `<div class="rel-sub">${T("rel.funding_h")}</div>${grid(byCat("funding"))}${nlCap}`+
+      `<div class="rel-sub">${T("rel.cond_h")}</div>${grid(byCat("conditions").concat(byCat("recession")))}`+
+      cap(T("rel.cap_cond",{nfci:f((S.NFCI||{}).value,3),t10y3m:f((S.T10Y3M||{}).value,2),sahm:f((S.SAHMREALTIME||{}).value,2)}))+
+      `<div class="rel-disc">${T("rel.macro_disc")} ${T("common.disc_viz")}</div></div>`;
   }
 
   function renderGamma(){
     const G=GAM.data;
-    if(!G) return `<div class="rel-sec"><div class="rel-h">ディーラー・ガンマ（米国のみ）</div>${BAD}</div>`;
-    if(G.data_status==="error") return `<div class="rel-sec"><div class="rel-h">ディーラー・ガンマ（米国のみ）</div>${BAD}<div class="rel-disc">${esc(G.note||"")}</div></div>`;
+    if(!G) return `<div class="rel-sec"><div class="rel-h">${T("rel.gamma_h")}</div>${BAD()}</div>`;
+    const note=G.note?esc(I18.code("gamma_note",G.note)):"";
+    if(G.data_status==="error") return `<div class="rel-sec"><div class="rel-h">${T("rel.gamma_h")}</div>${BAD()}<div class="rel-disc">${note}</div></div>`;
     const walls=(G.gamma_walls||[]).slice(0,10);
     const mxw=Math.max(0.001,...walls.map(w=>Math.abs(w.gex_bn||0)));
     const wallRows=walls.map(w=>{ const wd=Math.abs(w.gex_bn||0)/mxw*100;
-      return `<div class="rel-bar-row"><span style="width:60px">${w.strike}</span>`+
+      return `<div class="rel-bar-row"><span style="width:60px">${I18.fmtNum(w.strike,0)}</span>`+
         `<span class="rel-bar-track"><span class="rel-bar-fill" style="width:${wd.toFixed(0)}%;left:0;background:${(w.gex_bn||0)<0?"var(--red)":"var(--green)"}"></span></span>`+
-        `<span style="width:70px;text-align:right">${f(w.gex_bn,2)}bn</span></div>`;}).join("");
+        `<span style="width:70px;text-align:right">${T("rel.bn",{v:f(w.gex_bn,2)})}</span></div>`;}).join("");
     const vs=G.vol_structure||{};
     const zeroDte = G.gex_volume_0dte_status==="unavailable"
-      ? `<div class="rel-bad">0DTE（当日満期・出来高ベース）: <b>取得不能（unavailable）</b>。${esc(G.gex_volume_0dte_reason||"")}</div>`
-      : `<div class="rel-grid"><div><b>0DTE(出来高)</b> ${f(G.gex_volume_0dte_bn,2)}bn</div></div>`;
-    return `<div class="rel-sec"><div class="rel-h">ディーラー・ガンマ（米国のみ）</div>`+
-      `<div class="rel-grid"><div><b>総 GEX</b> ${f(G.gex_oi_bn,2)}bn ドル/1%</div><div><b>ゼロガンマ</b> ${f(G.zero_gamma,1)}</div>`+
-      `<div><b>現値</b> ${f(G.spot,2)}</div><div><b>フリップ判定</b> ${esc(G.flip_vs_spot||"")}</div></div>`+
-      cap(
-        `<b>この図</b>: オプションのディーラーが価格変動にどう反応するか（下の壁は行使価格別のガンマ）。`+
-        `<br><b>読み方</b>: 総 GEX がマイナスなら下落時に売り上昇時に買うため値動きが増幅、プラスなら打ち消し。`+
-        `<br><b>現在</b>: ${f(G.gex_oi_bn,2)}bnドル/1%、ゼロガンマ ${f(G.zero_gamma,1)}、現値 ${f(G.spot,2)} はその${G.flip_vs_spot==="below_flip_amplifying"?"下＝増幅ゾーン":"上＝抑制ゾーン"}。`+
-        `<br><b>出典・算出</b>: <span class="k">CBOE 公開オプションチェーン（SPX、建玉あり ${G.n_contracts_oi} 契約）。${esc((G.snapshot&&G.snapshot.source)||"")}。</span>`+
-        `<br><b>前提・限界</b>: <span class="k">${esc(G.note||"")} coverage: 米国のみ（EU/JP は JPX/Eurex がギリシャ文字非公開で unavailable）。</span>`)+
-      `<div class="rel-sub">ガンマ壁（行使価格別・上位10）</div>${wallRows||BAD}`+
-      cap(`<b>この図</b>: どの株価で値動きが止まりやすい/増幅しやすいかの「壁」。<br><b>読み方</b>: 正（緑）は貼り付き、負（赤）は増幅。<br><b>現在</b>: 最大の壁 ${walls[0]?walls[0].strike:"—"}（${walls[0]?f(walls[0].gex_bn,2)+"bn":"—"}）。<br><b>出典・算出</b>: <span class="k">CBOE gamma × 建玉、25ポイント刻み集計。</span><br><b>前提・限界</b>: <span class="k">売買主体の慣習的仮定に依存（下記）。</span>`)+
-      `<div class="rel-sub">0DTE（当日満期）</div>${zeroDte}`+
-      cap(`<b>この図</b>: 当日満期(0DTE)の日中増幅。<br><b>読み方</b>: 建玉ベースの総 GEX は 0DTE を過小評価します。<br><b>現在</b>: このフィードでは <b>取得不能</b>（前営業日引けスナップのため0DTEが消えている、契約数 ${G.n_0dte_contracts}）。<br><b>出典・算出</b>: <span class="k">CBOE 遅延フィード。0DTE を捉えるにはリアルタイムフィードが必要だが無料では入手できない。</span><br><b>前提・限界</b>: <span class="k">gex_oi と合算しない。0 ではなく unavailable と表示。</span>`)+
-      `<div class="rel-sub">ボラ構造</div><div class="rel-grid">`+
-      `<div><b>VIX3M/VIX</b> ${f(vs.vix3m_vix_ratio,3)} <span class="k">[${esc(vs.term_state||"")}]</span></div>`+
+      ? `<div class="rel-bad">${T("rel.dte_unavail",{reason:esc(G.gex_volume_0dte_reason?I18.code("gamma_note",G.gex_volume_0dte_reason):"")})}</div>`
+      : `<div class="rel-grid"><div><b>${T("rel.dte_vol")}</b> ${T("rel.bn",{v:f(G.gex_volume_0dte_bn,2)})}</div></div>`;
+    const flip=esc(I18.code("flip_vs_spot",G.flip_vs_spot||""));
+    const termState=esc(I18.code("term_state",vs.term_state||""));
+    const cov=G.coverage||{};
+    return `<div class="rel-sec"><div class="rel-h">${T("rel.gamma_h")}</div>`+
+      `<div class="rel-grid"><div><b>${T("rel.gex_total")}</b> ${T("rel.bn_per1",{v:f(G.gex_oi_bn,2)})}</div><div><b>${T("rel.zero_gamma")}</b> ${f(G.zero_gamma,1)}</div>`+
+      `<div><b>${T("rel.spot")}</b> ${f(G.spot,2)}</div><div><b>${T("rel.flip")}</b> ${flip}</div></div>`+
+      cap(T("rel.cap_gamma",{gex:f(G.gex_oi_bn,2),zg:f(G.zero_gamma,1),spot:f(G.spot,2),
+        zone:T(G.flip_vs_spot==="below_flip_amplifying"?"rel.zone_amp":"rel.zone_damp"),
+        n:I18.fmtNum(G.n_contracts_oi,0), snap:esc(I18.code("source",(G.snapshot&&G.snapshot.source)||"")), note}))+
+      `<div class="rel-sub">${T("rel.walls_h")}</div>${wallRows||BAD()}`+
+      cap(T("rel.cap_walls",{strike:walls[0]?I18.fmtNum(walls[0].strike,0):"—",gex:walls[0]?T("rel.bn",{v:f(walls[0].gex_bn,2)}):"—"}))+
+      `<div class="rel-sub">${T("rel.dte_h")}</div>${zeroDte}`+
+      cap(T("rel.cap_dte",{n:I18.fmtNum(G.n_0dte_contracts,0)}))+
+      `<div class="rel-sub">${T("rel.volstruct_h")}</div><div class="rel-grid">`+
+      `<div><b>VIX3M/VIX</b> ${f(vs.vix3m_vix_ratio,3)} <span class="k">[${termState}]</span></div>`+
       `<div><b>SKEW</b> ${f(vs.skew,1)}</div><div><b>MOVE/VIX</b> ${f(vs.move_vix_ratio,3)}</div></div>`+
-      cap(`<b>この図</b>: 恐怖の期間構造とテール・金利ボラ比。<br><b>読み方</b>: VIX3M/VIX>1=平常(コンタンゴ)、<1=ストレス(バックワーデーション)。MOVE/VIX が高いと金利ボラ主導。<br><b>現在</b>: 比 ${f(vs.vix3m_vix_ratio,3)}（${esc(vs.term_state||"")}）、SKEW ${f(vs.skew,1)}、MOVE/VIX ${f(vs.move_vix_ratio,3)}。<br><b>出典・算出</b>: <span class="k">CBOE VIX/VIX3M/SKEW CSV、MOVE は data.json。</span><br><b>前提・限界</b>: <span class="k">米国のみ。</span>`)+
-      `<div class="rel-bad">前提（必読）: assumption = <b>${esc(G.assumption||"")}</b>。${esc(G.note||"")}</div>`+
-      `<div class="rel-disc">coverage: US=${esc(G.coverage.us)} / EU=${esc(G.coverage.eu)} / JP=${esc(G.coverage.jp)}。この層は米国のみ。For data visualization purposes only. Not investment advice.</div></div>`;
+      cap(T("rel.cap_volstruct",{ratio:f(vs.vix3m_vix_ratio,3),state:termState,skew:f(vs.skew,1),mv:f(vs.move_vix_ratio,3)}))+
+      `<div class="rel-bad">${T("rel.assumption",{a:esc(I18.code("gamma_assumption",G.assumption||"")),note})}</div>`+
+      `<div class="rel-disc">${T("rel.coverage",{us:esc(I18.code("coverage",cov.us)),eu:esc(I18.code("coverage",cov.eu)),jp:esc(I18.code("coverage",cov.jp))})} ${T("common.disc_viz")}</div></div>`;
   }
 
   function render(){
     const el=$("rel-pane"); if(!el) return;
-    el.innerHTML=`<div class="mf-disc">⚠ 相場「環境」の可視化 / not investment advice</div>`+
+    el.innerHTML=`<div class="mf-disc">⚠ ${T("common.disc_env")}</div>`+
       renderBalance()+renderMacro()+renderGamma();
   }
   async function load(force){
@@ -2996,6 +2820,7 @@ loadScenarios();
     loaded=true; render();
   }
   window.__relToggleNom=function(){ showNominal=!showNominal; render(); };
+  I18.onChange(()=>{ if(loaded) render(); });
   window.__relShow=function(){
     $("rel-pane").style.display="block";
     const tw=document.querySelector(".tbl-wrap"); if(tw) tw.style.display="none";

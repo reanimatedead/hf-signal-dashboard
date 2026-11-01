@@ -49,21 +49,18 @@
 
   function fmtDt(s) {
     if (!s) return "—";
-    return String(s).replace("T", " ").replace("Z", "");
+    return I18.fmtDate(s, "ymdhm");
   }
 
   function renderRows(rows, integrity) {
     const root = $("sv-notify");
     if (!root) return;
-    let html = '<div class="sv-card-hd">通知ログ (改竄不能チェーン)</div>';
+    let html = '<div class="sv-card-hd">' + T("nt.title") + '</div>';
     if (!integrity.ok) {
-      html +=
-        '<div class="sv-notify-warn">⚠ chain integrity failed at index ' +
-        esc(integrity.brokenAt) + ' (' + esc(integrity.reason) + '). ' +
-        '<b>後出し改竄の疑い</b>: 通知の信頼性が損なわれています。</div>';
+      html += '<div class="sv-notify-warn">' + T("nt.broken", { i: esc(integrity.brokenAt), reason: esc(integrity.reason) }) + '</div>';
     }
     if (!rows.length) {
-      html += '<div class="sv-empty">notifications not published yet.</div>';
+      html += '<div class="sv-empty">' + T("nt.empty") + '</div>';
       root.innerHTML = html;
       return;
     }
@@ -74,8 +71,7 @@
     });
 
     html += '<table class="sv-table"><thead><tr>' +
-      '<th>ts</th><th>kind</th><th>sym</th><th>side</th><th>edge</th>' +
-      '<th>pattern</th><th>realized%</th>' +
+      ["ts", "kind", "sym", "side", "edge", "pattern", "realized"].map((k) => '<th>' + T("nt.th_" + k) + '</th>').join("") +
       '</tr></thead><tbody>';
     rows.forEach((r) => {
       const isExit = /^EXIT_/.test(r.kind || "");
@@ -83,14 +79,14 @@
       const realized = r.realized_pct;
       let rp = "—";
       if (typeof realized === "number" && Number.isFinite(realized)) {
-        rp = (realized >= 0 ? "+" : "") + realized.toFixed(2) + "%";
+        rp = I18.fmtSigned(realized, 2) + "%";
       }
       html +=
         '<tr class="' + cls + '">' +
           '<td>' + esc(fmtDt(r.ts_utc || r.bar_ts)) + '</td>' +
           '<td>' + esc(r.kind) + '</td>' +
           '<td>' + esc(r.symbol) + '</td>' +
-          '<td>' + esc(r.side) + '</td>' +
+          '<td>' + esc(I18.code("direction", r.side)) + '</td>' +
           '<td class="sv-num">' + esc(r.edge_score == null ? "—" : r.edge_score) + '</td>' +
           '<td>' + esc((r.pattern && r.pattern.regime) || "—") + '/' +
                    esc((r.pattern && r.pattern.distortion) || "—") + '</td>' +
@@ -103,16 +99,12 @@
     // Unmatched ENTRY (no EXIT_*) summary
     const open = rows.filter((r) => r.kind === "ENTRY" && !exitByRef[r.event_id]);
     if (open.length) {
-      html += '<div class="sv-notify-info">⚐ open positions (no EXIT recorded): ' +
-              esc(open.length) + ' — ' +
-              open.slice(0, 5).map((o) => esc(o.symbol)).join(", ") + '</div>';
+      html += '<div class="sv-notify-info">' + T("nt.open", { n: esc(open.length), syms: open.slice(0, 5).map((o) => esc(o.symbol)).join(", ") }) + '</div>';
     }
     // Fingerprint (最終 curr_hash の先頭 12 文字)
     const last = rows[rows.length - 1];
     if (last && last.curr_hash) {
-      html += '<div class="sv-card-src">chain fingerprint: ' +
-              esc(String(last.curr_hash).slice(0, 12)) + '… · n=' + rows.length +
-              '</div>';
+      html += '<div class="sv-card-src">' + T("nt.fingerprint", { h: esc(String(last.curr_hash).slice(0, 12)), n: rows.length }) + '</div>';
     }
     root.innerHTML = html;
   }
