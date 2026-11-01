@@ -21,20 +21,21 @@ jobs:
       PAGES_BASE: https://reanimatedead.github.io/hf-signal-dashboard
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - name: Set up uv (Python 3.11)
+        uses: astral-sh/setup-uv@v6
         with:
           python-version: "3.11"
-          cache: "pip"
+          enable-cache: true
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
-      - name: Install (lock + playwright)
+      - name: Install (uv.lock + playwright)
         run: |
-          pip install -r requirements.lock
+          uv sync --locked
           npm install --no-save playwright@1
           npx playwright install --with-deps chromium
       - name: Build preview site (fake data)
-        run: python3 tools/build_preview.py _preview_site/site
+        run: uv run python tools/build_preview.py _preview_site/site
       - name: Screenshots (fake data, external hosts stubbed)
         run: |
           python3 -m http.server -d _preview_site/site 8765 &

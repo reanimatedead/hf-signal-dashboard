@@ -27,28 +27,29 @@ jobs:
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - name: Set up uv (Python 3.11)
+        uses: astral-sh/setup-uv@v6
         with:
           python-version: "3.11"
-          cache: "pip"
-      - name: Install (lock)
-        run: pip install -r requirements.lock
+          enable-cache: true
+      - name: Install (uv.lock)
+        run: uv sync --locked
 
       - name: Update universe (±5% check, keep previous week on failure)
         id: uni
         env:
           NIKKEI_DYNAMIC: ${{ vars.NIKKEI_DYNAMIC }}
-        run: python3 tools/update_universe.py
+        run: uv run python tools/update_universe.py
 
       - name: Build US fundamentals (EDGAR, one company at a time)
         id: fund
         continue-on-error: true
         env:
           SEC_USER_AGENT: ${{ vars.SEC_USER_AGENT }}
-        run: python3 tools/build_us_fundamentals.py
+        run: uv run python tools/build_us_fundamentals.py
 
       - name: Offline tests for the changed files
-        run: python -m pytest tests/test_universe_lists.py tests/test_update_universe.py tests/test_us_fundamentals.py tests/screener/calc -q
+        run: uv run pytest tests/test_universe_lists.py tests/test_update_universe.py tests/test_us_fundamentals.py tests/screener/calc -q
 
       - name: Commit universe + fundamentals
         run: |

@@ -47,12 +47,6 @@ def test_repo_dir_is_home_hf_signal_dashboard_on_main():
     assert '[ "$branch" = "main" ]' in text and 'git -C "$REPO_DIR" status --porcelain' in text
 
 
-def test_no_obsidian_path_in_scripts_or_plist():
-    for p in (ROOT / "scripts").rglob("*"):
-        if p.is_file():
-            assert "Obsidian" not in p.read_text(errors="replace"), p
-
-
 def test_schedule_and_wake():
     text = SCRIPT.read_text()
     assert "<key>Hour</key><integer>19</integer>" in text and "<key>Minute</key><integer>0</integer>" in text

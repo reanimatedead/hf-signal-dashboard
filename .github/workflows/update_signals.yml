@@ -24,33 +24,30 @@ jobs:
           fetch-depth: 1
 
       # ── 2. Python setup ────────────────────────────────
-      - name: Set up Python 3.11
-        uses: actions/setup-python@v5
+      - name: Set up uv (Python 3.11)
+        uses: astral-sh/setup-uv@v6
         with:
           python-version: "3.11"
-          cache: "pip"
+          enable-cache: true
 
       # ── 3. Install dependencies ────────────────────────
-      - name: Install dependencies
-        run: |
-          pip install --upgrade pip
-          pip install -r requirements.txt
+      - name: Install dependencies (uv.lock)
+        run: uv sync --locked
 
       # ── 4. Run signal generation (incl. v4.1 money_flow) ─
       - name: Generate signals
-        run: python fetch_signals.py
+        run: uv run python fetch_signals.py
 
       # ── 4a'. Re-merge correlations (preserve corr block) ──
       # fetch_signals.py は data.json を全再構築するため correlations を
       # 再マージする(fetch_signals.py は編集禁止のため後段で注入)。
       - name: Re-merge correlations (preserve corr block)
-        run: python3 pipeline/build_corr.py
+        run: uv run python pipeline/build_corr.py
 
       # ── 4a. Schema gate (fail-fast on contract regression) ─
       - name: Verify contracts (pytest)
         run: |
-          pip install pytest
-          pytest tests/test_money_flow_schema.py \
+          uv run pytest tests/test_money_flow_schema.py \
                  tests/test_index_html_contract.py \
                  tests/test_survival_loop_schema.py \
                  tests/test_risk_ceiling.py \
@@ -62,7 +59,7 @@ jobs:
       - name: Generate macro layer
         env:
           FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
-        run: python pipeline/build_macro.py
+        run: uv run python pipeline/build_macro.py
 
       # ── 5/6. (removed 2026-11) commit/push of docs/data.json ──
       # 生成物は git に積まない（DATA_CONTRACT §11）。配信は deploy.yml の actions/deploy-pages だけ。

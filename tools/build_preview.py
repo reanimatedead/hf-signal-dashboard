@@ -46,10 +46,17 @@ def build(out, hours_ago=50.0):
     frames["USDJPY=X"] = _scaled(frames["AAA"], 150.0 / float(frames["AAA"]["Close"].iloc[-1]))
     fs._batched_2y_ohlc = lambda syms, **k: {s: frames.get(s) for s in syms}   # 通信しない
 
-    def rows(syms, label):
-        return [fs.process_ticker(frames[s].tail(126), s, f"FAKE {s} ({label})") for s in syms]
+    def rows(syms, label, names=None):
+        return [fs.process_ticker(frames[s].tail(126), s, (names or {}).get(s, f"FAKE {s} ({label})")) for s in syms]
+    # 米国の名前は取得元ごとの書き方（Nasdaq API: "... Class A Common Stock" / Wikipedia: "... (Class A)"）を真似る。
+    # DDD と EEE は同じ架空の会社の 2 種類の株（GOOG/GOOGL のような形）。画面は表示の時に名前を揃え、社数を数える。
+    ndx = {"AAA": "FAKE Alpha Inc. Common Stock", "BBB": "FAKE Beta plc Ordinary Shares",
+           "CCC": "FAKE Gamma Holdings Inc. American Depositary Shares",
+           "DDD": "FAKE Dual Inc. Class A Common Stock", "EEE": "FAKE Dual Inc. Class C Capital Stock"}
+    spx = {"AAA": "FAKE Alpha Inc.", "BBB": "FAKE Beta plc", "CCC": "FAKE Gamma Holdings Inc.",
+           "DDD": "FAKE Dual Inc. (Class A)", "EEE": "FAKE Dual Inc. (Class C)"}
     markets_eq = {"nikkei225": rows(list(jp) + ["7735.T"], "JP"), "dow30": rows(TICKERS[:2], "US"),
-                  "nasdaq100": rows(TICKERS, "US"), "sp500": rows(TICKERS, "US")}
+                  "nasdaq100": rows(TICKERS, "US", ndx), "sp500": rows(TICKERS, "US", spx)}
     collect = {}
     fs.attach_equity_charts(markets_eq, collect=collect)
     vrec = fs.build_and_write_verify(collect, out / "verify.json")

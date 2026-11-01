@@ -26,6 +26,7 @@
   const pct = (v, d = 1) => (num(v) == null ? "—" : I18.fmtSigned(v, d) + "%");
   const sig = (v) => I18.norm("chart_signal", v);                  // 旧形式（和文）→ コード
   const sigText = (c) => I18.code("chart_signal", c);
+  const cname = (n) => (window.NAMES ? NAMES.companyName(n) : String(n || ""));   // 会社名の表示（assets/signal/names.js）
   // verify.json のキーがコードでも旧形式（和文）でも引けるように
   function byCode(obj, code, prefix) {
     if (!obj) return undefined;
@@ -175,7 +176,7 @@
     const open = (sym, src) => `data-sym="${esc(sym)}" data-src-tab="${src}" tabindex="0" style="cursor:pointer"`
       + ` onclick="toggleDetail(event,'${esc(sym)}','${src}')"`
       + ` onkeydown="if(event.key==='Enter'){event.preventDefault();toggleDetail(event,'${esc(sym)}','${src}')}"`;
-    const body = rows.map(({ r, idx, src }) => `<tr class="ub-row" ${open(r.symbol, src)}><td>${judgeCell(r, "us")}</td><td><b>${esc(r.symbol)}</b></td><td>${esc(r.name || "")}</td>`
+    const body = rows.map(({ r, idx, src }) => `<tr class="ub-row" ${open(r.symbol, src)}><td>${judgeCell(r, "us")}</td><td><b>${esc(r.symbol)}</b></td><td>${esc(cname(r.name))}</td>`
       + `<td>${esc(idx.join(T("common.sep_list")))}</td><td style="text-align:right">${num(r.price) == null ? "—" : I18.fmtNum(r.price, 2)}</td>`
       + `<td style="text-align:right">${cell({ k: "cci288" }, r)}</td><td style="text-align:right">${cell({ k: "bb48_z" }, r)}</td></tr>`).join("");
     const th = ["ub.th_judge", "col.symbol", "col.name", "ub.th_index", "col.price", "col.cci288", "col.bb48_z"]
@@ -209,9 +210,12 @@
     // "<market>:<chart|composite>:<code>"（旧形式 "<market>: <label>" も読む）
     const p = String(x || "").split(":").map((v) => v.trim());
     if (p.length < 2) return String(x || "");
+    // 1 項目に出す判定の名前は 1 つだけ（チャート判定 か 総合スコア のどちらか）
     const kind = p.length >= 3 ? p[1] : "chart", c = p[p.length - 1];
-    const label = kind === "composite" ? I18.code("signal", c) : sigText(sig(c));
-    return T("vf.weak_item", { market: I18.code("verify_market", I18.norm("verify_market", p[0])), signal: label });
+    const composite = kind === "composite";
+    const label = composite ? I18.code("signal", I18.norm("signal", c)) : sigText(sig(c));
+    return T(composite ? "vf.weak_item_composite" : "vf.weak_item_chart",
+      { market: I18.code("verify_market", I18.norm("verify_market", p[0])), signal: label });
   }
   function renderWeakBanner(t) {
     const el = document.getElementById("weak-banner"); if (!el) return;

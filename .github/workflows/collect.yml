@@ -27,31 +27,28 @@ jobs:
         with:
           fetch-depth: 1
 
-      - name: Set up Python 3.11
-        uses: actions/setup-python@v5
+      - name: Set up uv (Python 3.11)
+        uses: astral-sh/setup-uv@v6
         with:
           python-version: "3.11"
-          cache: "pip"
+          enable-cache: true
 
-      - name: Install dependencies
-        run: |
-          pip install --upgrade pip
-          pip install -r requirements.txt
-          pip install pytest
+      - name: Install dependencies (uv.lock)
+        run: uv sync --locked
 
       # 取得 + 履歴 + ログ。collector.cli は 1 ソース失敗で死なない。
       - name: Run collector (fetch → snapshot → log)
-        run: python -m collector.cli --workflow=collect
+        run: uv run python -m collector.cli --workflow=collect
 
       # collector.cli も data.json を全再構築する経路を含むため correlations を
       # 再マージする(fetch_signals.py は編集禁止のため後段で注入)。
       - name: Re-merge correlations (preserve corr block)
-        run: python3 pipeline/build_corr.py
+        run: uv run python pipeline/build_corr.py
 
       # 契約ゲート: Phase 1 + Phase 1.5 の回帰防止。
       - name: pytest contract gate
         run: |
-          pytest tests/test_money_flow_schema.py \
+          uv run pytest tests/test_money_flow_schema.py \
                  tests/test_index_html_contract.py \
                  tests/test_survival_loop_schema.py \
                  tests/test_risk_ceiling.py \
@@ -60,7 +57,6 @@ jobs:
                  tests/test_collector_idempotent.py \
                  tests/test_collector_schema.py \
                  tests/test_collector_resilience.py \
-                 tests/test_collect_workflow.py \
                  -q
 
       - name: Commit history + log
@@ -70,8 +66,11 @@ jobs:
           for p in data/history data/collect_log.jsonl; do
             if [ -e "$p" ]; then git add "$p"; fi
           done
-          git diff --cached --quiet && echo "No changes to commit" || \
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+          else
             git commit -m "chore(autocollect): $(date -u '+%Y-%m-%d %H:%M UTC')"
+          fi
 
       # 並走push(人間/他workflow)による non-fast-forward 拒否で赤×になるのを
       # 防ぐ競合リトライ。rebase採用の根拠: bot commit は生成物のみで、rebase

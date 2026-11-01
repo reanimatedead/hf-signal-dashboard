@@ -1692,4 +1692,4 @@ Stats = {n, mean, median, up_pct}
   株式4タブのどれかで price=None が 10% を超えたら止める（upload / deploy-pages は走らず Pages は前日のまま）。
 - 失敗時の Issue 自動起票はしない。通知は各 workflow の ntfy ステップだけ（Secret `NTFY_TOPIC`、本文はジョブ名・日付・失敗のみ）。`NTFY_TOPIC` が未設定なら、ジョブのログに `::warning::` を出す。
 - `assert_gen_health` / `verify_live` / `health_gate` の判定は**変更なし**。
-- 依存は `requirements.lock`（Python 3.11・deploy.yml）と `uv.lock`（ci.yml・Mac mini）で固定。自動では上げない。
+- 依存は `uv.lock` の 1 か所だけで固定（全 workflow が Python 3.11 で `uv sync --locked`、Mac mini も uv）。自動では上げない。

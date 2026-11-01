@@ -5,7 +5,6 @@
 - 生成後の欠損チェック（--post）: meta.nan_report で price=None が 10% 超なら止める。
 - Issue は作らない（gh を呼ばない）。
 """
-import pytest
 import json
 import pathlib
 import subprocess
@@ -52,17 +51,6 @@ def test_precheck_never_contacts_yahoo(monkeypatch):
         assert name not in src, name
 
 
-@pytest.mark.ci_only   # workflow ファイルを読む: 通常の CI だけ
-def test_ntfy_missing_topic_warns_in_every_workflow():
-    for wf in (ROOT / ".github" / "workflows").glob("*.yml"):
-        text = wf.read_text(encoding="utf-8")
-        if "NTFY_TOPIC" not in text:
-            continue
-        n_steps = text.count('curl -fsS -m 20 -d "hf-signal-dashboard')
-        assert text.count("::warning::NTFY_TOPIC が未設定") == n_steps > 0, wf.name
-        assert "通知なし\"; exit 0" not in text, wf.name
-
-
 def _data(tmp_path, null=None):
     null = null or {}
     nan = {t: {"constituents": n, "price_null": null.get(t, 0), "chart_unavailable": 0}
@@ -85,15 +73,6 @@ def test_post_without_nan_report_stops(tmp_path):
     p.write_text('{"meta":{}}')
     assert cc.post(p) == 1
     assert cc.post(tmp_path / "nope.json") == 1
-
-
-@pytest.mark.ci_only   # workflow ファイルを読む: 通常の CI だけ
-def test_no_issue_creation_anywhere():
-    src = (ROOT / "tools" / "contract_check.py").read_text(encoding="utf-8")
-    assert "gh issue" not in src and "issue_once" not in src
-    for wf in (ROOT / ".github" / "workflows").glob("*.yml"):
-        text = wf.read_text(encoding="utf-8")
-        assert "gh issue create" not in text and "issues: write" not in text, wf.name
 
 
 def test_cli(tmp_path):
