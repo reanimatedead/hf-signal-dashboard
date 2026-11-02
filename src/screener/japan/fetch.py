@@ -6,8 +6,10 @@
   master_YYYY-MM-DD.json  銘柄一覧（equities/master）: 各月の最初の日
   months.json             各月の最初の日の一覧
 
-既定は今日（JST）の分だけ（毎日の差分）。--full で history_years 年分（初回の一括取得）。
-既にあるファイルは取り直さない（--force で上書き。削除はしない）。
+既定は直近 3 営業日（今日を含む）の分（毎日の差分）。--full で history_years 年分（初回の一括取得）。
+既にあるファイルは取り直さない。ただし直近 3 営業日の日足と決算は毎回取り直す（取引時間前に保存された
+空の日や、19:00 以降に出た決算を取りこぼさないため）。今日の日付で中身が空のときは保存しない。
+--force で全部上書き（削除はしない）。
 
     python -m screener.japan.fetch            # 今日の差分
     python -m screener.japan.fetch --full     # 5年分（初回）
@@ -21,12 +23,20 @@ import datetime as dt
 import json
 import os
 import sys
+from collections.abc import Collection
 from typing import Any
 
 from .. import config as config_mod
 from ..config import Config
 from ..dates import files_dates, minus, weekdays
 from ..jquants import Getter, default_client
+
+RECENT_DAYS = 3  # 毎回取り直す直近の営業日数（今日を含む）
+
+
+def recent_days(today: dt.date, n: int = RECENT_DAYS) -> list[str]:
+    """今日を含む直近 n 営業日（土日を除く。祝日は J-Quants が空を返すだけ）。"""
+    return weekdays(today - dt.timedelta(days=2 * n + 4), today)[-n:]
 
 
 def compact(rows: list[dict[str, Any]]) -> list[list[Any]]:
@@ -41,16 +51,26 @@ def _dump(path: os.PathLike[str] | str, obj: Any) -> None:
 
 
 def fetch_daily(
-    dates: list[str], cfg: Config, get: Getter, keep_raw: bool = True, force: bool = False, threads: int = 3
+    dates: list[str],
+    cfg: Config,
+    get: Getter,
+    keep_raw: bool = True,
+    force: bool = False,
+    threads: int = 3,
+    refresh: Collection[str] = (),
+    today: str | None = None,
 ) -> dict[str, int]:
-    """日足。スレッドで並べても回数制限は1つ（Client の RateLimiter はスレッド安全）。"""
+    """日足。スレッドで並べても回数制限は1つ（Client の RateLimiter はスレッド安全）。
+    refresh の日はファイルがあっても取り直す。today の日に空が返ったら保存しない（取引時間前など）。"""
     cfg.jp("daily").mkdir(parents=True, exist_ok=True)
-    todo = [d for d in dates if force or not cfg.jp("daily", f"{d}.json").exists()]
+    todo = [d for d in dates if force or d in refresh or not cfg.jp("daily", f"{d}.json").exists()]
     last = dates[-1] if dates else None
 
     def one(x: str) -> int:
         r = get("equities/bars/daily", date=x)
         if isinstance(r, list):
+            if not r and x == today:
+                return 0  # 今日の空は保存しない（あとで取り直せるように）
             _dump(cfg.jp("daily", f"{x}.json"), compact(r))
             if keep_raw and x == last and r:
                 _dump(cfg.jp(f"bars_{x}.json"), r)
@@ -62,16 +82,25 @@ def fetch_daily(
     return {"fetched": len(todo), "empty": sum(1 for x in res if x == 0), "err": sum(1 for x in res if x < 0)}
 
 
-def fetch_fins(dates: list[str], cfg: Config, get: Getter, force: bool = False) -> int:
-    """決算短信（開示日別）と、その月の銘柄一覧（まだ無ければ）。戻り値はエラーの数。"""
+def fetch_fins(
+    dates: list[str],
+    cfg: Config,
+    get: Getter,
+    force: bool = False,
+    refresh: Collection[str] = (),
+    today: str | None = None,
+) -> int:
+    """決算短信（開示日別）と、その月の銘柄一覧（まだ無ければ）。戻り値はエラーの数。
+    refresh の日はファイルがあっても取り直す（19:00 以降に出た決算）。today の空は保存しない。"""
     cfg.jp("fins").mkdir(parents=True, exist_ok=True)
     err = 0
     for d in dates:
         p = cfg.jp("fins", f"{d}.json")
-        if force or not p.exists():
+        if force or d in refresh or not p.exists():
             r = get("fins/summary", date=d)
             if isinstance(r, list):
-                _dump(p, r)
+                if r or d != today:
+                    _dump(p, r)
             else:
                 err += 1
     if dates:
@@ -120,7 +149,7 @@ def fetch_month(cfg: Config, get: Getter) -> tuple[list[str], int]:
 def date_range(cfg: Config, today: dt.date, full: bool = False) -> list[str]:
     if full:
         return weekdays(minus(today, years=int(cfg.get("jquants.history_years", 5))), today)
-    return weekdays(today, today)
+    return recent_days(today)
 
 
 def run(
@@ -130,8 +159,9 @@ def run(
     if get is None:
         get = default_client(int(cfg.get("jquants.rate_per_min", 50)), str(cfg.get("jquants.keychain_service"))).get
     dates = date_range(cfg, today, full)
-    d = fetch_daily(dates, cfg, get, keep_raw=True, force=force)
-    e = fetch_fins(dates, cfg, get, force=force)
+    recent = set(recent_days(today))
+    d = fetch_daily(dates, cfg, get, keep_raw=True, force=force, refresh=recent, today=today.isoformat())
+    e = fetch_fins(dates, cfg, get, force=force, refresh=recent, today=today.isoformat())
     months, calls = fetch_month(cfg, get)
     res = {"dates": len(dates), **d, "fins_err": e, "months": len(months), "month_calls": calls}
     if d["err"] or e:
