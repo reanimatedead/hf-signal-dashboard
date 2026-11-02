@@ -21,7 +21,7 @@ from typing import Any
 
 import numpy as np
 
-from .. import labels
+from .. import alerts, labels
 from ..calc import events, fund_us, ind
 from ..config import Config
 from ..dates import jp_anchor_dates, minus
@@ -222,7 +222,7 @@ def run(cfg: Config, asof: str | None = None, now: dt.datetime | None = None) ->
         "gap_days": events.GAP,
         "recent_since": since,
         "period": [dates[min(events.WARMUP, len(dates) - 1)] if dates else None, today],
-        "jp": verify(jx, since, screen.monthly_quintiles(cfg)),
+        "jp": verify(jx, since, screen.monthly_quintiles(cfg)) | {"cci_both_down": alerts.verify(jx)},
         "us": verify(ux, since),
     }
     v["weakened"] = bool(v["jp"]["weakened"] or v["us"]["weakened"])
@@ -233,4 +233,5 @@ def run(cfg: Config, asof: str | None = None, now: dt.datetime | None = None) ->
         "jp": jp,
         "us": us,
         "verify": v,
+        "cci_alerts": alerts.build(jp, jx, us, ux, list(cfg.get("alerts.watchlist", []) or [])),
     }

@@ -42,6 +42,26 @@ def event_returns(close, conds, h=H, gap=GAP, start=WARMUP, dates=None, since=No
     return out
 
 
+def event_returns_dated(close, conds, dates, h=H, gap=GAP, start=WARMUP):
+    """event_returns と同じ数え方で、(日付, h日後騰落%) の組を返す（年ごと・特定の日を除く集計用）。"""
+    C = np.asarray(close, dtype=float)
+    out = {"base": []}
+    last = {}
+    for k in conds:
+        out[k] = []
+        last[k] = -(10**9)
+    for i in range(start, len(C) - h):
+        if not (np.isfinite(C[i]) and np.isfinite(C[i + h]) and C[i] > 0):
+            continue
+        f = (C[i + h] / C[i] - 1) * 100
+        out["base"].append((dates[i], f))
+        for k, cond in conds.items():
+            if cond[i] and i - last[k] >= gap:
+                last[k] = i
+                out[k].append((dates[i], f))
+    return out
+
+
 def merge(acc, part):
     for k, v in part.items():
         acc.setdefault(k, []).extend(v)

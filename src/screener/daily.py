@@ -7,6 +7,7 @@
 2. J-Quants 契約テスト（V2・日足 ≥3500 件・決算短信の列）
 3. 差分を取得（日本株 J-Quants は直近3営業日を取り直す・米国株 Yahoo の株価）
 4. 一覧（screen → signals）→ local_report（<data_dir>/out/ にだけ書く）
+5. CCI ±200 の抜けを Mac mini の通知で1回出す（screener.alerts。ntfy には送らない。押すとその日の一覧が開く）
 失敗したら ntfy に「失敗＋日付」を送って終了コード 1。
 成功したら何も送らない。ただし月曜は最後に「週次 OK＋日付」を1回送る。
 """
@@ -24,8 +25,8 @@ import traceback
 from collections.abc import Callable
 from typing import Any
 
+from . import alerts, contract, local_report, notify
 from . import config as config_mod
-from . import contract, local_report, notify
 from .config import Config
 from .jquants import Getter, default_client
 
@@ -66,6 +67,9 @@ def update_us(cfg: Config, today: dt.date) -> None:
         raise RuntimeError(f"米国株の株価が {err}/{len(tickers)} 件取れない")
 
 
+mac_notify: Callable[..., Any] = alerts.notify  # テストで差し替える
+
+
 def pipeline(
     cfg: Config,
     today: dt.date,
@@ -85,6 +89,8 @@ def pipeline(
     doc = signals.run(cfg)
     c = local_report.write(cfg, doc)
     print("counts", json.dumps(c, ensure_ascii=False), flush=True)  # 件数だけ
+    if doc.get("cci_alerts"):
+        mac_notify(doc["cci_alerts"], local_report.alerts_html(cfg, doc))
     return c
 
 
