@@ -7,7 +7,8 @@
 2. J-Quants 契約テスト（V2・日足 ≥3500 件・決算短信の列）
 3. 差分を取得（日本株 J-Quants は直近3営業日を取り直す・米国株 Yahoo の株価）
 4. 一覧（screen → signals）→ local_report（<data_dir>/out/ にだけ書く）
-5. CCI ±200 の抜けを Mac mini の通知で1回出す（screener.alerts。ntfy には送らない。押すとその日の一覧が開く）
+5. CCI ±200 の抜けを Mac mini の通知で1回出す（screener.alerts。既定は osascript。
+   本文の最後に一覧の場所。ntfy には送らない）
 失敗したら ntfy に「失敗＋日付」を送って終了コード 1。
 成功したら何も送らない。ただし月曜は最後に「週次 OK＋日付」を1回送る。
 """
@@ -90,7 +91,11 @@ def pipeline(
     c = local_report.write(cfg, doc)
     print("counts", json.dumps(c, ensure_ascii=False), flush=True)  # 件数だけ
     if doc.get("cci_alerts"):
-        mac_notify(doc["cci_alerts"], local_report.alerts_html(cfg, doc))
+        mac_notify(
+            doc["cci_alerts"],
+            local_report.alerts_html(cfg, doc),
+            prefer=str(cfg.get("alerts.notifier", "osascript") or "osascript"),
+        )
     return c
 
 

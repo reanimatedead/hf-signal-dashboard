@@ -5,8 +5,9 @@
 - 「一斉に割れ」: その日の日本株の both_down 件数が、過去1年（その日を含まない）の日々の件数の上位1%を超えた日
   （ただし 5 件以上。平穏な年は線が 0 件になり、1 銘柄でも「一斉に」になってしまうため）。
 - +200 を上に抜けたものは通知しない（一覧の列には残す）。
-- 通知は Mac mini の中だけ（terminal-notifier、無ければ osascript）。ntfy には送らない。銘柄名を出してよいのは
-  通知と一覧が Mac mini の外に出ないため（ADR-002）。
+- 通知は Mac mini の中だけ。既定は osascript の display notification（本文の最後に一覧のファイルの場所）。
+  terminal-notifier は config の [alerts] notifier = "terminal-notifier" のときだけ試し、使えなければ osascript。
+  ntfy には送らない。銘柄名を出してよいのは通知と一覧が Mac mini の外に出ないため（ADR-002）。
 """
 
 from __future__ import annotations
@@ -209,37 +210,61 @@ def message(a: dict[str, Any]) -> tuple[str, str] | None:
 Runner = Callable[..., Any]
 
 
+def shown_path(p: Path, home: Path | None = None) -> str:
+    """通知に書く一覧の場所（ホームの下なら ~/ から）。"""
+    home = home or Path.home()
+    try:
+        return "~/" + str(p.resolve().relative_to(home.resolve()))
+    except ValueError:
+        return str(p)
+
+
+def _ok(r: Any) -> None:
+    rc = getattr(r, "returncode", 0)
+    if rc not in (0, None):
+        raise RuntimeError(f"終了コード {rc}")
+
+
 def notify(
     a: dict[str, Any],
     html_path: Path,
     runner: Runner = subprocess.run,
     which: Callable[[str], str | None] = shutil.which,
     platform: str = sys.platform,
+    prefer: str = "osascript",
+    home: Path | None = None,
 ) -> str:
-    """Mac mini の通知を1回出す。戻り値は使った方法（terminal-notifier / osascript / none / not_mac / error）。
-    通知の失敗で本処理を失敗にしない。"""
+    """Mac mini の通知を1回出す。戻り値は使った方法（osascript / terminal-notifier / none / not_mac / error）。
+    既定は osascript の display notification（macOS 26 では terminal-notifier が通知の許可の一覧に出ず使えなかった）。
+    prefer="terminal-notifier"（config の [alerts] notifier）のときだけ試し、実行時にエラーなら osascript に切り替える。
+    本文の最後に一覧のファイルの場所を書く。通知の失敗で本処理を失敗にしない。"""
     m = message(a)
     if m is None:
         print("mac通知: 該当なし", flush=True)
         return "none"
     title, body = m
+    body = f"{body} ／ 一覧: {shown_path(html_path, home)}"
     if platform != "darwin":
         print(f"mac通知: Mac ではないので出さない（{title}）", flush=True)
         return "not_mac"
-    try:
-        tn = which("terminal-notifier")
-        if tn:
-            runner(
-                [tn, "-title", title, "-message", body, "-open", html_path.as_uri(), "-group", "screener-cci"],
-                timeout=30,
+    tn = which("terminal-notifier") if prefer == "terminal-notifier" else None
+    if tn:
+        try:
+            _ok(
+                runner(
+                    [tn, "-title", title, "-message", body, "-open", html_path.as_uri(), "-group", "screener-cci"],
+                    timeout=30,
+                )
             )
-            how = "terminal-notifier"
-        else:  # osascript の通知は押しても一覧は開かない（brew install terminal-notifier で開くようになる）
-            esc = lambda s: s.replace("\\", "\\\\").replace('"', '\\"')  # noqa: E731
-            runner(["osascript", "-e", f'display notification "{esc(body)}" with title "{esc(title)}"'], timeout=30)
-            how = "osascript"
+            print(f"mac通知: terminal-notifier（{title}）→ {html_path}", flush=True)
+            return "terminal-notifier"
+        except Exception as e:
+            print(f"mac通知: terminal-notifier が使えない（{type(e).__name__}）→ osascript に切り替え", flush=True)
+    try:
+        esc = lambda s: s.replace("\\", "\\\\").replace('"', '\\"')  # noqa: E731
+        _ok(runner(["osascript", "-e", f'display notification "{esc(body)}" with title "{esc(title)}"'], timeout=30))
     except Exception as e:
         print(f"mac通知: 出せませんでした（{type(e).__name__}）", flush=True)
         return "error"
-    print(f"mac通知: {how}（{title}）→ {html_path}", flush=True)
-    return how
+    print(f"mac通知: osascript（{title}）→ {html_path}", flush=True)
+    return "osascript"
