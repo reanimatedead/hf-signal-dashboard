@@ -17,8 +17,8 @@
 | tests/screener/test_japan_fetch.py | 4 | 既定は直近3営業日（毎回取り直す・今日の空は保存しない）・--full は年数分・一括取得でも 50回/60秒以下 |
 | tests/screener/test_japan_screen.py | 6 | 理論株価・F・魔法の公式・分割前後で PBR 不変・「決算短信で確認」・四半期/未来の開示を使わない |
 | tests/screener/test_japan_signals.py | 6 | 総合判定 A = 割安5分の1 × 買い系 の規則・割安5分の1の母集団と境界・**A の銘柄はすべて上値余地が割安5分の1の境界以上**・A の定義そのものの検証（verify_local.json の jp.grade_A）・**バックテスト（with_chart）と画面が同じ関数を呼び、同じ件数・成績になる**・バックテストが動く |
-| tests/screener/calc/test_cci_rules.py | 4 | CCI ±200 の「抜け」（両方そろった日だけ・続く日は数えない・+200 は通知しない）・「一斉に割れ」の線（過去1年の上位1%を超え、かつ5件以上・その日より前だけで線を引く） |
-| tests/screener/test_alerts.py | 6 | 両方 −200 割れ（日本株）とウォッチリストの一覧・「一斉に割れ」の強調・通知なしの日・既定は osascript（本文の最後に一覧の場所）・terminal-notifier は選んだときだけで、実行時のエラーなら osascript に切り替え・Mac 以外は出さない・毎日の実行で一覧と verify_local.json（jp.cci_both_down）を書き通知は1回 |
+| tests/screener/calc/test_cci_rules.py | 4 | CCI ±200 の「抜け」（両方そろった日だけ・続く日は数えない・+200 は通知しない）・「一斉に割れ」の線（過去1年の上位1% と その市場の銘柄数の 1.5% の大きい方を超えた日・その日より前だけで線を引く） |
+| tests/screener/test_alerts.py | 8 | 日本株・米国株・FX・仮想通貨の両方 −200 割れとウォッチリスト・一斉に割れは 1.5% 以上（日本株 54 件・米国株 8 件）・FX/仮想通貨は「未検証」で1つずつ・通知は osascript が既定で本文の最後に一覧の場所・terminal-notifier は選んだときだけで失敗なら osascript・FX/仮想通貨の一覧は公開サイトと1か所・取れなければ前回のまま・verify_local.json の cci_both_down（市場ごと・件数つき） |
 | tests/screener/test_us.py | 3 | 決算を1社ずつ読む・判定・株価の付け足しと分割検知 |
 | tests/screener/test_local_report.py | 3 | 書くのは `<data_dir>/out/` だけ（japan_list.html と同じ形の us_list.html も）・counts.json（前回とずれ%）・リポジトリ内は拒否 |
 | tests/screener/test_notify.py | 4 | 本文が `^screener \d{4}-\d{2}-\d{2} (OK\|失敗\|週次 OK)$` だけ・送信結果（HTTP コード）を1行ログに出す |

@@ -210,6 +210,20 @@ def verify(xs: Xs, since: str, vq: dict[str, dict[str, str]] | None = None) -> d
     return out
 
 
+def alert_markets(cfg: Config, jp: list[Row], jx: Xs, us: list[Row], ux: Xs) -> dict[str, tuple[Xs, dict[str, Row]]]:
+    """CCI ±200 の通知・検証の対象（日本株・米国株・FX・仮想通貨）。行は {コード: {name, cci48, cci288}}。"""
+    from .. import fxcrypto
+
+    def pick(rows: list[Row], key: str, name: str) -> dict[str, Row]:
+        return {r[key]: {"name": r.get(name), "cci48": r.get("cci48"), "cci288": r.get("cci288")} for r in rows}
+
+    out = {"jp": (jx, pick(jp, "code", "company_name")), "us": (ux, pick(us, "ticker", "name"))}
+    for m in ("fx", "crypto"):
+        rows, xs = fxcrypto.load(cfg, m)
+        out[m] = (xs, rows)
+    return out
+
+
 def run(cfg: Config, asof: str | None = None, now: dt.datetime | None = None) -> dict[str, Any]:
     now = now or dt.datetime.now(dt.UTC)
     jp, jx, dates, anchors = build_jp(cfg, asof)
@@ -222,10 +236,12 @@ def run(cfg: Config, asof: str | None = None, now: dt.datetime | None = None) ->
         "gap_days": events.GAP,
         "recent_since": since,
         "period": [dates[min(events.WARMUP, len(dates) - 1)] if dates else None, today],
-        "jp": verify(jx, since, screen.monthly_quintiles(cfg)) | {"cci_both_down": alerts.verify(jx)},
+        "jp": verify(jx, since, screen.monthly_quintiles(cfg)),
         "us": verify(ux, since),
     }
     v["weakened"] = bool(v["jp"]["weakened"] or v["us"]["weakened"])
+    markets = alert_markets(cfg, jp, jx, us, ux)
+    v["cci_both_down"] = {m: alerts.verify(xs, m) for m, (xs, _) in markets.items()}
     return {
         "asof": today,
         "generated_at": now.isoformat(timespec="seconds"),
@@ -233,5 +249,5 @@ def run(cfg: Config, asof: str | None = None, now: dt.datetime | None = None) ->
         "jp": jp,
         "us": us,
         "verify": v,
-        "cci_alerts": alerts.build(jp, jx, us, ux, list(cfg.get("alerts.watchlist", []) or [])),
+        "cci_alerts": alerts.build(markets, list(cfg.get("alerts.watchlist", []) or [])),
     }

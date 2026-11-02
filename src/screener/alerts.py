@@ -1,13 +1,15 @@
 """CCI ±200 の抜け: その日の一覧（HTML）・Mac mini の通知・検証。規則は screener.calc.ind（cci_events / spike_*）だけ。
 
-- 対象: 「両方が −200 を下に抜けた」は日本株（検証した範囲）。ウォッチリスト（config の [alerts] watchlist）は
-  日本株のコード・米国株のティッカーのどちらでもよく、CCI48 / CCI288 の −200 割れを通知する。
-- 「一斉に割れ」: その日の日本株の both_down 件数が、過去1年（その日を含まない）の日々の件数の上位1%を超えた日
-  （ただし 5 件以上。平穏な年は線が 0 件になり、1 銘柄でも「一斉に」になってしまうため）。
+市場（MARKETS）: 日本株・米国株（Dow・Nasdaq100・S&P500 の和集合）・FX（18）・仮想通貨（4）。全部の市場で同じ規則。
+- 両方割れ = CCI48 と CCI288 の両方が −200 以下にそろった日（前の日はそろっていない）。
+- 「一斉に割れ（暴落の可能性）」: 日本株・米国株だけ。その日の両方割れの件数が、過去1年（その日を含まない）の
+  日々の件数の上位1% と その市場の銘柄数の 1.5% の大きい方を超えた日。FX・仮想通貨は銘柄が少ないので出さない。
+- FX・仮想通貨は 1つずつ通知する。検証していないので、通知と一覧に「未検証」と出す。
+- ウォッチリスト（config の [alerts] watchlist）は、どの市場の銘柄でもよく、CCI48 / CCI288 の −200 割れを通知する。
 - +200 を上に抜けたものは通知しない（一覧の列には残す）。
-- 通知は Mac mini の中だけ。既定は osascript の display notification（本文の最後に一覧のファイルの場所）。
-  terminal-notifier は config の [alerts] notifier = "terminal-notifier" のときだけ試し、使えなければ osascript。
-  ntfy には送らない。銘柄名を出してよいのは通知と一覧が Mac mini の外に出ないため（ADR-002）。
+- 通知は Mac mini の中だけ。既定は osascript の display notification（本文は市場ごとの件数＋上位銘柄、最後に一覧の
+  ファイルの場所）。terminal-notifier は config の [alerts] notifier = "terminal-notifier" のときだけ試し、
+  使えなければ osascript。ntfy には送らない。銘柄名を出してよいのは Mac mini の外に出ないため（ADR-002）。
 """
 
 from __future__ import annotations
@@ -29,23 +31,35 @@ from .calc import events, ind
 Row = dict[str, Any]
 Xs = dict[str, tuple[dict[str, Any], list[str]]]
 TOP_N = 5
-ALERT_COLS = ["watch", "code", "name", "market", "cci48", "cci288", *ind.CCI_EVENTS]
+ALERT_COLS = ["market", "watch", "code", "name", "cci48", "cci288", *ind.CCI_EVENTS]
+
+# 市場ごとの扱い（規則そのものは ind。ここは「一斉に割れ」を出すか・検証済みか・注記だけ）
+MARKETS: dict[str, dict[str, Any]] = {
+    "jp": {"label": "日本株", "spike": True, "verified": True, "note": ""},
+    "us": {
+        "label": "米国株",
+        "spike": True,
+        "verified": True,
+        "note": "今の構成銘柄だけで検証（生き残りの偏りあり：途中で外れた・上場廃止の銘柄は入っていない）",
+    },
+    "fx": {"label": "FX", "spike": False, "verified": False, "note": "未検証"},
+    "crypto": {"label": "仮想通貨", "spike": False, "verified": False, "note": "未検証"},
+}
 
 
-def daily_counts(xs: Xs, key: str = "both_down") -> tuple[list[str], list[int]]:
-    """全営業日（どれかの銘柄に日足がある日）の、その抜けの件数（0 の日も含む）。"""
+def daily_counts(xs: Xs, key: str = "both_down") -> tuple[list[str], list[int], list[int]]:
+    """(日付, その抜けの件数, その日に日足がある銘柄の数)。0 件の日も含む。"""
     cnt: collections.Counter[str] = collections.Counter()
-    days: set[str] = set()
+    active: collections.Counter[str] = collections.Counter()
     for x, ds in xs.values():
-        days.update(ds)
-        ev = ind.cci_events(x)[key]
-        for i in np.flatnonzero(ev):
+        active.update(ds)
+        for i in np.flatnonzero(ind.cci_events(x)[key]):
             cnt[ds[i]] += 1
-    dates = sorted(days)
-    return dates, [cnt.get(d, 0) for d in dates]
+    dates = sorted(active)
+    return dates, [cnt.get(d, 0) for d in dates], [active[d] for d in dates]
 
 
-def _today_rows(xs: Xs, rows: dict[str, Row], asof: str, name_key: str, market: str) -> list[Row]:
+def _today_rows(market: str, xs: Xs, rows: dict[str, Row], asof: str) -> list[Row]:
     out = []
     for code, (x, ds) in xs.items():
         if not ds or ds[-1] != asof:
@@ -56,9 +70,9 @@ def _today_rows(xs: Xs, rows: dict[str, Row], asof: str, name_key: str, market: 
         r = rows.get(code, {})
         out.append(
             {
+                "market": market,
                 "code": code,
-                "name": r.get(name_key) or code,
-                "market": r.get("market") or market,
+                "name": r.get("name") or code,
                 "cci48": r.get("cci48"),
                 "cci288": r.get("cci288"),
                 **ev,
@@ -72,36 +86,45 @@ def _order(items: list[Row]) -> list[Row]:
     return sorted(items, key=lambda r: (r["cci288"] if r["cci288"] is not None else 0, r["cci48"] or 0))
 
 
-def build(jp_rows: list[Row], jx: Xs, us_rows: list[Row], ux: Xs, watchlist: list[str] | None = None) -> dict[str, Any]:
-    """その日の CCI ±200 の抜けをまとめる（通知と一覧の元）。"""
+def build(markets: dict[str, tuple[Xs, dict[str, Row]]], watchlist: list[str] | None = None) -> dict[str, Any]:
+    """markets = {市場: (xs, {コード: {name, cci48, cci288}})}。その日の CCI ±200 の抜けをまとめる。"""
     watch = {str(w).strip().upper() for w in (watchlist or []) if str(w).strip()}
-    dates, counts = daily_counts(jx)
-    asof = dates[-1] if dates else None
-    n = counts[-1] if counts else 0
-    thr = ind.spike_threshold(counts[-1 - ind.SPIKE_LOOKBACK : -1]) if counts else None
-    us_asof = max((ds[-1] for _, ds in ux.values() if ds), default=None)
-    items = _today_rows(jx, {r["code"]: r for r in jp_rows}, asof, "company_name", "JP") if asof else []
-    if us_asof:
-        items += _today_rows(ux, {r["ticker"]: r for r in us_rows}, us_asof, "name", "US")
-    for r in items:
-        r["watch"] = r["code"].upper() in watch
-    items = _order(items)
-    both = [r for r in items if r["market"] != "US" and r["both_down"]]
+    per: dict[str, Any] = {}
+    items: list[Row] = []
+    for m, (xs, rows) in markets.items():
+        spec = MARKETS[m]
+        dates, counts, active = daily_counts(xs)
+        asof = dates[-1] if dates else None
+        n = counts[-1] if counts else 0
+        line = ind.spike_line(counts[-1 - ind.SPIKE_LOOKBACK : -1], active[-1]) if (counts and spec["spike"]) else None
+        mi = _order(_today_rows(m, xs, rows, asof)) if asof else []
+        for r in mi:
+            r["watch"] = r["code"].upper() in watch
+        items += mi
+        per[m] = {
+            "label": spec["label"],
+            "asof": asof,
+            "universe": active[-1] if active else 0,
+            "both_down_count": n,
+            "spike_line": line,
+            "spike": bool(spec["spike"] and ind.is_spike(n, line)),
+            "verified": spec["verified"],
+            "note": spec["note"],
+            "both_down": [r for r in mi if r["both_down"]],
+        }
     watched = [r for r in items if r["watch"] and any(r[k] for k in ind.NOTIFY_EVENTS)]
+    asof = (per.get("jp") or {}).get("asof") or max((v["asof"] or "" for v in per.values()), default="") or None
     return {
         "asof": asof,
-        "us_asof": us_asof,
-        "both_down_count": n,
-        "spike_threshold": thr,
-        "spike": ind.is_spike(n, thr),
-        "both_down": both,
+        "markets": per,
+        "spike": any(v["spike"] for v in per.values()),
         "watch_hits": watched,
         "watchlist": sorted(watch),
         "items": items,
     }
 
 
-# ── 検証（verify_local.json の jp.cci_both_down）────────────────────────────────
+# ── 検証（verify_local.json の cci_both_down.<市場>）──────────────────────────────
 
 
 def _stats_by_year(pairs: list[tuple[str, float]]) -> dict[str, Any]:
@@ -111,20 +134,25 @@ def _stats_by_year(pairs: list[tuple[str, float]]) -> dict[str, Any]:
     return {y: events.stats(v) for y, v in sorted(by.items())}
 
 
-def verify(jx: Xs) -> dict[str, Any]:
-    """「CCI48 と CCI288 の両方が −200 を下に抜けた」日の 20営業日後（中央値など）。
-    全体・「一斉に割れ」の日（暴落の日）を除く・年ごと。比べる相手は同じ銘柄・同じ期間の全営業日（base）。"""
-    dates, counts = daily_counts(jx)
-    spikes = ind.spike_days(dates, counts)
+def verify(xs: Xs, market: str) -> dict[str, Any]:
+    """両方割れの日の 20営業日後（中央値など。件数 n も必ず出す）。全体・「一斉に割れ」の日を除く・年ごと。
+    比べる相手は同じ銘柄・同じ期間の全営業日（base）。FX・仮想通貨は「一斉に割れ」を出さないので除く日は無い。"""
+    spec = MARKETS[market]
+    dates, counts, active = daily_counts(xs)
+    spikes = ind.spike_days(dates, counts, active) if spec["spike"] else set()
     acc: dict[str, list[tuple[str, float]]] = {}
-    for x, ds in jx.values():
+    for x, ds in xs.values():
         ev = ind.cci_events(x)
-        part = events.event_returns_dated(x["c"], {"both_down": ev["both_down"], "both_up": ev["both_up"]}, ds)
-        events.merge(acc, part)
-    bd = acc.get("both_down", [])
-    base = acc.get("base", [])
+        events.merge(
+            acc, events.event_returns_dated(x["c"], {"both_down": ev["both_down"], "both_up": ev["both_up"]}, ds)
+        )
+    bd, base = acc.get("both_down", []), acc.get("base", [])
     return {
+        "market": spec["label"],
+        "verified": spec["verified"],
+        "note": spec["note"],
         "definition": "cci48_and_cci288_both_cross_below_minus200",
+        "symbols": len(xs),
         "horizon_days": events.H,
         "gap_days": events.GAP,
         "full": {
@@ -137,43 +165,16 @@ def verify(jx: Xs) -> dict[str, Any]:
             "base": events.stats([f for d, f in base if d not in spikes]),
         },
         "spike_days": sorted(spikes),
-        "spike_rule": {"quantile": ind.SPIKE_Q, "lookback_days": ind.SPIKE_LOOKBACK, "min_count": ind.SPIKE_MIN_COUNT},
+        "spike_rule": (
+            {"quantile": ind.SPIKE_Q, "lookback_days": ind.SPIKE_LOOKBACK, "min_frac_of_universe": ind.SPIKE_MIN_FRAC}
+            if spec["spike"]
+            else None
+        ),
         "by_year": {"both_down": _stats_by_year(bd), "base": _stats_by_year(base)},
     }
 
 
 # ── 一覧（HTML）と Mac mini の通知 ─────────────────────────────────────────────
-
-
-def render_html(a: dict[str, Any]) -> str:
-    head = "".join(f"<th>{html.escape(labels.col(c))}</th>" for c in ALERT_COLS)
-    body = []
-    for r in a["items"]:
-        tds = "".join(f"<td>{html.escape(_cell(r.get(c)))}</td>" for c in ALERT_COLS)
-        cls = "bd" if r.get("both_down") else ("w" if r.get("watch") else "")
-        body.append(f'<tr class="{cls}">{tds}</tr>')
-    thr = a["spike_threshold"]
-    banner = (
-        '<p class="spike">一斉に割れ（暴落の可能性）: 両方が −200 を下に抜けた銘柄が '
-        f"{a['both_down_count']} 件。過去1年の上位1%の線（{thr:.0f} 件）を超えました。</p>"
-        if a["spike"]
-        else ""
-    )
-    thr_txt = f"{thr:.0f} 件" if thr is not None else "履歴が短く未判定"
-    return (
-        '<!DOCTYPE html>\n<html lang="ja"><head><meta charset="utf-8">'
-        f"<title>CCI ±200 {html.escape(str(a['asof']))}</title>"
-        "<style>body{font-family:sans-serif;font-size:13px}table{border-collapse:collapse}"
-        "th,td{border:1px solid #ccc;padding:2px 6px}th{background:#eee;position:sticky;top:0}"
-        ".bd{background:#ffe6e6}.w{background:#e6f0ff}.spike{color:#b00;font-weight:bold;font-size:16px}</style>"
-        "</head><body>"
-        f"<h1>CCI ±200 の抜け（日本株 {html.escape(str(a['asof']))}・米国株 {html.escape(str(a['us_asof']))}）</h1>"
-        f"{banner}<p>両方が −200 を下に抜けた日本株: {a['both_down_count']} 件（「一斉に割れ」の線: {thr_txt}）。"
-        f"ウォッチリストで −200 を抜けた銘柄: {len(a['watch_hits'])} 件。"
-        "+200 を上に抜けたものは通知しません（列だけ）。"
-        "過去の集計は verify_local.json の jp.cci_both_down。このファイルは Mac mini のローカルにだけあります。</p>"
-        f"<table><thead><tr>{head}</tr></thead><tbody>{''.join(body)}</tbody></table></body></html>\n"
-    )
 
 
 def _cell(v: Any) -> str:
@@ -184,30 +185,74 @@ def _cell(v: Any) -> str:
     return str(v)
 
 
-def _names(rs: list[Row]) -> str:
-    s = "、".join(f"{r['code']} {r['name']}" for r in rs[:TOP_N])
-    return s + (f" ほか{len(rs) - TOP_N}" if len(rs) > TOP_N else "")
+def render_html(a: dict[str, Any]) -> str:
+    head = "".join(f"<th>{html.escape(labels.col(c))}</th>" for c in ALERT_COLS)
+    body = []
+    for r in a["items"]:
+        r = r | {"market": MARKETS[r["market"]]["label"]}
+        tds = "".join(f"<td>{html.escape(_cell(r.get(c)))}</td>" for c in ALERT_COLS)
+        cls = "bd" if r.get("both_down") else ("w" if r.get("watch") else "")
+        body.append(f'<tr class="{cls}">{tds}</tr>')
+    summary = []
+    for m in a["markets"].values():
+        line = f"{m['spike_line']:.0f} 件" if m["spike_line"] is not None else "—"
+        flag = "一斉に割れ（暴落の可能性）" if m["spike"] else ""
+        summary.append(
+            "<tr>"
+            + "".join(
+                f"<td>{html.escape(str(v))}</td>"
+                for v in (m["label"], m["asof"], m["universe"], m["both_down_count"], line, flag, m["note"])
+            )
+            + "</tr>"
+        )
+    banner = "".join(
+        f'<p class="spike">一斉に割れ（暴落の可能性）: {html.escape(m["label"])} 両方 −200 割れ '
+        f"{m['both_down_count']} 件（線 {m['spike_line']:.0f} 件を超えた）</p>"
+        for m in a["markets"].values()
+        if m["spike"]
+    )
+    return (
+        '<!DOCTYPE html>\n<html lang="ja"><head><meta charset="utf-8">'
+        f"<title>CCI ±200 {html.escape(str(a['asof']))}</title>"
+        "<style>body{font-family:sans-serif;font-size:13px}table{border-collapse:collapse;margin:8px 0}"
+        "th,td{border:1px solid #ccc;padding:2px 6px}th{background:#eee;position:sticky;top:0}"
+        ".bd{background:#ffe6e6}.w{background:#e6f0ff}.spike{color:#b00;font-weight:bold;font-size:16px}</style>"
+        f"</head><body><h1>CCI ±200 の抜け（{html.escape(str(a['asof']))}）</h1>{banner}"
+        "<table><thead><tr><th>市場</th><th>日付</th><th>銘柄数</th><th>両方 −200 割れ</th>"
+        "<th>「一斉に割れ」の線</th><th></th><th>注記</th></tr></thead>"
+        f"<tbody>{''.join(summary)}</tbody></table>"
+        f"<p>ウォッチリストで −200 を抜けた銘柄: {len(a['watch_hits'])} 件。"
+        "+200 を上に抜けたものは通知しません（列だけ）。過去の集計は verify_local.json の cci_both_down。"
+        "このファイルは Mac mini のローカルにだけあります。</p>"
+        f"<table><thead><tr>{head}</tr></thead><tbody>{''.join(body)}</tbody></table></body></html>\n"
+    )
+
+
+def _names(rs: list[Row], n: int = TOP_N) -> str:
+    s = "、".join(f"{r['code']} {r['name']}" for r in rs[:n])
+    return s + (f" ほか{len(rs) - n}" if len(rs) > n else "")
 
 
 def message(a: dict[str, Any]) -> tuple[str, str] | None:
-    """(タイトル, 本文)。通知することが無ければ None。"""
-    if a["spike"]:
-        return (
-            "⚠ 一斉に割れ（暴落の可能性）",
-            f"{a['asof']} 日本株で CCI48・288 の両方が −200 割れ {a['both_down_count']} 件"
-            f"（過去1年の上位1%の線 {a['spike_threshold']:.0f} 件を超えた）。{_names(a['both_down'])}",
-        )
+    """(タイトル, 本文)。本文は市場ごとの件数＋上位銘柄（FX・仮想通貨は1つずつ全部・「未検証」）。無ければ None。"""
     parts = []
-    if a["both_down"]:
-        parts.append(f"両方 −200 割れ {len(a['both_down'])} 件: {_names(a['both_down'])}")
+    for m in a["markets"].values():
+        bd = m["both_down"]
+        if not bd:
+            continue
+        if m["spike"]:
+            parts.append(f"⚠{m['label']} 一斉に割れ {len(bd)} 件（線 {m['spike_line']:.0f} 件超え）: {_names(bd)}")
+        elif m["verified"]:
+            parts.append(f"{m['label']} 両方割れ {len(bd)} 件: {_names(bd)}")
+        else:
+            parts.append(f"{m['label']}（未検証）{len(bd)} 件: {_names(bd, n=len(bd))}")
     if a["watch_hits"]:
         parts.append(f"ウォッチ {len(a['watch_hits'])} 件: {_names(a['watch_hits'])}")
     if not parts:
         return None
-    return f"CCI −200 割れ {a['asof']}", " ／ ".join(parts)
-
-
-Runner = Callable[..., Any]
+    spiked = [m["label"] for m in a["markets"].values() if m["spike"]]
+    title = f"⚠ 一斉に割れ（暴落の可能性）: {'・'.join(spiked)}" if spiked else f"CCI −200 割れ {a['asof']}"
+    return title, " ／ ".join(parts)
 
 
 def shown_path(p: Path, home: Path | None = None) -> str:
@@ -225,6 +270,9 @@ def _ok(r: Any) -> None:
         raise RuntimeError(f"終了コード {rc}")
 
 
+Runner = Callable[..., Any]
+
+
 def notify(
     a: dict[str, Any],
     html_path: Path,
@@ -236,7 +284,7 @@ def notify(
 ) -> str:
     """Mac mini の通知を1回出す。戻り値は使った方法（osascript / terminal-notifier / none / not_mac / error）。
     既定は osascript の display notification（macOS 26 では terminal-notifier が通知の許可の一覧に出ず使えなかった）。
-    prefer="terminal-notifier"（config の [alerts] notifier）のときだけ試し、実行時にエラーなら osascript に切り替える。
+    prefer="terminal-notifier" のときだけ試し、実行時にエラーなら osascript に切り替える。
     本文の最後に一覧のファイルの場所を書く。通知の失敗で本処理を失敗にしない。"""
     m = message(a)
     if m is None:

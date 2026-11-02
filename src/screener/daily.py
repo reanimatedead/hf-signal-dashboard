@@ -5,7 +5,7 @@
    こうしないと pull の前に読み込んだ古いコードのまま走り、pull した修正が次の日まで効かない。
    uv run で起動し直すので、uv.lock が変わっていれば依存もそろえ直される。
 2. J-Quants 契約テスト（V2・日足 ≥3500 件・決算短信の列）
-3. 差分を取得（日本株 J-Quants は直近3営業日を取り直す・米国株 Yahoo の株価）
+3. 差分を取得（日本株 J-Quants は直近3営業日を取り直す・米国株と FX・仮想通貨は Yahoo の日足）
 4. 一覧（screen → signals）→ local_report（<data_dir>/out/ にだけ書く）
 5. CCI ±200 の抜けを Mac mini の通知で1回出す（screener.alerts。既定は osascript。
    本文の最後に一覧の場所。ntfy には送らない）
@@ -66,6 +66,9 @@ def update_us(cfg: Config, today: dt.date) -> None:
     got, err = us_fetch.fetch_prices(cfg, tickers)
     if err > len(tickers) * 0.1:
         raise RuntimeError(f"米国株の株価が {err}/{len(tickers)} 件取れない")
+    from . import fxcrypto
+
+    print("fx/crypto", fxcrypto.fetch(cfg), flush=True)  # 取れなかった銘柄は前回のまま（止めない）
 
 
 mac_notify: Callable[..., Any] = alerts.notify  # テストで差し替える

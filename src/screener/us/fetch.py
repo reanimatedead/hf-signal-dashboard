@@ -15,6 +15,7 @@ import json
 import os
 import sys
 import time
+import urllib.parse
 import urllib.request
 from collections.abc import Callable
 from pathlib import Path
@@ -178,14 +179,21 @@ def merge_chart(old: dict[str, Any], new: dict[str, Any]) -> dict[str, Any] | No
 
 
 def fetch_prices(
-    cfg: Config, tickers: list[str], full: bool = False, getter: Raw = raw, sleep: Callable[[float], None] = time.sleep
+    cfg: Config,
+    tickers: list[str],
+    full: bool = False,
+    getter: Raw = raw,
+    sleep: Callable[[float], None] = time.sleep,
+    dest: Path | None = None,
 ) -> tuple[int, int]:
-    cfg.us("px").mkdir(parents=True, exist_ok=True)
+    """Yahoo の日足を dest（既定 <data_dir>/us/px）に付け足す。取れなかった銘柄は前回のファイルのまま。"""
+    dest = dest or cfg.us("px")
+    dest.mkdir(parents=True, exist_ok=True)
     got = err = 0
     base = "https://query1.finance.yahoo.com/v8/finance/chart/"
     for t in tickers:
-        p = cfg.us("px", f"{t}.json")
-        y = t.replace(".", "-")
+        p = dest / f"{t}.json"
+        y = urllib.parse.quote(t.replace(".", "-") if "=" not in t and "^" not in t else t, safe="-")
         rng = "5y" if (full or not p.exists()) else "1mo"
         try:
             j = json.loads(getter(f"{base}{y}?range={rng}&interval=1d&events=split,div"))

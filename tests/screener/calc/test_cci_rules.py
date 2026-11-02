@@ -28,18 +28,27 @@ def test_up_events_and_first_day_and_nan():
     assert set(ind.NOTIFY_EVENTS) == {"both_down", "cci48_down", "cci288_down"}  # +200 は通知しない
 
 
-def test_spike_threshold_is_strictly_above_top_1pct_of_past_year():
-    assert ind.spike_threshold([0] * 50) is None  # 履歴が短いと判定しない
-    past = [0] * 240 + [10, 20, 30, 40, 50]
-    thr = ind.spike_threshold(past)
-    assert thr == float(np.quantile(past, 0.99))
-    assert ind.is_spike(int(thr) + 1, thr) and not ind.is_spike(thr, thr) and not ind.is_spike(0, -1.0)
-    assert not ind.is_spike(4, 0.0) and ind.is_spike(5, 0.0)  # 線が 0 件でも 5 件未満は「一斉に」としない
+def test_spike_line_is_max_of_top_1pct_and_1_5pct_of_universe():
+    assert ind.spike_line([0] * 50, 3600) is None  # 履歴が短いと判定しない
+    calm = [0] * 245
+    assert (
+        ind.spike_line(calm, 3600) == 54.0 and ind.spike_line(calm, 520) == 0.015 * 520
+    )  # 日本株 54 件・米国株 7.8 件
+    past = [0] * 240 + [100, 200, 300, 400, 500]
+    q = float(np.quantile(past, 0.99))
+    assert ind.spike_line(past, 3600) == max(q, 54.0) == q
+    line = ind.spike_line(calm, 3600)
+    assert not ind.is_spike(54, line) and ind.is_spike(55, line)  # 線を「超えた」日だけ
+    us = ind.spike_line(calm, 520)  # 米国株 520 銘柄 → 7.8 件
+    assert not ind.is_spike(7, us) and ind.is_spike(8, us)
+    assert not ind.is_spike(3, None)
 
 
-def test_spike_days_use_only_the_days_before():
+def test_spike_days_use_only_the_days_before_and_daily_universe():
     dates = [f"d{i:03d}" for i in range(200)]
     counts = [1] * 200
-    counts[150] = 50
-    counts[151] = 50  # 前の日が入っても、上位1%の線はまだ低い → 続けて「一斉に割れ」
-    assert ind.spike_days(dates, counts) == {"d150", "d151"}
+    counts[150] = 60
+    counts[151] = 60  # 前の日が入っても、上位1%の線はまだ低い → 続けて「一斉に割れ」
+    counts[160] = 40  # 平常日より多いが、銘柄数の 1.5%（54 件）に届かない
+    assert ind.spike_days(dates, counts, [3600] * 200) == {"d150", "d151"}
+    assert ind.spike_days(dates, counts, [6000] * 200) == set()  # 銘柄数が多ければ線は 90 件

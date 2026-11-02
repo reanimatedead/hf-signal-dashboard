@@ -4,8 +4,9 @@ out/japan_list.csv    日本株の一覧（列名・値はコード: grade A/B/C
 out/japan_list.html   同じ内容の簡単な表（言葉は screener.labels で付ける。ブラウザで開くだけ。外部の読み込みなし）
 out/us_list.csv       米国株の一覧
 out/us_list.html      同じ形の簡単な表（米国株）
-out/verify_local.json 検証（20営業日後 vs 基準。jp.cci_both_down = CCI 両方 −200 割れの検証）
-out/cci_alerts.html   CCI ±200 の抜けの一覧（最新）。日付つきの cci_alerts_YYYY-MM-DD.html も残す（通知を押すと開く）
+out/verify_local.json 検証（20営業日後 vs 基準。cci_both_down.<jp/us/fx/crypto> = CCI 両方 −200 割れの検証）
+out/cci_alerts.html   CCI ±200 の抜けの一覧（最新・日本株/米国株/FX/仮想通貨）。日付つきの
+                      cci_alerts_YYYY-MM-DD.html も残す（通知の本文の最後にこの場所を書く）
 out/counts.json       件数（前回の件数 previous と、日本株の件数のずれ % も入れる）
 """
 
