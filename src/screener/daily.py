@@ -95,6 +95,8 @@ def main(
         return 1
     if today.weekday() == 0:
         notify.send(cfg, "週次 OK", today, **send_kw)
+    else:
+        print("ntfy: 送信なし HTTP -（成功・月曜以外は送らない）", flush=True)
     return 0
 
 

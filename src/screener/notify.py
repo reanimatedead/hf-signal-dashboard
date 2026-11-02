@@ -8,6 +8,7 @@ from __future__ import annotations
 import datetime as dt
 import re
 import sys
+import urllib.error
 import urllib.request
 from collections.abc import Callable
 from typing import Any
@@ -34,17 +35,23 @@ def _post(url: str, data: bytes) -> Any:
 
 
 def send(cfg: Config, status: str, day: dt.date, poster: Poster = _post) -> bool:
-    """送れたら True。トピックが無い・送れないときは False（例外にしない。本処理の結果を変えない）。"""
+    """送れたら True。トピックが無い・送れないときは False（例外にしない。本処理の結果を変えない）。
+    結果を1行だけログ（標準出力）に出す: 「ntfy: <状態> HTTP <コード>」。トピック・本文以外の中身は出さない。"""
     topic = cfg.ntfy_topic
     if not topic:
-        print("ntfy: トピックが設定されていません（install_macmini.sh）", file=sys.stderr)
+        print(f"ntfy: {status} 送信せず HTTP -（トピックが設定されていません・install_macmini.sh）", flush=True)
         return False
     try:
-        poster(f"{cfg.ntfy_server}/{topic}", body(status, day).encode("utf-8"))
-        return True
-    except Exception as e:  # 通知の失敗で本処理を変えない
-        print(f"ntfy: 送れませんでした（{type(e).__name__}）", file=sys.stderr)
+        code = poster(f"{cfg.ntfy_server}/{topic}", body(status, day).encode("utf-8"))
+    except urllib.error.HTTPError as e:  # 通知の失敗で本処理を変えない
+        print(f"ntfy: {status} 送信失敗 HTTP {e.code}", flush=True)
         return False
+    except Exception as e:
+        print(f"ntfy: {status} 送信失敗 HTTP -（{type(e).__name__}）", flush=True)
+        return False
+    ok = not isinstance(code, int) or 200 <= code < 300
+    print(f"ntfy: {status} {'送信' if ok else '送信失敗'} HTTP {code if isinstance(code, int) else '?'}", flush=True)
+    return ok
 
 
 def main(argv: list[str] | None = None) -> int:
