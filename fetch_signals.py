@@ -15,7 +15,7 @@ import pandas as pd
 import yfinance as yf
 
 # 計算式は marketcalc/ だけ（DATA_CONTRACT §21）。import はここ1か所。
-from marketcalc import contracts, fund_us, ind  # noqa: E402
+from marketcalc import contracts, fund_us, ind, schedule  # noqa: E402
 
 warnings.filterwarnings("ignore")
 
@@ -3113,8 +3113,8 @@ def main():
     # §21: 米国3タブに magic_rank / f_score / f_max（決算は data/us_fundamentals.json・週次）。
     us_fund_meta = attach_us_fundamentals((dj_results, nq_results, sp_results))
 
-    next_run = (now_jst + timedelta(days=1)).replace(
-        hour=8, minute=0, second=0, microsecond=0)
+    # 次回 = deploy.yml の full の cron から計算（時刻を固定の文字で書かない）。読めなければ None →「—」。
+    next_run = schedule.next_job_run("full", now_jst)
 
     # ── Part 3: 上場廃止/入替の検知（定義済みだが取得できなかった銘柄）を meta に記録。
     #    黙って件数だけ減らさない。nikkei/nasdaq のハードコード subset は full 未達を明示。
@@ -3172,7 +3172,7 @@ def main():
         "meta": {
             "updated_at":      now_jst.isoformat(),
             "updated_at_str":  now_jst.strftime("%Y-%m-%d %H:%M JST"),
-            "next_update_str": next_run.strftime("%Y-%m-%d %H:%M JST"),
+            "next_update_str": next_run.strftime("%Y-%m-%d %H:%M JST") if next_run else None,
             "elapsed_sec":     round(time.time() - t0, 1),
             "counts": {
                 "nikkei225": len(nk_results), "dow30": len(dj_results),

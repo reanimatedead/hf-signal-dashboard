@@ -1,8 +1,11 @@
 """毎日 19:00（launchd）に動く本体: python -m screener.daily
 
-1. リポジトリ（config の repo_dir、既定 ~/hf-signal-dashboard）で git pull --ff-only
+1. リポジトリ（config の repo_dir、既定 ~/hf-signal-dashboard）で git pull --ff-only。
+   そのあと自分自身を起動し直す（os.execv で `uv run python -m screener.daily --pulled`）。
+   こうしないと pull の前に読み込んだ古いコードのまま走り、pull した修正が次の日まで効かない。
+   uv run で起動し直すので、uv.lock が変わっていれば依存もそろえ直される。
 2. J-Quants 契約テスト（V2・日足 ≥3500 件・決算短信の列）
-3. 今日の差分を取得（日本株 J-Quants・米国株 Yahoo の株価）
+3. 差分を取得（日本株 J-Quants は直近3営業日を取り直す・米国株 Yahoo の株価）
 4. 一覧（screen → signals）→ local_report（<data_dir>/out/ にだけ書く）
 失敗したら ntfy に「失敗＋日付」を送って終了コード 1。
 成功したら何も送らない。ただし月曜は最後に「週次 OK＋日付」を1回送る。
@@ -13,6 +16,8 @@ from __future__ import annotations
 import argparse
 import datetime as dt
 import json
+import os
+import shutil
 import subprocess
 import sys
 import traceback
@@ -25,12 +30,22 @@ from .config import Config
 from .jquants import Getter, default_client
 
 Runner = Callable[..., Any]
+Exec = Callable[[str, list[str]], Any]
 
 
 def git_pull(cfg: Config, runner: Runner = subprocess.run) -> None:
     r = runner(["git", "-C", str(cfg.repo_dir), "pull", "--ff-only"], capture_output=True, text=True, timeout=300)
     if r.returncode != 0:
         raise RuntimeError(f"git pull --ff-only が失敗（{cfg.repo_dir}）: {str(r.stderr).strip()[:300]}")
+
+
+def reexec_argv(cfg: Config, args: list[str]) -> tuple[str, list[str]]:
+    """pull したあとの起動し直し方。uv があれば uv run（依存もそろう）、無ければ同じ python。"""
+    rest = ["-m", "screener.daily", "--pulled", *args]
+    uv = shutil.which("uv")
+    if uv:
+        return uv, [uv, "run", "--project", str(cfg.repo_dir), "python", *rest]
+    return sys.executable, [sys.executable, *rest]
 
 
 def update_us(cfg: Config, today: dt.date) -> None:
@@ -55,14 +70,13 @@ def pipeline(
     cfg: Config,
     today: dt.date,
     get: Getter | None = None,
-    runner: Runner = subprocess.run,
     us_update: Callable[[Config, dt.date], None] = update_us,
 ) -> dict[str, Any]:
+    """git pull と起動し直しは main が先に済ませている（ここは新しいコードで走る）。"""
     from .japan import fetch as jp_fetch
     from .japan import signals
 
     cfg.ensure_dirs()
-    git_pull(cfg, runner)
     if get is None:
         get = default_client(int(cfg.get("jquants.rate_per_min", 50)), str(cfg.get("jquants.keychain_service"))).get
     print(contract.check(today, get), flush=True)
@@ -80,14 +94,26 @@ def main(
     today: dt.date | None = None,
     run: Callable[[Config, dt.date], Any] | None = None,
     poster: notify.Poster | None = None,
+    runner: Runner = subprocess.run,
+    execv: Exec = os.execv,
 ) -> int:
     ap = argparse.ArgumentParser(description=(__doc__ or "").splitlines()[0])
     ap.add_argument("--today", help="基準日（既定: 今日 JST）")
-    a = ap.parse_args(argv)
+    ap.add_argument("--pulled", action="store_true", help="git pull 済み（起動し直したあと。手で付けない）")
+    args = sys.argv[1:] if argv is None else list(argv)
+    a = ap.parse_args(args)
     today = today or (dt.date.fromisoformat(a.today) if a.today else config_mod.today_jst())
     send_kw: dict[str, Any] = {"poster": poster} if poster else {}
     try:
         cfg = cfg or config_mod.load()
+        if not a.pulled:
+            git_pull(cfg, runner)
+            print("git pull --ff-only: OK → 新しいコードで起動し直す", flush=True)
+            sys.stdout.flush()
+            sys.stderr.flush()
+            prog, new_argv = reexec_argv(cfg, [x for x in args if x != "--pulled"])
+            execv(prog, new_argv)  # 戻らない（テストでは差し替え）
+            return 0
         (run or pipeline)(cfg, today)
     except Exception:
         traceback.print_exc()

@@ -11,9 +11,9 @@ _SRC = str(pathlib.Path(__file__).resolve().parents[1] / "src")
 if _SRC not in sys.path:
     sys.path.insert(0, _SRC)
 
-from screener.calc import contracts, events, fund_us, ind, value  # noqa: E402
+from screener.calc import contracts, events, fund_us, ind, schedule, value  # noqa: E402
 
-for _m in (contracts, events, fund_us, ind, value):
+for _m in (contracts, events, fund_us, ind, schedule, value):
     sys.modules[f"{__name__}.{_m.__name__.rsplit('.', 1)[-1]}"] = _m
 
-__all__ = ["contracts", "events", "fund_us", "ind", "value"]
+__all__ = ["contracts", "events", "fund_us", "ind", "schedule", "value"]
