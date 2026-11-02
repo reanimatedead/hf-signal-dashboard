@@ -17,6 +17,9 @@ from ..config import Config
 
 FIN = {"7050", "7100", "7150", "7200"}  # 銀行・証券・保険・その他金融（指標の意味が違う）
 MARKETS = ("プライム", "スタンダード", "グロース")
+# 割安5分の1（総合判定 A の割安側。backtest_value.with_chart で検証した定義）
+QUINTILE_MARKETS = ("プライム", "スタンダード")
+QUINTILE_MIN_MCAP_OKU = 300
 Row = dict[str, Any]
 
 
@@ -179,3 +182,38 @@ def tag(r: Row) -> str:
     if (r["upside_pct"] or 0) >= 50 and (r["F"] <= 3 or (r["roe_fwd_pct"] or 0) < 3):
         t.append("cheap_low_quality")
     return "|".join(t)
+
+
+def quintile_universe(rows: list[Row]) -> list[Row]:
+    """割安5分の1を決める母集団: プライム・スタンダード / 金融を除く / 時価総額300億円以上 / 上値余地あり。"""
+    return [
+        r
+        for r in rows
+        if r.get("market") in QUINTILE_MARKETS
+        and not r["financial"]
+        and (r["mcap_oku_jpy"] or 0) >= QUINTILE_MIN_MCAP_OKU
+        and r["upside_pct"] is not None
+    ]
+
+
+def cheap_bounds(rows: list[Row]) -> tuple[float, float] | None:
+    """(割高5分の1の上限, 割安5分の1の下限)。上値余地を小さい順に並べた 20% 点と 80% 点（with_chart と同じ取り方）。"""
+    q = sorted(r["upside_pct"] for r in quintile_universe(rows))
+    n = len(q)
+    return (q[n // 5], q[4 * n // 5]) if n else None
+
+
+def value_quintile(rows: list[Row]) -> dict[str, str]:
+    """{code: cheap_quintile / middle / expensive_quintile}。母集団の外の銘柄は入らない。"""
+    b = cheap_bounds(rows)
+    if b is None:
+        return {}
+    lo, hi = b
+    return {
+        r["code"]: "cheap_quintile"
+        if r["upside_pct"] >= hi
+        else "expensive_quintile"
+        if r["upside_pct"] <= lo
+        else "middle"
+        for r in quintile_universe(rows)
+    }

@@ -19,6 +19,7 @@ def test_writes_only_under_out(cfg):
         "japan_list.csv",
         "japan_list.html",
         "us_list.csv",
+        "us_list.html",
         "verify_local.json",
         "counts.json",
     }
@@ -27,6 +28,10 @@ def test_writes_only_under_out(cfg):
     html = (cfg.out_dir / "japan_list.html").read_text()
     assert "決算短信で確認" in html and "<script" not in html  # 言葉は描画時に付ける
     assert "<th>コード</th>" in html and "check_earnings_release" not in html
+    assert "<th>割安度(5分位)</th>" in html and "<th>品質の候補</th>" in html
+    us_html = (cfg.out_dir / "us_list.html").read_text()  # 米国株も同じ形の表
+    assert "<h1>米国株の一覧" in us_html and "<th>ティッカー</th>" in us_html and "<script" not in us_html
+    assert us_html.count('<tr class="g') == 3
     csv = (cfg.out_dir / "japan_list.csv").read_text(encoding="utf-8-sig")
     assert csv.splitlines()[0].startswith("code,") and len(csv.splitlines()) == 6
 

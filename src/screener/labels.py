@@ -14,7 +14,8 @@ COLUMNS = {
     "chart_signal": "チャート判定", "trend": "長期", "price": "株価", "fair_price": "理論株価",
     "upside_pct": "上値余地%", "PBR": "PBR", "F": "F", "f_max": "F満点", "magic_rank": "魔法の公式順位",
     "fin_tag": "財務判定", "mcap_oku_jpy": "時価総額(億円)", "one_off_note": "一時利益の目印",
-    "one_off_reasons": "一時利益の理由",
+    "one_off_reasons": "一時利益の理由", "value_quintile": "割安度(5分位)", "quality_candidate": "品質の候補",
+    "ticker": "ティッカー", "name": "会社名", "idx": "指数",
 }  # fmt: skip
 
 # 値（コード）
@@ -27,6 +28,8 @@ VALUES = {
     # 財務判定（screener.japan.screen.tag / screener.us.make_value.tag）
     "long_candidate": "長期候補", "mid_candidate": "中期候補", "cheap_low_quality": "割安だが質に注意",
     "value_quality_top50": "割安×質 上位50",
+    # 割安度（screener.japan.screen.value_quintile）
+    "cheap_quintile": "割安5分の1", "middle": "中間", "expensive_quintile": "割高5分の1",
     # 一時利益の目印（screener.calc.value）
     "check_earnings_release": "決算短信で確認",
     "net_income_gt_op_income_1_3x": "純利益が営業利益の1.3倍超",
@@ -34,7 +37,7 @@ VALUES = {
 }  # fmt: skip
 
 # 総合判定 A/B/C の説明
-GRADE_TEXT = {"A": "A 割安×買い", "B": "B どちらか一方", "C": "C 該当なし"}
+GRADE_TEXT = {"A": "A 割安5分の1×買い", "B": "B どちらか一方", "C": "C 該当なし"}
 
 SEP = "|"  # 複数コードの区切り（財務判定・一時利益の理由）
 

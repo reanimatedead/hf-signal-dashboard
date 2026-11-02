@@ -59,6 +59,13 @@ def test_failure_sends_fail_and_exit_1(cfg):
     assert rc == 1 and sent == ["screener 2026-11-03 失敗"]
 
 
+def test_daily_logs_ntfy_result_line(cfg, capsys):
+    assert daily.main([], cfg=cfg, today=MON, run=lambda c, d: None, poster=lambda u, b: 200) == 0
+    assert "ntfy: 週次 OK 送信 HTTP 200" in capsys.readouterr().out
+    assert daily.main([], cfg=cfg, today=TUE, run=lambda c, d: None, poster=lambda u, b: 200) == 0
+    assert "ntfy: 送信なし HTTP -" in capsys.readouterr().out
+
+
 def test_success_sends_nothing_except_monday(cfg):
     sent = []
     post = lambda u, b: sent.append(b.decode())  # noqa: E731

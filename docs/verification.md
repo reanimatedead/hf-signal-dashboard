@@ -16,11 +16,11 @@
 | tests/screener/test_jquants.py | 6 | 120 回で直近60秒 50 回以下・3スレッドでも 50 回以下（偽の時計）・V2・ページ送り・キーを出さない |
 | tests/screener/test_japan_fetch.py | 3 | 既定は今日だけ・--full は年数分・一括取得でも 50回/60秒以下 |
 | tests/screener/test_japan_screen.py | 6 | 理論株価・F・魔法の公式・分割前後で PBR 不変・「決算短信で確認」・四半期/未来の開示を使わない |
-| tests/screener/test_japan_signals.py | 3 | 総合判定 A/B/C の規則・架空5銘柄で狙った判定・バックテストが動く |
+| tests/screener/test_japan_signals.py | 5 | 総合判定 A = 割安5分の1 × 買い系 の規則・割安5分の1の母集団と境界・**A の銘柄はすべて上値余地が割安5分の1の境界以上**・A の定義そのものの検証（verify_local.json の jp.grade_A）・バックテストが動く |
 | tests/screener/test_us.py | 3 | 決算を1社ずつ読む・判定・株価の付け足しと分割検知 |
-| tests/screener/test_local_report.py | 3 | 書くのは `<data_dir>/out/` だけ・counts.json（前回とずれ%）・リポジトリ内は拒否 |
-| tests/screener/test_notify.py | 3 | 本文が `^screener \d{4}-\d{2}-\d{2} (OK\|失敗\|週次 OK)$` だけ |
-| tests/screener/test_daily.py | 7 | 失敗→「失敗」と終了コード1・成功は無通知・月曜は「週次 OK」・git pull --ff-only・契約テスト不合格で止まる・全段 |
+| tests/screener/test_local_report.py | 3 | 書くのは `<data_dir>/out/` だけ（japan_list.html と同じ形の us_list.html も）・counts.json（前回とずれ%）・リポジトリ内は拒否 |
+| tests/screener/test_notify.py | 4 | 本文が `^screener \d{4}-\d{2}-\d{2} (OK\|失敗\|週次 OK)$` だけ・送信結果（HTTP コード）を1行ログに出す |
+| tests/screener/test_daily.py | 8 | 失敗→「失敗」と終了コード1・成功は無通知・月曜は「週次 OK」・ntfy の結果を1行ログ・git pull --ff-only・契約テスト不合格で止まる・全段 |
 | tests/screener/test_config.py | 3 | 既定 ~/screener-data・config.toml で変更・リポジトリ内は拒否 |
 | tests/screener/test_install_script.py | 7 | キーをファイル/ログに書く行が無い・~/hf-signal-dashboard の main・Obsidian のパスが無い・bash -n・shellcheck |
 | tests/test_data_json_gate.py | 4 | 生成物が無い→skip、REQUIRE_DATA_JSON=1→fail |

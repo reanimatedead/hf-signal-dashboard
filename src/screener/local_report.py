@@ -3,6 +3,7 @@
 out/japan_list.csv    日本株の一覧（列名・値はコード: grade A/B/C・chart_signal・fair_price・one_off_note など）
 out/japan_list.html   同じ内容の簡単な表（言葉は screener.labels で付ける。ブラウザで開くだけ。外部の読み込みなし）
 out/us_list.csv       米国株の一覧
+out/us_list.html      同じ形の簡単な表（米国株）
 out/verify_local.json 検証（20営業日後 vs 基準）
 out/counts.json       件数（前回の件数 previous と、日本株の件数のずれ % も入れる）
 """
@@ -23,9 +24,22 @@ from .config import PACKAGE_REPO, Config, _inside
 
 GRADE_ORDER = {"A": 0, "B": 1, "C": 2}
 HTML_COLS = [
-    "grade", "code", "company_name", "market", "sector", "chart_signal", "price", "fair_price", "upside_pct", "PBR",
-    "F", "f_max", "magic_rank", "fin_tag", "mcap_oku_jpy", "one_off_note", "one_off_reasons",
+    "grade", "code", "company_name", "market", "sector", "chart_signal", "price", "fair_price", "upside_pct",
+    "value_quintile", "quality_candidate", "PBR", "F", "f_max", "magic_rank", "fin_tag", "mcap_oku_jpy",
+    "one_off_note", "one_off_reasons",
 ]  # fmt: skip
+US_HTML_COLS = [
+    "grade", "ticker", "name", "idx", "sector", "chart_signal", "trend", "price", "fin_tag", "magic_rank", "F", "f_max",
+]  # fmt: skip
+JP_NOTE = (
+    "総合判定 A = 割安5分の1（プライム・スタンダード／金融を除く／時価総額300億円以上の中で上値余地が上位20%）"
+    "× 買い系のチャート判定。"
+    "品質の候補（長期候補・中期候補）は別の列です。一時利益の目印がある銘柄は決算短信で確認してください。"
+)
+US_NOTE = (
+    "総合判定 A = 財務判定（割安×質 上位50・中期候補）× 買い系のチャート判定"
+    "（米国株は理論株価の余地を出していません）。"
+)
 
 
 def _check_outside_repo(p: Path, cfg: Config) -> None:
@@ -64,22 +78,27 @@ def _sort_key(r: dict[str, Any]) -> tuple[int, float]:
     return GRADE_ORDER.get(r.get("grade", "C"), 9), -(r.get("upside_pct") or -1e9)
 
 
-def render_html(rows: list[dict[str, Any]], asof: str) -> str:
-    """HTML の表。データはコードのまま渡し、列名・値の言葉はここで screener.labels から付ける。"""
-    head = "".join(f"<th>{html.escape(labels.col(c))}</th>" for c in HTML_COLS)
+def render_html(
+    rows: list[dict[str, Any]],
+    asof: str,
+    cols: list[str] = HTML_COLS,
+    title: str = "日本株の一覧",
+    note: str = JP_NOTE,
+) -> str:
+    """HTML の表（日本株・米国株で同じ形）。データはコードのまま渡し、列名・値の言葉は screener.labels で付ける。"""
+    head = "".join(f"<th>{html.escape(labels.col(c))}</th>" for c in cols)
     body = []
     for r in rows:
-        tds = "".join(f"<td>{html.escape(labels.value(r.get(c)))}</td>" for c in HTML_COLS)
+        tds = "".join(f"<td>{html.escape(labels.value(r.get(c)))}</td>" for c in cols)
         body.append(f'<tr class="g{html.escape(str(r.get("grade", "")))}">{tds}</tr>')
     return (
         '<!DOCTYPE html>\n<html lang="ja"><head><meta charset="utf-8">'
-        f"<title>日本株の一覧 {html.escape(asof)}</title>"
+        f"<title>{html.escape(title)} {html.escape(asof)}</title>"
         "<style>body{font-family:sans-serif;font-size:13px}table{border-collapse:collapse}"
         "th,td{border:1px solid #ccc;padding:2px 6px}th{background:#eee;position:sticky;top:0}"
         ".gA{background:#e6ffe6}.gB{background:#fffbe6}</style></head><body>"
-        f"<h1>日本株の一覧（{html.escape(asof)}・{len(rows)} 件）</h1>"
-        "<p>このファイルは Mac mini のローカルにだけあります（公開しない）。"
-        "一時利益の目印がある銘柄は決算短信で確認してください。</p>"
+        f"<h1>{html.escape(title)}（{html.escape(asof)}・{len(rows)} 件）</h1>"
+        f"<p>このファイルは Mac mini のローカルにだけあります（公開しない）。{html.escape(note)}</p>"
         f"<table><thead><tr>{head}</tr></thead><tbody>{''.join(body)}</tbody></table></body></html>\n"
     )
 
@@ -111,6 +130,7 @@ def write(cfg: Config, doc: dict[str, Any]) -> dict[str, Any]:
     _write_csv(out / "japan_list.csv", jp)
     (out / "japan_list.html").write_text(render_html(jp, asof), encoding="utf-8")
     _write_csv(out / "us_list.csv", us)
+    (out / "us_list.html").write_text(render_html(us, asof, US_HTML_COLS, "米国株の一覧", US_NOTE), encoding="utf-8")
     dump_json(out / "verify_local.json", doc.get("verify") or {})
     cp = out / "counts.json"
     previous = None

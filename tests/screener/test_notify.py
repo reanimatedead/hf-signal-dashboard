@@ -37,3 +37,19 @@ def test_send_without_topic_or_on_error_returns_false(cfg):
     assert notify.send(cfg, "OK", dt.date(2026, 11, 2), poster=boom) is False
     cfg.raw["ntfy"]["topic"] = ""
     assert notify.send(cfg, "OK", dt.date(2026, 11, 2), poster=lambda u, d: None) is False
+
+
+def test_send_logs_one_line_with_http_code(cfg, capsys):
+    import io
+    import urllib.error
+
+    d = dt.date(2026, 11, 2)
+    assert notify.send(cfg, "OK", d, poster=lambda u, b: 200)
+    assert capsys.readouterr().out.strip().splitlines() == ["ntfy: OK 送信 HTTP 200"]
+
+    def http_err(u, b):
+        raise urllib.error.HTTPError(u, 429, "Too Many Requests", {}, io.BytesIO())
+
+    assert notify.send(cfg, "失敗", d, poster=http_err) is False
+    out = capsys.readouterr().out.strip().splitlines()
+    assert out == ["ntfy: 失敗 送信失敗 HTTP 429"] and "screener-testtopic" not in out[0]
