@@ -196,3 +196,71 @@ def label_conditions(x, p=P):
     """判定コードごとの日次 bool 配列（検証用）。day_labels と同じ規則。"""
     lab = day_labels(x, p)
     return {k: lab == k for k in (LABELS[2], LABELS[1], LONG_OVERSOLD_LABEL, LABELS[-1], LABELS[-2])}
+
+
+# ── CCI ±200 の抜け（通知と検証の両方がこれだけを使う。規則はここ1か所）──────────────────
+CCI_ALERT_LEVEL = 200  # ±200
+SPIKE_Q = 0.99  # 「一斉に割れ」: 過去1年の日々の件数の上位1%を超えた日
+SPIKE_LOOKBACK = 245  # 過去1年 ≒ 245 営業日
+SPIKE_MIN_DAYS = 120  # これより短い履歴では「一斉に割れ」を判定しない
+SPIKE_MIN_FRAC = (
+    0.015  # 「一斉に割れ」の最低件数 = その市場の銘柄数の 1.5%（日本株 約3,600 → 54件、米国株 約520 → 8件）
+)
+CCI_EVENTS = ("both_down", "cci48_down", "cci288_down", "both_up", "cci48_up", "cci288_up")
+NOTIFY_EVENTS = ("both_down", "cci48_down", "cci288_down")  # +200 を上に抜けたものは通知しない（一覧には残す）
+
+
+def _crossed(now, prev):
+    """前の日は条件を満たさず、その日に満たした（=「抜けた」日）。最初の日は数えない。"""
+    out = now & ~np.concatenate([[True], prev[:-1]])
+    return out
+
+
+def cci_events(x, level=CCI_ALERT_LEVEL):
+    """日ごとの CCI ±level の「抜け」（bool 配列）。
+    both_down: CCI48 と CCI288 の両方が −level 以下に「そろった」日（前の日はそろっていない）
+    cci48_down / cci288_down: それぞれが −level を下に抜けた日
+    both_up / cci48_up / cci288_up: 同じ規則で +level を上に抜けた日（通知はしない）"""
+    S, L = x["cciS"], x["cciL"]
+    with np.errstate(invalid="ignore"):
+        sd, ld, su, lu = S <= -level, L <= -level, S >= level, L >= level
+    return {
+        "both_down": _crossed(sd & ld, sd & ld),
+        "cci48_down": _crossed(sd, sd),
+        "cci288_down": _crossed(ld, ld),
+        "both_up": _crossed(su & lu, su & lu),
+        "cci48_up": _crossed(su, su),
+        "cci288_up": _crossed(lu, lu),
+    }
+
+
+def spike_threshold(past_counts, q=SPIKE_Q, min_days=SPIKE_MIN_DAYS):
+    """過去の日々の both_down 件数（0 の日も含む）の上位 (1-q)。履歴が短いときは None。"""
+    v = np.asarray(past_counts, dtype=float)
+    if len(v) < min_days:
+        return None
+    return float(np.quantile(v, q))
+
+
+def spike_line(past_counts, n_universe, q=SPIKE_Q, min_days=SPIKE_MIN_DAYS, frac=SPIKE_MIN_FRAC):
+    """「一斉に割れ」の線 = 過去1年の上位1% と その市場の銘柄数の 1.5% の大きい方。履歴が短いときは None。"""
+    t = spike_threshold(past_counts, q, min_days)
+    if t is None:
+        return None
+    return max(t, frac * n_universe)
+
+
+def is_spike(count, line):
+    """その日の件数が線を「超えた」（等しいだけでは違う）。線が無い（履歴が短い）日は判定しない。"""
+    return line is not None and count > 0 and count > line
+
+
+def spike_days(dates, counts, n_universe, lookback=SPIKE_LOOKBACK, q=SPIKE_Q, min_days=SPIKE_MIN_DAYS):
+    """各日について、その日より前の lookback 日の件数とその日の銘柄数で線を引き、超えた日の集合。
+    n_universe は日ごとの銘柄数（その日に日足がある銘柄の数）の配列。検証で「暴落の日」を除く用。"""
+    out = set()
+    for i, d in enumerate(dates):
+        line = spike_line(counts[max(0, i - lookback) : i], n_universe[i], q, min_days)
+        if is_spike(counts[i], line):
+            out.add(d)
+    return out

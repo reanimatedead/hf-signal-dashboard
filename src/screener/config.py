@@ -12,6 +12,8 @@ config.toml の例（install_macmini.sh が作る）::
     repo_dir = "~/hf-signal-dashboard"
     [ntfy]
     topic = "screener-<ランダム32桁>"
+    [alerts]
+    watchlist = ["7203", "6758", "AAPL"]   # CCI ±200 の通知で見る銘柄（任意）
 """
 
 from __future__ import annotations
@@ -32,6 +34,9 @@ DEFAULTS: dict[str, dict[str, Any]] = {
     "jquants": {"keychain_service": "screener-jquants", "rate_per_min": 50, "history_years": 5},
     "ntfy": {"server": "https://ntfy.sh", "topic": ""},
     "edgar": {"user_agent": "screener research (local)"},
+    # CCI ±200 の通知: watchlist = 見る銘柄（日本株のコード・米国株のティッカー）、
+    # notifier = "osascript"（既定）/ "terminal-notifier"（使えなければ osascript に切り替える）
+    "alerts": {"watchlist": [], "notifier": "osascript"},
 }
 
 

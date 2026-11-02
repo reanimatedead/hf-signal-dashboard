@@ -16,6 +16,9 @@ COLUMNS = {
     "fin_tag": "財務判定", "mcap_oku_jpy": "時価総額(億円)", "one_off_note": "一時利益の目印",
     "one_off_reasons": "一時利益の理由", "value_quintile": "割安度(5分位)", "quality_candidate": "品質の候補",
     "ticker": "ティッカー", "name": "会社名", "idx": "指数",
+    "cci48": "CCI48", "cci288": "CCI288", "watch": "ウォッチ",
+    "both_down": "両方 −200 割れ", "cci48_down": "CCI48 −200 割れ", "cci288_down": "CCI288 −200 割れ",
+    "both_up": "両方 +200 超え", "cci48_up": "CCI48 +200 超え", "cci288_up": "CCI288 +200 超え",
 }  # fmt: skip
 
 # 値（コード）

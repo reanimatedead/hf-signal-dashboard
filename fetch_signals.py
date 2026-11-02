@@ -15,7 +15,7 @@ import pandas as pd
 import yfinance as yf
 
 # 計算式は marketcalc/ だけ（DATA_CONTRACT §21）。import はここ1か所。
-from marketcalc import contracts, fund_us, ind, schedule  # noqa: E402
+from marketcalc import assets, contracts, fund_us, ind, schedule  # noqa: E402
 
 warnings.filterwarnings("ignore")
 
@@ -195,14 +195,7 @@ NASDAQ100 = {
     "ZS":"Zscaler",
 }
 
-FX_PAIRS = {
-    "USDJPY=X":"USD/JPY","EURJPY=X":"EUR/JPY","GBPJPY=X":"GBP/JPY",
-    "AUDJPY=X":"AUD/JPY","NZDJPY=X":"NZD/JPY","CADJPY=X":"CAD/JPY",
-    "CHFJPY=X":"CHF/JPY","EURUSD=X":"EUR/USD","GBPUSD=X":"GBP/USD",
-    "AUDUSD=X":"AUD/USD","USDCAD=X":"USD/CAD","USDCHF=X":"USD/CHF",
-    "NZDUSD=X":"NZD/USD","EURGBP=X":"EUR/GBP","EURAUD=X":"EUR/AUD",
-    "GBPAUD=X":"GBP/AUD","GC=F":"Gold (XAU/USD)","SI=F":"Silver (XAG/USD)",
-}
+FX_PAIRS = dict(assets.FX_PAIRS)  # 一覧は src/screener/calc/assets.py の1か所（Mac mini の CCI 通知と共通）
 
 
 def _sp500_from_wikipedia():
@@ -1033,8 +1026,7 @@ def process_volatility():
     return [vix, move]
 
 
-CRYPTO = [("BTC-USD", "Bitcoin"), ("ETH-USD", "Ethereum"),
-          ("XRP-USD", "XRP"), ("BCH-USD", "Bitcoin Cash")]
+CRYPTO = list(assets.CRYPTO)  # 一覧は src/screener/calc/assets.py の1か所
 
 
 def process_crypto():

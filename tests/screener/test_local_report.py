@@ -22,6 +22,8 @@ def test_writes_only_under_out(cfg):
         "us_list.html",
         "verify_local.json",
         "counts.json",
+        "cci_alerts.html",
+        f"cci_alerts_{doc['cci_alerts']['asof']}.html",
     }
     assert not any(cfg.repo_dir.rglob("*"))  # リポジトリには何も書かない
     assert c["japan_rows"] == 5 and c["us_rows"] == 3 and "previous" not in c

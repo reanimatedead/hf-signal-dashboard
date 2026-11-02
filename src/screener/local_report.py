@@ -4,7 +4,9 @@ out/japan_list.csv    日本株の一覧（列名・値はコード: grade A/B/C
 out/japan_list.html   同じ内容の簡単な表（言葉は screener.labels で付ける。ブラウザで開くだけ。外部の読み込みなし）
 out/us_list.csv       米国株の一覧
 out/us_list.html      同じ形の簡単な表（米国株）
-out/verify_local.json 検証（20営業日後 vs 基準）
+out/verify_local.json 検証（20営業日後 vs 基準。cci_both_down.<jp/us/fx/crypto> = CCI 両方 −200 割れの検証）
+out/cci_alerts.html   CCI ±200 の抜けの一覧（最新・日本株/米国株/FX/仮想通貨）。日付つきの
+                      cci_alerts_YYYY-MM-DD.html も残す（通知の本文の最後にこの場所を書く）
 out/counts.json       件数（前回の件数 previous と、日本株の件数のずれ % も入れる）
 """
 
@@ -19,7 +21,7 @@ import os
 from pathlib import Path
 from typing import Any
 
-from . import labels
+from . import alerts, labels
 from .config import PACKAGE_REPO, Config, _inside
 
 GRADE_ORDER = {"A": 0, "B": 1, "C": 2}
@@ -120,6 +122,11 @@ def counts(doc: dict[str, Any], previous: dict[str, Any] | None) -> dict[str, An
     return c
 
 
+def alerts_html(cfg: Config, doc: dict[str, Any]) -> Path:
+    """その日の CCI ±200 の一覧（通知を押すと開く）。"""
+    return cfg.out_dir / f"cci_alerts_{(doc.get('cci_alerts') or {}).get('asof')}.html"
+
+
 def write(cfg: Config, doc: dict[str, Any]) -> dict[str, Any]:
     out = cfg.out_dir
     _check_outside_repo(out, cfg)
@@ -132,6 +139,11 @@ def write(cfg: Config, doc: dict[str, Any]) -> dict[str, Any]:
     _write_csv(out / "us_list.csv", us)
     (out / "us_list.html").write_text(render_html(us, asof, US_HTML_COLS, "米国株の一覧", US_NOTE), encoding="utf-8")
     dump_json(out / "verify_local.json", doc.get("verify") or {})
+    a = doc.get("cci_alerts")
+    if a:
+        page = alerts.render_html(a)
+        (out / f"cci_alerts_{a['asof']}.html").write_text(page, encoding="utf-8")
+        (out / "cci_alerts.html").write_text(page, encoding="utf-8")
     cp = out / "counts.json"
     previous = None
     if cp.exists():
