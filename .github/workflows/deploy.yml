@@ -8,9 +8,14 @@ name: Deploy to Pages (full daily + corr refresh)
 # "never overwrite with broken data" mechanism.
 #
 # Two jobs share one Pages deployment (concurrency group "pages", no cancel):
-#   full         — 00:00 JST daily: full regeneration + macro + deploy
-#   corr_refresh — 07:30 / 11:00 JST Mon-Fri: pull the live site as base,
+#   full         — 07:30 JST daily (米国の終値 06:00 JST・夏時間 05:00 JST のあと):
+#                  full regeneration (correlations included) + macro + deploy
+#   corr_refresh — 11:00 JST Mon-Fri: pull the live site as base,
 #                  recompute correlations only, redeploy the full payload
+#                  （07:30 の corr_refresh は full に統合した。同じ時刻に2つ走ると
+#                   concurrency "pages" の cancel-in-progress で片方が止まるため）
+# 画面の「次回」は fetch_signals.py が下の full の cron から計算する（screener.calc.schedule）。
+# 各 cron 行の末尾コメントの先頭の語はジョブ名（full / corr_refresh）。変えるときは下の if: と一緒に。
 # On manual dispatch, pick which job via the `job` input (default: full).
 
 on:
@@ -22,8 +27,7 @@ on:
         options: [full, corr_refresh]
         default: full
   schedule:
-    - cron: "0 15 * * *"      # full         — 00:00 JST daily
-    - cron: "30 22 * * 0-4"   # corr_refresh — 07:30 JST Mon-Fri
+    - cron: "30 22 * * *"     # full         — 07:30 JST daily
     - cron: "0 2 * * 1-5"     # corr_refresh — 11:00 JST Mon-Fri
 
 permissions:
@@ -47,11 +51,11 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # ── FULL: 00:00 JST daily (or manual `job=full`) ──────────────────────────
+  # ── FULL: 07:30 JST daily (or manual `job=full`) ──────────────────────────
   full:
     if: >-
       (github.event_name == 'workflow_dispatch' && inputs.job == 'full') ||
-      (github.event_name == 'schedule' && github.event.schedule == '0 15 * * *')
+      (github.event_name == 'schedule' && github.event.schedule == '30 22 * * *')
     runs-on: ubuntu-latest
     timeout-minutes: 30
     environment:
@@ -184,7 +188,6 @@ jobs:
   corr_refresh:
     if: >-
       (github.event_name == 'workflow_dispatch' && inputs.job == 'corr_refresh') ||
-      (github.event_name == 'schedule' && github.event.schedule == '30 22 * * 0-4') ||
       (github.event_name == 'schedule' && github.event.schedule == '0 2 * * 1-5')
     runs-on: ubuntu-latest
     timeout-minutes: 15

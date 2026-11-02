@@ -981,8 +981,9 @@ charts 合計は約 5.9 MB で、Cloudflare Pages の上限に対し十分な余
 2026-07-26 に GitHub Pages のソースを「Deploy from a branch」から **GitHub Actions** に切替えた。
 生成物（`docs/data.json` / `docs/charts/*.json` / `docs/health.json` / 将来の
 `docs/macro_v2.json` / `docs/relations.json` / `docs/gamma.json`）は **`.gitignore` 済みで git に積まない**。
-`.github/workflows/deploy.yml` の **full**（00:00 JST）と **corr_refresh**（07:30 / 11:00 JST）が
+`.github/workflows/deploy.yml` の **full**（07:30 JST 毎日・米国の終値のあと）と **corr_refresh**（11:00 JST 月〜金）が
 生成 → health_gate → pytest → `upload-pages-artifact` → `deploy-pages` で**直接配信**する。
+画面の「次回」（`meta.next_update_str`）は deploy.yml の full の cron から `screener.calc.schedule` で計算する（固定の文字を書かない）。
 
 ### 既存ワークフローの整理（A-Ⅱ）
 
@@ -1243,10 +1244,10 @@ link_check.json = {as_of_utc, checked, ok, warn, policy,
 `deploy.yml` の 2 ジョブは**生成するファイルが違う**。にもかかわらず両ジョブで同じ
 契約テスト（`tests/`）を回すため、**存在するファイルの集合をジョブ間で揃える**必要がある。
 
-- **full**（00:00 JST）: `fetch_signals.py` + `build_corr/macro_v2/gamma/relations.py` を
+- **full**（07:30 JST 毎日。2026-11 に 00:00 から変更・07:30 の corr_refresh は full に統合）: `fetch_signals.py` + `build_corr/macro_v2/gamma/relations.py` を
   実行し、`data.json` / `charts/*.json` / `macro_v2.json` / `relations.json` / `gamma.json`
   を**全て新規生成**する。→ 契約テストは全ファイルを**実測検査**する。
-- **corr_refresh**（07:30 / 11:00 JST）: 相関だけを安く更新する。マクロ層（macro_v2 /
+- **corr_refresh**（11:00 JST 月〜金）: 相関だけを安く更新する。マクロ層（macro_v2 /
   relations / gamma）は**再生成しない**。代わりに `tools/pull_live_base.py` が**公開サイトから
   持ち越す**（data.json / charts と同様）。→ 契約テストは持ち越した層を検査する。
 
