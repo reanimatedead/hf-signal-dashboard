@@ -116,3 +116,17 @@ def test_chart_series_nd_rounds_prices(fx):
     s = ind.chart_series(p["h"], p["l"], p["c"], tail=50, nd=1)
     v = [x for x in s["close"] + s["bb48"]["p2"] if x is not None]
     assert v and all(round(x, 1) == x for x in v)
+
+
+def test_long_oversold_on_a_sell_day_counts_as_sell(monkeypatch):
+    """長期の売られすぎ と 売り が同じ日は「売り」（画面・検証とも ind.day_labels の1か所の規則）。"""
+    import numpy as np
+
+    sig = np.array([0, -1, 1, 0, -2])
+    lo = np.array([True, True, True, False, True])
+    monkeypatch.setattr(ind, "signals", lambda x, p=ind.P: sig)
+    monkeypatch.setattr(ind, "long_oversold", lambda x, p=ind.P: lo)
+    lab = list(ind.day_labels({}))
+    assert lab == ["buy_long_oversold", "sell", "buy", "neutral", "sell_strong"]
+    assert ind.buy_type_days({}).tolist() == [True, False, True, False, False]
+    assert ind.is_buy_type("buy_long_oversold") and not ind.is_buy_type("sell") and not ind.is_buy_type(None)

@@ -78,8 +78,21 @@ def test_run_on_fixture(cfg):
     assert g["full"]["grade_A"]["n"] > 0 and g["full"]["base"] == v["jp"]["full"]["base"]
     assert set(g["median_below_base"]) == {"full", "recent6m"}
     assert "grade_A" not in v["us"]
-    assert any(cfg.jp("derived", signals.QUINTILE_CACHE).glob("*.json"))  # 月初の評価は控えから読み直せる
+    assert any(cfg.jp("derived", screen.VALUATION_CACHE).glob("*.json"))  # 月初の評価は控えから読み直せる
     assert signals.run(cfg)["verify"]["jp"]["grade_A"]["full"] == g["full"]
+
+
+def test_backtest_uses_same_rules_as_screen(cfg):
+    """with_chart の「割安5分の1 × 買い系」と、画面の A の検証（verify_local.json の jp.grade_A）が同じ件数・同じ成績。
+    規則（割安5分の1 の線・買い系の日）は screen / ind の1か所だけにある。"""
+    g = signals.run(cfg)["verify"]["jp"]["grade_A"]["full"]["grade_A"]
+    w = backtest_value.with_chart(cfg, min_bars=300, min_mcap=0)["res"]["either|cheap_quintile"]
+    assert g["n"] > 0 and w["n"] == g["n"] and w["median_pct"] == g["median"]
+    import inspect
+
+    for mod in (backtest_value, signals):
+        src = inspect.getsource(mod)
+        assert "4 * n // 5" not in src and "ind.long_oversold(" not in src, mod.__name__
 
 
 def test_backtests_run_on_fixture(cfg):

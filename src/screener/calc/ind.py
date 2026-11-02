@@ -92,6 +92,26 @@ def long_oversold(x, p=P):
         return x["c"] <= x["mL"] - p["k2"] * x["sL"]
 
 
+def day_labels(x, p=P):
+    """日ごとの判定コード（画面の判定・検証の両方がこれだけを使う。規則はここ1か所）。
+    シグナル（buy_strong/buy/neutral/sell/sell_strong）が基本。長期の売られすぎ（BB288 -2σ 以下）は
+    シグナルが 0 の日だけ buy_long_oversold にする（売りと同じ日は売り、買いと同じ日は買いのまま）。"""
+    s = signals(x, p)
+    lab = np.array([LABELS[int(v)] for v in s], dtype=object)
+    lab[long_oversold(x, p) & (s == 0)] = LONG_OVERSOLD_LABEL
+    return lab
+
+
+def is_buy_type(label):
+    """買い系の判定コードか（買い / 強い買い / 買い（長期の売られすぎ））。"""
+    return (label or "") in BUY_LABELS
+
+
+def buy_type_days(x, p=P):
+    """買い系の日の bool 配列（day_labels と同じ規則）。"""
+    return np.isin(day_labels(x, p), BUY_LABELS)
+
+
 def _r(v, nd):
     v = float(v)
     return None if not np.isfinite(v) else round(v, nd)
@@ -105,10 +125,8 @@ def judge(x, p=P, i=None):
     zL = (c - mL) / sL if sL else np.nan
     s = int(signals(x, p)[i])
     trend = TREND[bool(x["cciL"][i] > 0)]
-    label = LABELS[s]
+    label = str(day_labels(x, p)[i])
     lo = bool(long_oversold(x, p)[i])
-    if lo and s >= 0:
-        label = LONG_OVERSOLD_LABEL if s == 0 else label
     return {
         "label": label,
         "signal": s,
@@ -175,14 +193,6 @@ SELL_LABELS = (LABELS[-1], LABELS[-2])
 
 
 def label_conditions(x, p=P):
-    """判定コードごとの日次 bool 配列（検証用）。judge() の最新日のコードと同じ規則:
-    buy_strong / buy / buy_long_oversold（シグナル0 かつ BB288 -2σ 以下）/ sell / sell_strong。"""
-    s = signals(x, p)
-    lo = long_oversold(x, p)
-    return {
-        LABELS[2]: s == 2,
-        LABELS[1]: s == 1,
-        LONG_OVERSOLD_LABEL: lo & (s == 0),
-        LABELS[-1]: s == -1,
-        LABELS[-2]: s == -2,
-    }
+    """判定コードごとの日次 bool 配列（検証用）。day_labels と同じ規則。"""
+    lab = day_labels(x, p)
+    return {k: lab == k for k in (LABELS[2], LABELS[1], LONG_OVERSOLD_LABEL, LABELS[-1], LABELS[-2])}

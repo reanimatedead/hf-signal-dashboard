@@ -1,14 +1,14 @@
 """財務判定（理論株価の余地）の検証（日本株・ローカルだけ）。
 
   yearly:     財務判定（長期候補・中期候補など）と余地の5分位を 1年後の騰落で比べる（期間は手元の bars_ から1年刻み）
-  with_chart: 割安度（余地の5分の1）× チャート判定 の組み合わせを 20営業日後で比べる（months.json の各月初で評価）
+  with_chart: 割安度（余地の5分の1）× チャート判定 の組み合わせを 20営業日後で比べる（months.json の各月初で評価）。
+              割安5分の1 と チャート判定の規則は画面と同じ関数（screen.monthly_valuation / ind.day_labels）を呼ぶ
 出力: <data_dir>/out/verify/YYYY-MM/backtest_value.json（リポジトリには書かない）
 """
 
 from __future__ import annotations
 
 import argparse
-import bisect
 import collections
 import json
 import statistics
@@ -89,36 +89,12 @@ def _st(v: list[float]) -> dict[str, Any] | None:
 
 
 def with_chart(cfg: Config, min_bars: int = 420, min_mcap: float = 300e8) -> dict[str, Any]:
-    with open(cfg.jp("months.json")) as fh:
-        months = json.load(fh)
-    V: dict[str, dict[str, tuple[str, bool]]] = {}
-    for d in months:
-        mp = cfg.jp(f"master_{d}.json")
-        if not mp.exists() or not cfg.jp(f"bars_{d}.json").exists():
-            continue
-        rows = screen.screen(d, d, d, d, str(mp), cfg=cfg)
-        U = [
-            r
-            for r in rows
-            if not r["financial"] and (r["mcap_oku_jpy"] or 0) * 1e8 >= min_mcap and r["upside_pct"] is not None
-        ]
-        if not U:
-            continue
-        q = sorted(r["upside_pct"] for r in U)
-        n = len(q)
-        lo, hi = q[n // 5], q[4 * n // 5]
-        V[d] = {
-            r["code"]: (
-                "cheap_quintile"
-                if r["upside_pct"] >= hi
-                else "expensive_quintile"
-                if r["upside_pct"] <= lo
-                else "middle",
-                "long_candidate" in r["fin_tag"],
-            )
-            for r in U
-        }
-    vm = sorted(V)
+    """割安度（月初の 割安5分の1）× チャート判定 を 20営業日後で比べる。
+    割安度は screen.monthly_valuation（画面の A と同じ母集団・同じ線）、チャート判定は ind.day_labels（画面と同じ規則:
+    長期の売られすぎが売りと同じ日は売り）。ここに規則は書かない。min_mcap はチャートを読む銘柄の範囲だけに使う。"""
+    mv = screen.monthly_valuation(cfg)
+    vm = sorted(mv)
+    lt_sets = {d: set(v["long_candidate"]) for d, v in mv.items()}
     dates, panel = load_panel(cfg, universe(cfg, min_mcap))
     R: dict[tuple[str, str], list[float]] = collections.defaultdict(list)
     for c, (h, low, cl) in panel.items():
@@ -126,21 +102,23 @@ def with_chart(cfg: Config, min_bars: int = 420, min_mcap: float = 300e8) -> dic
             continue
         di = [d for d, o in zip(dates, ~np.isnan(cl), strict=False) if o]
         x = ind.compute(h, low, cl)
-        s = ind.signals(x)
-        lo_ = ind.long_oversold(x)
+        lc = ind.label_conditions(x)
+        buy = lc[ind.LABELS[2]] | lc[ind.LABELS[1]]
+        lo_ = lc[ind.LONG_OVERSOLD_LABEL]
+        either = ind.buy_type_days(x)
         C = x["c"]
         last: dict[tuple[str, str], int] = collections.defaultdict(lambda: -99)
         for i in range(int(ind.P["bb_long"]), len(C) - 20):
-            k = bisect.bisect_right(vm, di[i]) - 1
-            if k < 0:
+            m = screen.month_at(vm, di[i])
+            if m is None:
                 continue
-            v = V[vm[k]].get(c)
-            if not v:
+            grp = mv[m]["quintile"].get(c)
+            if not grp:
                 continue
             fw = (C[i + 20] / C[i] - 1) * 100
-            grp, lt = v
+            lt = c in lt_sets[m]
             R[("base", grp)].append(fw)
-            for name, cond in (("buy", s[i] >= 1), ("long_oversold", lo_[i]), ("either", s[i] >= 1 or lo_[i])):
+            for name, cond in (("buy", buy[i]), ("long_oversold", lo_[i]), ("either", either[i])):
                 if not cond:
                     continue
                 for g in (grp, "all") + (("long_candidate",) if lt else ()):
@@ -150,7 +128,7 @@ def with_chart(cfg: Config, min_bars: int = 420, min_mcap: float = 300e8) -> dic
                     last[key] = i
                     R[key].append(fw)
     period = [dates[min(int(ind.P["bb_long"]), len(dates) - 1)], dates[-1]] if dates else None
-    return {"res": {f"{a}|{b}": _st(v) for (a, b), v in R.items()}, "period": period, "valuation_months": len(V)}
+    return {"res": {f"{a}|{b}": _st(v) for (a, b), v in R.items()}, "period": period, "valuation_months": len(mv)}
 
 
 def main(argv: list[str] | None = None) -> int:
