@@ -10,13 +10,13 @@
 
 | ファイル | 件数 | 内容 |
 |---|---|---|
-| tests/screener/calc/test_ind.py | 10 | CCI・BB（母標準偏差）・売買判定・長期の売られすぎ・chart_series |
+| tests/screener/calc/test_ind.py | 11 | CCI・BB（母標準偏差）・売買判定・長期の売られすぎ（売りと同じ日は売り・規則は ind.day_labels の1か所）・chart_series |
 | tests/screener/calc/test_fund_us.py | 6 | EDGAR 形の決算から F・魔法の公式・残余利益 |
 | tests/screener/calc/test_value_events_contracts.py | 4 | 理論PBR・一時利益の目印・イベントスタディ・契約判定 |
 | tests/screener/test_jquants.py | 6 | 120 回で直近60秒 50 回以下・3スレッドでも 50 回以下（偽の時計）・V2・ページ送り・キーを出さない |
 | tests/screener/test_japan_fetch.py | 3 | 既定は今日だけ・--full は年数分・一括取得でも 50回/60秒以下 |
 | tests/screener/test_japan_screen.py | 6 | 理論株価・F・魔法の公式・分割前後で PBR 不変・「決算短信で確認」・四半期/未来の開示を使わない |
-| tests/screener/test_japan_signals.py | 5 | 総合判定 A = 割安5分の1 × 買い系 の規則・割安5分の1の母集団と境界・**A の銘柄はすべて上値余地が割安5分の1の境界以上**・A の定義そのものの検証（verify_local.json の jp.grade_A）・バックテストが動く |
+| tests/screener/test_japan_signals.py | 6 | 総合判定 A = 割安5分の1 × 買い系 の規則・割安5分の1の母集団と境界・**A の銘柄はすべて上値余地が割安5分の1の境界以上**・A の定義そのものの検証（verify_local.json の jp.grade_A）・**バックテスト（with_chart）と画面が同じ関数を呼び、同じ件数・成績になる**・バックテストが動く |
 | tests/screener/test_us.py | 3 | 決算を1社ずつ読む・判定・株価の付け足しと分割検知 |
 | tests/screener/test_local_report.py | 3 | 書くのは `<data_dir>/out/` だけ（japan_list.html と同じ形の us_list.html も）・counts.json（前回とずれ%）・リポジトリ内は拒否 |
 | tests/screener/test_notify.py | 4 | 本文が `^screener \d{4}-\d{2}-\d{2} (OK\|失敗\|週次 OK)$` だけ・送信結果（HTTP コード）を1行ログに出す |

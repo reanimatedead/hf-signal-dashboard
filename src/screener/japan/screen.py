@@ -7,10 +7,14 @@
 
 from __future__ import annotations
 
+import bisect
 import collections
 import json
+import os
 from pathlib import Path
 from typing import Any
+
+import numpy as np
 
 from ..calc.value import RI, FScore, magic_rank, one_off_flag, ri_ratio
 from ..config import Config
@@ -217,3 +221,54 @@ def value_quintile(rows: list[Row]) -> dict[str, str]:
         else "middle"
         for r in quintile_universe(rows)
     }
+
+
+VALUATION_CACHE = "valuation_v2"  # 定義を変えたら名前を変える（古い控えを使わない）
+
+
+def monthly_valuation(cfg: Config) -> dict[str, dict[str, Any]]:
+    """months.json の各月初の評価 {月初: {"quintile": {code: cheap_quintile/middle/expensive_quintile},
+    "long_candidate": [code, ...]}}。画面の A の検証（signals）と backtest_value.with_chart の両方がこれを使う。
+    過去の月初は変わらないので <data_dir>/japan/derived/ に控える（J-Quants 由来・ローカルだけ）。"""
+    mp = cfg.jp("months.json")
+    if not mp.exists():
+        return {}
+    out: dict[str, dict[str, Any]] = {}
+    cdir = cfg.jp("derived", VALUATION_CACHE)
+    for d in _load(mp):
+        cp = cdir / f"{d}.json"
+        if cp.exists():
+            out[d] = _load(cp)
+            continue
+        master = cfg.jp(f"master_{d}.json")
+        if not master.exists() or not cfg.jp(f"bars_{d}.json").exists():
+            continue
+        rows = screen(d, d, d, d, str(master), cfg=cfg)
+        vq = value_quintile(rows)
+        out[d] = {"quintile": vq, "long_candidate": sorted(r["code"] for r in rows if "long_candidate" in r["fin_tag"])}
+        cdir.mkdir(parents=True, exist_ok=True)
+        tmp = cp.with_name(cp.name + ".tmp")
+        tmp.write_text(json.dumps(out[d]))
+        os.replace(tmp, cp)
+    return out
+
+
+def monthly_quintiles(cfg: Config) -> dict[str, dict[str, str]]:
+    """{月初: {code: 割安度}}（monthly_valuation の quintile だけ）。"""
+    return {d: v["quintile"] for d, v in monthly_valuation(cfg).items()}
+
+
+def month_at(months: list[str], day: str) -> str | None:
+    """その日以前で最も近い月初（months は昇順）。無ければ None。"""
+    k = bisect.bisect_right(months, day) - 1
+    return months[k] if k >= 0 else None
+
+
+def cheap_days(code: str, ds: list[str], vq: dict[str, dict[str, str]]) -> np.ndarray:
+    """各日がその日以前で最も近い月初の評価で 割安5分の1 か（bool 配列。評価の無い日は False）。"""
+    vm = sorted(vq)
+    out = np.zeros(len(ds), bool)
+    for i, d in enumerate(ds):
+        m = month_at(vm, d)
+        out[i] = m is not None and vq[m].get(code) == "cheap_quintile"
+    return out

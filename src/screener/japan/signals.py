@@ -15,10 +15,8 @@
 
 from __future__ import annotations
 
-import bisect
 import datetime as dt
 import json
-import os
 from typing import Any
 
 import numpy as np
@@ -41,7 +39,7 @@ Xs = dict[str, tuple[dict[str, Any], list[str]]]
 
 def overall(chart_label: str | None, cheap: bool) -> str:
     """総合判定 A/B/C。cheap = 日本株は割安5分の1（cheap_quintile）、米国株は US_CANDIDATES のどれか。"""
-    buy = (chart_label or "") in BUY_LABELS
+    buy = ind.is_buy_type(chart_label)
     if buy and cheap:
         return "A"
     if buy or cheap:
@@ -52,43 +50,6 @@ def overall(chart_label: str | None, cheap: bool) -> str:
 def tags_in(fin_tag: str | None, candidates: tuple[str, ...]) -> str:
     """財務判定のうち candidates に入るものだけ（'a|b'）。"""
     return labels.SEP.join(t for t in (fin_tag or "").split(labels.SEP) if t in candidates)
-
-
-QUINTILE_CACHE = "value_quintile_v1"  # 定義を変えたら名前を変える（古い控えを使わない）
-
-
-def monthly_quintiles(cfg: Config) -> dict[str, dict[str, str]]:
-    """months.json の各月初の 割安5分の1（{月初: {code: cheap_quintile/middle/expensive_quintile}}）。
-    過去の月初は変わらないので <data_dir>/japan/derived/ に控える（J-Quants 由来・ローカルだけ）。"""
-    mp = cfg.jp("months.json")
-    if not mp.exists():
-        return {}
-    out: dict[str, dict[str, str]] = {}
-    cdir = cfg.jp("derived", QUINTILE_CACHE)
-    for d in _load(str(mp)):
-        cp = cdir / f"{d}.json"
-        if cp.exists():
-            out[d] = _load(str(cp))
-            continue
-        master = cfg.jp(f"master_{d}.json")
-        if not master.exists() or not cfg.jp(f"bars_{d}.json").exists():
-            continue
-        out[d] = screen.value_quintile(screen.screen(d, d, d, d, str(master), cfg=cfg))
-        cdir.mkdir(parents=True, exist_ok=True)
-        tmp = cp.with_name(cp.name + ".tmp")
-        tmp.write_text(json.dumps(out[d]))
-        os.replace(tmp, cp)
-    return out
-
-
-def cheap_days(code: str, ds: list[str], vq: dict[str, dict[str, str]]) -> np.ndarray:
-    """各日がその日以前で最も近い月初の評価で 割安5分の1 か（bool 配列。評価の無い日は False）。"""
-    vm = sorted(vq)
-    out = np.zeros(len(ds), bool)
-    for i, d in enumerate(ds):
-        k = bisect.bisect_right(vm, d) - 1
-        out[i] = k >= 0 and vq[vm[k]].get(code) == "cheap_quintile"
-    return out
 
 
 def _load(p: str) -> Any:
@@ -194,12 +155,6 @@ def build_us(cfg: Config, today: dt.date) -> tuple[list[Row], Xs]:
     return rows, xs
 
 
-def buy_type(x: dict[str, Any]) -> np.ndarray:
-    """買い系（judge() の label が BUY_LABELS になる日）の bool 配列。"""
-    lc = ind.label_conditions(x)
-    return np.asarray(lc[BUY_LABELS[0]] | lc[BUY_LABELS[1]] | lc[BUY_LABELS[2]], bool)
-
-
 def _grade_a(
     xs: Xs, since: str, vq: dict[str, dict[str, str]], base: dict[str, Any], base6m: dict[str, Any]
 ) -> dict[str, Any]:
@@ -208,10 +163,10 @@ def _grade_a(
     full: dict[str, list[float]] = {}
     recent: dict[str, list[float]] = {}
     for code, (x, ds) in xs.items():
-        cheap = cheap_days(code, ds, vq)
+        cheap = screen.cheap_days(code, ds, vq)
         if not cheap.any():
             continue
-        conds = {"grade_A": cheap & buy_type(x), "cheap_quintile_days": cheap}
+        conds = {"grade_A": cheap & ind.buy_type_days(x), "cheap_quintile_days": cheap}
         events.merge(full, events.event_returns(x["c"], conds))
         events.merge(recent, events.event_returns(x["c"], conds, dates=ds, since=since))
     keys = ("grade_A", "cheap_quintile_days")
@@ -232,13 +187,18 @@ def _grade_a(
 def verify(xs: Xs, since: str, vq: dict[str, dict[str, str]] | None = None) -> dict[str, Any]:
     """20営業日後の騰落を全期間の平均（基準）と比べる。全期間と直近6か月。
     vq（月初ごとの割安5分の1）を渡すと A の定義そのものの成績（grade_A）も出す。
-    「根拠が弱まっています」の判定（weakened）の規則は変えない（buy / long_oversold だけ）。"""
+    「根拠が弱まっています」の判定（weakened）の規則は変えない（buy / long_oversold の中央値が基準を下回る）。
+    どの日を buy / long_oversold と数えるかは画面と同じ ind.day_labels。"""
     full: dict[str, list[float]] = {}
     recent: dict[str, list[float]] = {}
     for x, ds in xs.values():
-        s = ind.signals(x)
-        lo = ind.long_oversold(x)
-        conds = {"buy": s >= 1, "buy3": s == 2, "long_oversold": lo, "sell": s <= -1}
+        lc = ind.label_conditions(x)  # 画面と同じ規則（ind.day_labels）。長期の売られすぎ×売りの日は売り
+        conds = {
+            "buy": lc[ind.LABELS[2]] | lc[ind.LABELS[1]],
+            "buy3": lc[ind.LABELS[2]],
+            "long_oversold": lc[ind.LONG_OVERSOLD_LABEL],
+            "sell": lc[ind.LABELS[-1]] | lc[ind.LABELS[-2]],
+        }
         events.merge(full, events.event_returns(x["c"], conds))
         events.merge(recent, events.event_returns(x["c"], conds, dates=ds, since=since))
     fs = {k: events.stats(v) for k, v in full.items()}
@@ -262,7 +222,7 @@ def run(cfg: Config, asof: str | None = None, now: dt.datetime | None = None) ->
         "gap_days": events.GAP,
         "recent_since": since,
         "period": [dates[min(events.WARMUP, len(dates) - 1)] if dates else None, today],
-        "jp": verify(jx, since, monthly_quintiles(cfg)),
+        "jp": verify(jx, since, screen.monthly_quintiles(cfg)),
         "us": verify(ux, since),
     }
     v["weakened"] = bool(v["jp"]["weakened"] or v["us"]["weakened"])
