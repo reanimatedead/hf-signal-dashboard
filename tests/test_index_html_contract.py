@@ -1,6 +1,6 @@
 """index.html が SPEC_MONEYFLOW §3-4 と SPEC_SURVIVAL §5-6 の構造を持つか静的検査。
 
-- 11 タブ厳格 (survival 既定先頭・検証タブを追加)。
+- 12 タブ厳格 (survival 既定先頭・検証タブ・右端に仕組み（About）を追加)。
 - 背景 canvas (#bg-fx) が body 直下に存在。
 - 共有粒子モジュール (assets/lib/particles.js) を読み込む。
 - お金の流れ pane に 3 地域分の canvas が宣言されている。
@@ -21,16 +21,18 @@ def test_index_exists():
     assert INDEX.exists(), "docs/index.html must exist"
 
 
-def test_exactly_eleven_main_tabs():
+def test_exactly_twelve_main_tabs():
     html = _read()
     tabs = re.findall(r'<button[^>]*class="tab(?:\s+active)?"[^>]*data-tab="([^"]+)"', html)
-    # 検証タブを追加（2026-11, DATA_CONTRACT §21）: 10 → 11。抜け道のクラス名は使わない。
-    assert len(tabs) == 11, f"expected 11 main tabs (incl. survival, relations, verify), found {len(tabs)}: {tabs}"
+    # 検証タブを追加（2026-11, DATA_CONTRACT §21）: 10 → 11。仕組み（About）を右端に追加: 11 → 12。
+    # 抜け道のクラス名は使わない。
+    assert len(tabs) == 12, f"expected 12 main tabs (incl. survival, relations, verify, about), found {len(tabs)}: {tabs}"
+    assert tabs[-1] == "about", f"about must be the rightmost tab: {tabs}"
     expected = {
         "survival",
         "nikkei225", "dow30", "nasdaq100", "sp500",
         "fx", "rates_vol", "pos_val", "relations", "moneyflow",
-        "verify",
+        "verify", "about",
     }
     assert set(tabs) == expected, f"unexpected tab set: {set(tabs) ^ expected}"
 

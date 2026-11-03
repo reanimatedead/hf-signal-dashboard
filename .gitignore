@@ -41,6 +41,8 @@ docs/link_check.json
 !docs/decisions.jsonl
 # §21: 検証層（fetch_signals が毎日生成・git 非追跡）。
 docs/verify.json
+# 仕組み（About）タブの要約（tools/build_about.py が deploy.yml で毎回作る・git 非追跡）
+docs/about.json
 # PR プレビュー（tools/build_preview.py の出力）
 _preview_site/
 

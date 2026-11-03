@@ -119,6 +119,10 @@ jobs:
       - name: Generate relations layer
         run: uv run python pipeline/build_relations.py
 
+      # 仕組み（About）タブ用の要約（docs/about.json）。ind.P・判定の規則・cron・verify.json・data.json の meta から作る。
+      - name: Build about.json
+        run: uv run python tools/build_about.py
+
       # Fail-closed gates: any failure below stops the job BEFORE upload, so the
       # previous good Pages deploy stays live.
       - name: Health gate
@@ -226,6 +230,10 @@ jobs:
 
       - name: Re-merge correlations
         run: uv run python pipeline/build_corr.py
+
+      # 仕組み（About）タブ用の要約（docs/about.json）。ind.P・判定の規則・cron・verify.json・data.json の meta から作る。
+      - name: Build about.json
+        run: uv run python tools/build_about.py
 
       - name: Health gate
         run: uv run python tools/health_gate.py
