@@ -48,7 +48,8 @@ EQUITY_TABS = ("nikkei225", "dow30", "nasdaq100", "sp500")
 # full-only macro layers carried forward from the live site (see module docstring).
 # verify.json（§21 判定の検証・full だけが作る）も同じ理由で持ち越す。2026-11-02: これが抜けていて、
 # 11:00 の corr_refresh が公開サイトから verify.json を消していた（tests/test_pull_live_base.py で再発防止）。
-LAYER_FILES = ("macro_v2.json", "relations.json", "gamma.json", "verify.json")
+# about.json（仕組みタブ）も持ち越す（corr_refresh はその後 tools/build_about.py で作り直す）。
+LAYER_FILES = ("macro_v2.json", "relations.json", "gamma.json", "verify.json", "about.json")
 
 
 _UA = ("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "

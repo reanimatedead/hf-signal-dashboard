@@ -71,6 +71,7 @@ jobs:
           for rel in ("verify.json", "relations.json", "macro_v2.json", "gamma.json", "health.json"):
               get(rel, False)
           PY
+          uv run python tools/build_about.py --docs _preview_site/live
       - name: Screenshots (live data — fails on any console / page error)
         run: |
           python3 -m http.server -d _preview_site/live 8766 &

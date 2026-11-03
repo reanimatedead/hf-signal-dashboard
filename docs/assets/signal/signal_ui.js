@@ -443,5 +443,5 @@
   }
 
   window.SIG = { loadVerify, cols, cell, judgeCell, renderUsBuyList, renderMacOnlyNote, renderStaleBanner, renderWeakBanner,
-    showVerify, hideVerify, drawPriceCciChart, EQ_TABS, BUY, SELL, state: S };
+    showVerify, hideVerify, drawPriceCciChart, weakItem, EQ_TABS, BUY, SELL, state: S };
 })();

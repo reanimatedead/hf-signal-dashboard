@@ -22,7 +22,7 @@ const offline = args.includes("--offline");
 const warnOnly = args.includes("--warn-only");
 const langs = opt("--langs", "ja,en").split(",");
 const widths = opt("--widths", "1280,390").split(",").map(Number);
-const TABS = ["survival", "nikkei225", "dow30", "nasdaq100", "sp500", "fx", "rates_vol", "pos_val", "relations", "moneyflow", "verify"];
+const TABS = ["survival", "nikkei225", "dow30", "nasdaq100", "sp500", "fx", "rates_vol", "pos_val", "relations", "moneyflow", "verify", "about"];
 const JP_SYMBOL = "7735.T";
 fs.mkdirSync(out, { recursive: true });
 

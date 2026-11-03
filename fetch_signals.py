@@ -15,7 +15,7 @@ import pandas as pd
 import yfinance as yf
 
 # 計算式は marketcalc/ だけ（DATA_CONTRACT §21）。import はここ1か所。
-from marketcalc import assets, contracts, fund_us, ind, schedule  # noqa: E402
+from marketcalc import assets, composite, contracts, fund_us, ind, schedule  # noqa: E402
 
 warnings.filterwarnings("ignore")
 
@@ -257,7 +257,7 @@ def get_sp500_tickers():
 
 # ─── INDICATOR LIBRARY ────────────────────────────────────
 
-def calc_rsi(series, period=14):
+def calc_rsi(series, period=composite.PERIODS["rsi"]):
     delta = series.diff()
     gain  = delta.clip(lower=0)
     loss  = -delta.clip(upper=0)
@@ -266,14 +266,15 @@ def calc_rsi(series, period=14):
     rs    = ag / al.replace(0, np.nan)
     return 100 - (100 / (1 + rs))
 
-def calc_macd(series, fast=12, slow=26, signal=9):
+def calc_macd(series, fast=composite.PERIODS["macd"][0], slow=composite.PERIODS["macd"][1],
+              signal=composite.PERIODS["macd"][2]):
     ef  = series.ewm(span=fast,   adjust=False).mean()
     es  = series.ewm(span=slow,   adjust=False).mean()
     ml  = ef - es
     sl  = ml.ewm(span=signal, adjust=False).mean()
     return ml, sl, ml - sl
 
-def calc_bollinger(series, period=20, std_dev=2.0):
+def calc_bollinger(series, period=composite.PERIODS["bb"], std_dev=composite.PERIODS["bb_k"]):
     sma   = series.rolling(period).mean()
     std   = series.rolling(period).std(ddof=0)
     upper = sma + std_dev * std
@@ -281,7 +282,7 @@ def calc_bollinger(series, period=20, std_dev=2.0):
     pct_b = (series - lower) / (upper - lower + 1e-12)
     return upper, sma, lower, pct_b
 
-def calc_atr(high, low, close, period=14):
+def calc_atr(high, low, close, period=composite.PERIODS["atr"]):
     tr = pd.concat([
         high - low,
         (high - close.shift()).abs(),
@@ -473,44 +474,8 @@ def monte_carlo_prob(returns, n_sims=800, n_forward=5, direction="long"):
 # ─── STOCK COMPOSITE SIGNAL ──────────────────────────────
 
 def compute_signal(rsi, macd_hist, ema20, ema50, ema200, bb_pct, price):
-    score = 0
-    if   rsi <= 25: score += 25
-    elif rsi <= 35: score += 21
-    elif rsi <= 45: score += 16
-    elif rsi <= 55: score += 12
-    elif rsi <= 65: score += 7
-    elif rsi <= 75: score += 3
-
-    if macd_hist > 0:
-        score += 20
-    else:
-        score += max(0, int(25 * (1 + macd_hist / (abs(macd_hist) + 1e-6)) * 0.4))
-
-    if not np.isnan(ema200):
-        if   price > ema20 > ema50 > ema200: score += 25
-        elif price > ema20 > ema50:          score += 20
-        elif price > ema50 and price > ema200: score += 15
-        elif price > ema200:                 score += 8
-    else:
-        if   price > ema20 > ema50: score += 20
-        elif price > ema50:         score += 13
-        else:                       score += 3
-
-    if   bb_pct <= 0.05: score += 25
-    elif bb_pct <= 0.20: score += 21
-    elif bb_pct <= 0.35: score += 16
-    elif bb_pct <= 0.55: score += 10
-    elif bb_pct <= 0.75: score += 5
-    elif bb_pct <= 0.90: score += 2
-
-    score = min(100, max(0, score))
-    # ラベルはコード（表示文は UI 辞書）。
-    if   score >= 78: label = "strong_buy"
-    elif score >= 63: label = "buy"
-    elif score >= 43: label = "hold"
-    elif score >= 28: label = "watch"
-    else:             label = "avoid"
-    return score, label
+    """総合スコアとラベルのコード。表（点・しきい値）は marketcalc.composite の1か所だけ。"""
+    return composite.compute(rsi, macd_hist, ema20, ema50, ema200, bb_pct, price)
 
 # ─── DATA FETCHING ────────────────────────────────────────
 
@@ -669,10 +634,11 @@ def process_ticker(df, symbol, name):
         macd_hist  = float(hist.iloc[-1]) if not np.isnan(hist.iloc[-1]) else 0.0
         macd_dir   = "UP" if macd_hist > 0 else "DOWN"
 
-        ema20  = float(close.ewm(span=20,  adjust=False).mean().iloc[-1])
-        ema50  = float(close.ewm(span=50,  adjust=False).mean().iloc[-1])
-        e200s  = close.ewm(span=200, adjust=False).mean()
-        ema200 = float(e200s.iloc[-1]) if len(close) >= 40 else float("nan")
+        _e1, _e2, _e3 = composite.PERIODS["ema"]
+        ema20  = float(close.ewm(span=_e1, adjust=False).mean().iloc[-1])
+        ema50  = float(close.ewm(span=_e2, adjust=False).mean().iloc[-1])
+        e200s  = close.ewm(span=_e3, adjust=False).mean()
+        ema200 = float(e200s.iloc[-1]) if len(close) >= composite.PERIODS["ema200_min_bars"] else float("nan")
 
         _, _, _, bb_pct_s = calc_bollinger(close)
         bb_pct = float(bb_pct_s.iloc[-1]) if not np.isnan(bb_pct_s.iloc[-1]) else 0.5
@@ -2306,15 +2272,16 @@ def composite_label_series(close):
     rsi = calc_rsi(close).fillna(50.0).to_numpy()
     _, _, hist = calc_macd(close)
     hist = hist.fillna(0.0).to_numpy()
-    e20 = close.ewm(span=20, adjust=False).mean().to_numpy()
-    e50 = close.ewm(span=50, adjust=False).mean().to_numpy()
-    e200 = close.ewm(span=200, adjust=False).mean().to_numpy()
+    _e1, _e2, _e3 = composite.PERIODS["ema"]
+    e20 = close.ewm(span=_e1, adjust=False).mean().to_numpy()
+    e50 = close.ewm(span=_e2, adjust=False).mean().to_numpy()
+    e200 = close.ewm(span=_e3, adjust=False).mean().to_numpy()
     _, _, _, bbp = calc_bollinger(close)
     bbp = bbp.fillna(0.5).clip(0.0, 1.0).to_numpy()
     c = close.to_numpy()
     out = []
     for i in range(len(c)):
-        e2 = e200[i] if i + 1 >= 40 else e50[i]
+        e2 = e200[i] if i + 1 >= composite.PERIODS["ema200_min_bars"] else e50[i]
         out.append(compute_signal(rsi[i], hist[i], e20[i], e50[i], e2, bbp[i], c[i])[1])
     return out
 

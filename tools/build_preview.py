@@ -29,7 +29,7 @@ import fetch_signals as fs  # noqa: E402
 from marketcalc import fund_us  # noqa: E402
 from tests._fake_market import TICKERS, facts, frame  # noqa: E402
 
-GENERATED = ("data.json", "charts", "verify.json", "health.json", "macro_v2.json", "relations.json", "gamma.json")
+GENERATED = ("data.json", "charts", "verify.json", "about.json", "health.json", "macro_v2.json", "relations.json", "gamma.json")
 
 
 def build(out, hours_ago=50.0):
@@ -86,6 +86,9 @@ def build(out, hours_ago=50.0):
     payload = fs._json_safe(payload)
     fs.split_chart_payload(payload, out)
     ps = fs.record_payload_size(payload, out)
+    sys.path.insert(0, str(ROOT / "tools"))
+    import build_about  # noqa: E402  仕組み（About）タブ用（本番と同じ組み立て）
+    build_about.write(out)
     print(f"preview: {out} initial={ps['initial_bytes']:,}B total={ps['total_bytes']:,}B verify={vrec}")
     return out
 
