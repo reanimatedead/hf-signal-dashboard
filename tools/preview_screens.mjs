@@ -120,6 +120,8 @@ for (const lang of langs) {
       return true;
     };
     for (const t of ["nikkei225", "dow30", "nasdaq100", "sp500", "etf", "fx"]) {
+      // ETF は 2026-11 追加。公開中の古い data.json（markets.etf が無い版）では表が空なのが正しい → 飛ばす
+      if (t === "etf" && !(await page.evaluate(() => typeof DATA !== "undefined" && !!DATA && Array.isArray((DATA.markets || {}).etf)))) continue;
       await page.click(`.tab[data-tab="${t}"]`);
       await page.waitForTimeout(400);
       const first = await page.$("#tbody tr[data-sym]:not([data-sym=''])");
