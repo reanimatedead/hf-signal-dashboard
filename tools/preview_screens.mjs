@@ -114,8 +114,9 @@ for (const lang of langs) {
     // 買い判定一覧は Enter キーでも開くこと・cursor: pointer であることも見る。
     // （SURVIVAL の候補表は Take/Skip の操作用、金利・債券・VOL と ポジション/割安度 は詳細を出さない設計なので対象外）
     const opened = async (where) => {
-      // charts/sp500.json は 12MB 超。CI では読み込みに 8 秒を超えることがある → 25 秒待つ
-      try { await page.waitForSelector("tr.detail-row .dt-wrap", { timeout: 25000 }); }
+      // charts/sp500.json は 12MB 超。CI のスマホ幅（deviceScaleFactor 3）では読み込み・解析に 25 秒を超えることがある
+      // （診断: 失敗時は CHART_CACHE に sp500 がまだ無い = 読み込み中）→ 60 秒待つ
+      try { await page.waitForSelector("tr.detail-row .dt-wrap", { timeout: 60000 }); }
       catch (e) {
         // 診断: 画面と状態（詳細行の有無・読み込み中の charts）を残す
         const st = await page.evaluate(() => ({ detailRows: document.querySelectorAll("tr.detail-row").length,
