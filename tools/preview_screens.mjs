@@ -127,7 +127,10 @@ for (const lang of langs) {
       const first = await page.$("#tbody tr[data-sym]:not([data-sym=''])");
       if (!first) { report.errors.push({ tag, type: "e2e", text: `${t}: 表に銘柄の行が無い` }); continue; }
       // 行の中央は列が多いと銘柄のリンク（外部）に当たることがある → 銘柄詳細の撮影と同じく 2 列目のセルを押す
-      await (await first.$("td:nth-child(2)") || first).click();
+      const fsym = await first.getAttribute("data-sym");
+      console.log(`e2e ${tag} ${t} ${fsym}`);
+      try { await (await first.$("td:nth-child(2)") || first).click({ timeout: 15000, noWaitAfter: true }); }
+      catch (e) { report.errors.push({ tag, type: "e2e", text: `${t}: ${fsym} の行を押せない（${String(e).slice(0, 120)}）` }); continue; }
       await opened(`${t} の表`);
     }
     await page.click('.tab[data-tab="nasdaq100"]');
