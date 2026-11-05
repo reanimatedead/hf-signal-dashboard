@@ -32,7 +32,7 @@ jobs:
       - name: Install (uv.lock + playwright)
         run: |
           uv sync --locked
-          npm install --no-save playwright@1
+          npm install --no-save playwright@1.64.1   # 2026-11-06: 1.65.0 は playwright-core 1.65.0 が未公開で入らない（ETARGET）。版を固定
           npx playwright install --with-deps chromium
       - name: Build preview site (fake data)
         run: uv run python tools/build_preview.py _preview_site/site
