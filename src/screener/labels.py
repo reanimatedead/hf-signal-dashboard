@@ -25,6 +25,7 @@ COLUMNS = {
     "PER": "PER", "roe_act_pct": "ROE%(実績)", "roe_pct": "ROE%", "div_yield_fwd_pct": "配当利回り%(予想)",
     "div_yield_pct": "配当利回り%", "equity_ratio_pct": "自己資本比率%", "turnover_20d": "売買代金(20日平均)",
     "next_earnings": "次の決算(推定)", "etf_kind": "種類", "cci200_signal": "CCI ±200 の判定(本日)",
+    "bb48_z": "BB48 の位置(σ)", "bb288_z": "BB288 の位置(σ)",
 }  # fmt: skip
 
 # 値（コード）

@@ -41,8 +41,8 @@ def test_preview_public_japan_is_chart_only(preview):
     us = [r for r in d["markets"]["nasdaq100"] if not r["symbol"].startswith("^")]
     assert any(r.get("score_value") is not None and r.get("PER") is not None for r in us)
     etf = {r["symbol"]: r for r in d["markets"]["etf"]}
-    assert etf["1357.T"]["etf_kind"] == "inverse" and etf["1357.T"]["score"] is None
-    assert etf["1306.T"]["score"] is not None
+    assert etf["1357.T"]["etf_kind"] == "inverse" and etf["1357.T"].get("score") is None
+    assert etf["1357.T"]["score_note"] == "not_scored_inverse" and etf["1306.T"].get("score") is not None
     assert set(v["score_tiers"]) == {"nikkei225", "us", "etf"}
     for t in v["score_tiers"].values():
         assert set(t["full"]) == {"base", *score.TIER_KEYS} and "recent6m" in t
@@ -50,6 +50,15 @@ def test_preview_public_japan_is_chart_only(preview):
     a = json.loads((preview / "about.json").read_text())
     assert a["rules"]["score"]["weights"] == score.W               # 配分は1か所から自動で出る
     assert "etf" in a["tabs"]
+
+
+def test_price_glitch_mask_drops_single_unit_errors():
+    import numpy as np
+    from marketcalc import contracts
+
+    c = np.array([710, 712, 7.28, 715, 729.7, 731, 3461.5, 733, 740.0])
+    assert list(np.flatnonzero(contracts.price_glitch_mask(c))) == [2, 6]
+    assert not contracts.price_glitch_mask(np.array([100, 101, 140, 150, 151])).any()   # 本物の急騰は残す
 
 
 def test_live_data_json_japan_is_chart_only():

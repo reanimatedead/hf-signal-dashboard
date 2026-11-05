@@ -687,7 +687,27 @@ def process_ticker(df, symbol, name):
         return {"symbol": symbol, "name": name, "composite_score": -1,
                 "signal": "error", "error": "exception"}
 
-def process_market(symbols_dict, label):
+_GLITCHES = {}   # {銘柄: 除いた本数}（ETF の単位の誤り。meta.price_glitches に残す・黙って直さない）
+
+
+def drop_price_glitches(df, symbol):
+    """終値が前後から 3 倍以上離れた 1 本（Yahoo の日本の ETF の単位の誤り）を NaN にする（contracts.price_glitch_mask）。
+    ETF だけに使う（株の既存の処理は変えない）。除いた本数は _GLITCHES に記録。"""
+    if df is None or "Close" not in df.columns or not len(df):
+        return df
+    c = pd.to_numeric(df["Close"].squeeze(), errors="coerce").to_numpy(dtype=float)
+    m = contracts.price_glitch_mask(c)
+    if m.any():
+        df = df.copy()
+        for k in ("Open", "High", "Low", "Close", "Adj Close"):
+            if k in df.columns:
+                df.loc[df.index[m], k] = np.nan
+        _GLITCHES[symbol] = _GLITCHES.get(symbol, 0) + int(m.sum())
+        print(f"  [glitch] {symbol}: {int(m.sum())} bar(s) dropped (price unit error)")
+    return df
+
+
+def process_market(symbols_dict, label, clean=None):
     print(f"\n[{label}] {len(symbols_dict)} symbols…")
     raw = fetch_batch(list(symbols_dict.keys()))
     # 2026-08-19 追加: バッチで欠落した銘柄を Yahoo chart API 個別取得で回収する。
@@ -710,6 +730,8 @@ def process_market(symbols_dict, label):
         print(f"  [heal] recovered {healed}/{len(missing)} via chart_api")
     results = []
     for sym, df in raw.items():
+        if clean is not None:
+            df = clean(df, sym)
         results.append(process_ticker(df, sym, symbols_dict.get(sym, sym)))
     results.sort(key=lambda x: x.get("composite_score", -1), reverse=True)
     ok = sum(1 for r in results if not r.get("error"))
@@ -2213,6 +2235,10 @@ US_FUND_FIELDS = ("magic_rank", "f_score", "f_max")
 US_VALUE_FIELDS = ("PER", "PBR", "roe_pct", "div_yield_pct", "equity_ratio_pct", "fair_price", "upside_pct",
                    "one_off_flag", "next_earnings", "earnings_soon")
 ETF_TAB = "etf"
+# data.json で値が None ならキーを省く新しい列（2026-11 追加分だけ。既存の列は従来どおり null を出す）
+PRUNE_NONE = (*US_VALUE_FIELDS, "turnover_20d", "cci200_signal", "cci200_recent", "cci200_spike",
+              "score", "score_tier", "score_value", "score_chart", "score_penalty", "score_penalties",
+              "score_quality", "score_sell", "score_note")
 
 
 def load_universe(name, default, udir=None):
@@ -2450,6 +2476,12 @@ def attach_scores(nk, us_tabs, etf, gates):
                 for k in score.OUT_KEYS:
                     r[k] = src.get(k)
     score.score_rows(con(etf), gates.get(ETF_TAB), ("chart", "penalty"), market="etf")
+    for rows in (nk, etf, *us_tabs):          # 初回ロードを軽くする: 新しい列の空（None）はキーごと省く（画面は無い=—）
+        for r in rows:
+            for k in PRUNE_NONE:
+                if k in r and (r[k] is None or (k in ("cci200_spike", "earnings_soon", "one_off_flag") and r[k] is False)
+                               or (k == "score_penalties" and r[k] == "")):
+                    del r[k]
     n = sum(1 for rows in (nk, etf, *us_tabs) for r in rows if r.get("score") is not None)
     print(f"[score] scored rows: {n}")
     return n
@@ -2532,6 +2564,9 @@ def attach_equity_charts(equity_markets, collect=None):
             targets.append(r)
     print(f"[Equity charts] P2 constituents: charting {len(targets)} rows, batched 2y…")
     frames = _batched_2y_ohlc([r["symbol"] for r in targets])
+    for sym, grps in tab_of.items():          # ETF だけ単位の誤りの 1 本を除く（株は従来どおり）
+        if grps and grps[0] == "etf" and frames.get(sym) is not None:
+            frames[sym] = drop_price_glitches(frames[sym], sym)
     ok = fail = 0
     for r in targets:
         sym = r["symbol"]
@@ -3132,7 +3167,7 @@ def main():
     sp_results  = process_market(sp500_dict, "S&P500")
     fx_results  = process_fx_advanced(FX_PAIRS)
     # 2026-11: ETF（主要 ETF・一覧は marketcalc.assets.ETFS の1か所）
-    etf_results = process_market({s: n for s, (n, _k) in assets.ETFS.items()}, "ETF")
+    etf_results = process_market({s: n for s, (n, _k) in assets.ETFS.items()}, "ETF", clean=drop_price_glitches)
     for r in etf_results:
         r["etf_kind"] = assets.ETFS.get(r.get("symbol"), ("", "unknown"))[1]
 
@@ -3249,6 +3284,7 @@ def main():
             "stale_hours": _stale_hours(),
             "verify": verify_meta,
             "us_fundamentals": us_fund_meta,
+            "price_glitches": dict(_GLITCHES),   # ETF の単位の誤りとして除いた本数（銘柄ごと）
             # 銘柄ユニバースの取得率＋上場廃止/入替候補。劣化を隠さず可視化する。
             "universe": universe_meta,
             # サイレント fallback 禁止: 発動した fallback を全て記録（0件なら健全）。

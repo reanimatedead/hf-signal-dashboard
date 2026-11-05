@@ -114,8 +114,17 @@ for (const lang of langs) {
     // 買い判定一覧は Enter キーでも開くこと・cursor: pointer であることも見る。
     // （SURVIVAL の候補表は Take/Skip の操作用、金利・債券・VOL と ポジション/割安度 は詳細を出さない設計なので対象外）
     const opened = async (where) => {
-      try { await page.waitForSelector("tr.detail-row .dt-wrap", { timeout: 8000 }); }
-      catch (e) { report.errors.push({ tag, type: "e2e", text: `${where}: 1行目を押しても銘柄詳細が開かない` }); return false; }
+      // charts/sp500.json は 12MB 超。CI のスマホ幅（deviceScaleFactor 3）では読み込み・解析に 25 秒を超えることがある
+      // （診断: 失敗時は CHART_CACHE に sp500 がまだ無い = 読み込み中）→ 60 秒待つ
+      try { await page.waitForSelector("tr.detail-row .dt-wrap", { timeout: 60000 }); }
+      catch (e) {
+        // 診断: 画面と状態（詳細行の有無・読み込み中の charts）を残す
+        const st = await page.evaluate(() => ({ detailRows: document.querySelectorAll("tr.detail-row").length,
+          cache: Object.keys(typeof CHART_CACHE !== "undefined" ? CHART_CACHE : {}), tab: typeof tab !== "undefined" ? tab : null,
+          scrollX: window.scrollX, wrapScroll: (document.querySelector(".tbl-wrap") || {}).scrollLeft })).catch((x) => String(x));
+        await page.screenshot({ path: path.join(out, `e2efail_${tag}_${where.replace(/\W/g, "")}.png`) }).catch(() => {});
+        report.errors.push({ tag, type: "e2e", text: `${where}: 1行目を押しても銘柄詳細が開かない ${JSON.stringify(st)}` }); return false;
+      }
       await page.evaluate(() => document.querySelectorAll("tr.detail-row").forEach((e) => e.remove()));
       return true;
     };
@@ -126,7 +135,11 @@ for (const lang of langs) {
       await page.waitForTimeout(400);
       const first = await page.$("#tbody tr[data-sym]:not([data-sym=''])");
       if (!first) { report.errors.push({ tag, type: "e2e", text: `${t}: 表に銘柄の行が無い` }); continue; }
-      await first.click();
+      // 行の中央は列が多いと銘柄のリンク（外部）に当たることがある → 銘柄詳細の撮影と同じく 2 列目のセルを押す
+      const fsym = await first.getAttribute("data-sym");
+      console.log(`e2e ${tag} ${t} ${fsym}`);
+      try { await (await first.$("td:nth-child(2)") || first).click({ timeout: 15000, noWaitAfter: true }); }
+      catch (e) { report.errors.push({ tag, type: "e2e", text: `${t}: ${fsym} の行を押せない（${String(e).slice(0, 120)}）` }); continue; }
       await opened(`${t} の表`);
     }
     await page.click('.tab[data-tab="nasdaq100"]');
