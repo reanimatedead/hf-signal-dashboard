@@ -153,3 +153,26 @@ def test_broken_config_still_sends_fail(tmp_path, monkeypatch):
     sent = []
     rc = daily.main(["--pulled"], today=TUE, poster=lambda u, b: sent.append((u, b.decode())))
     assert rc == 1 and sent == [("https://ntfy.sh/screener-abc123", "screener 2026-11-03 失敗")]
+
+
+def test_pipeline_writes_today_html_only_under_out(cfg):
+    """daily の最後に <data_dir>/out/today.html（日本株・米国株・ETF の段階5/4・CCI ±200・決算7日以内・段階の検証）。"""
+    daily.pipeline(cfg, dt.date(2026, 10, 30), get=fake_get(cfg=cfg), us_update=lambda c, d: None)
+    p = cfg.out_dir / "today.html"
+    assert p.exists() and not any(cfg.repo_dir.rglob("*"))
+    t = p.read_text(encoding="utf-8")
+    for s in (
+        "日本株",
+        "米国株",
+        "ETF",
+        "段階5 の上位",
+        "段階4 の上位",
+        "そろって −200 割れ",
+        "そろって +200 超え",
+        "日以内",
+        "段階ごとの検証",
+        "空売りの根拠ではありません",
+        "公開しない",
+    ):
+        assert s in t, s
+    assert "<script" not in t and "buy_cci200" not in t  # 言葉は描画時に付ける（コードを出さない）

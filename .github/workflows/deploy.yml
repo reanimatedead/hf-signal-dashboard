@@ -172,7 +172,7 @@ jobs:
       - name: Post-deploy i18n check (snake_case on real data, warn only)
         continue-on-error: true
         run: |
-          npm install --no-save playwright@1
+          npm install --no-save playwright@1.64.1   # 1.65.0 は playwright-core が未公開で入らない（2026-11-06）。pr_preview.yml と同じ版
           npx playwright install --with-deps chromium
           python3 -m http.server -d docs 8770 >/dev/null 2>&1 &
           sleep 2
