@@ -9,6 +9,7 @@
 4. 一覧（screen → signals）→ local_report（<data_dir>/out/ にだけ書く）
 5. CCI ±200 の抜けを Mac mini の通知で1回出す（screener.alerts。既定は osascript。
    本文の最後に一覧の場所。ntfy には送らない）
+6. 最後に <data_dir>/out/today.html「今日の要点」を作る（screener.today。ローカルだけ）
 失敗したら ntfy に「失敗＋日付」を送って終了コード 1。
 成功したら何も送らない。ただし月曜は最後に「週次 OK＋日付」を1回送る。
 """
@@ -28,6 +29,7 @@ from typing import Any
 
 from . import alerts, contract, local_report, notify
 from . import config as config_mod
+from . import today as today_page
 from .config import Config
 from .jquants import Getter, default_client
 
@@ -99,6 +101,7 @@ def pipeline(
             local_report.alerts_html(cfg, doc),
             prefer=str(cfg.get("alerts.notifier", "osascript") or "osascript"),
         )
+    print("today.html →", today_page.write(cfg, doc), flush=True)  # 最後に「今日の要点」（ローカルだけ）
     return c
 
 

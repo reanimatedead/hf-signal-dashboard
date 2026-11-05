@@ -62,7 +62,7 @@
   .js-c2{font-weight:700;font-size:11px;padding:1px 6px;border-radius:3px;white-space:nowrap;border:1px solid}
   .js-c2b{color:#22d3ee;border-color:#22d3ee;background:rgba(34,211,238,.10)} .js-c2s{color:#e879f9;border-color:#e879f9;background:rgba(232,121,249,.10)}
   .dt-card{margin:6px 0 4px;padding:6px 10px;border:1px solid var(--border);border-radius:5px;background:var(--bg2);font-size:12px;line-height:1.5;white-space:normal}
-  .dt-card b{color:var(--text)} .dt-card .dc-note{font-size:11px;color:#dc2626}
+  .dt-card b{color:var(--text)} .dt-card details.dc-old{margin-top:3px;font-size:11px;color:var(--text-dim)} .dt-card details.dc-old summary{cursor:pointer} .dt-card .dc-note{font-size:11px;color:#dc2626}
   .sc-cell{display:flex;flex-direction:column;gap:1px;line-height:1.2;font-size:11px}
   .sc-tot{font-weight:700;font-size:13px} .sc-tier{font-size:10px;padding:0 5px;border-radius:3px;border:1px solid var(--border);color:var(--text-dim);white-space:nowrap}
   .sc-t5{color:#fff;background:#16a34a;border-color:#16a34a} .sc-t4{color:#16a34a;border-color:#16a34a}
@@ -121,7 +121,10 @@
   function labCls(c) {
     return ({ buy_strong: "js-sbuy", buy: "js-buy", buy_long_oversold: "js-lo", sell_strong: "js-ssell", sell: "js-sell" })[c] || "js-wait";
   }
+  const isInv = (r) => r && (r.score_note === "not_scored_inverse" || r.etf_kind === "inverse");
+  const NA = () => `<span class="login-only">${T("sc.not_scored_inverse")}</span>`;
   function judgeCell(r, tab) {
+    if (isInv(r)) return `<div class="js-cell">${NA()}</div>`;   // インバース ETF はどの欄でも「対象外」
     const c = sig(r.chart_signal);
     if (!c) return `<div class="js-cell"><span class="js-lab js-wait">${T("sig.none")}</span><span class="js-vs">${esc(r.chart_signal_note ? I18.code("chart_signal_note", r.chart_signal_note) : T("sig.short_bars"))}</span></div>`;
     const c2 = r.cci200_recent && r.cci200_recent.code ? r.cci200_recent : null;
@@ -146,11 +149,27 @@
     const c = sig(r.chart_signal);
     items.push(T("dc.chart", { v: c && c !== "neutral" ? `<b>${esc(sigText(c))}</b>` : T("dc.none") }));
     if (num(r.score) != null) items.push(T("dc.trade_score", { v: I18.fmtNum(r.score, 1), tier: I18.fmtNum(r.score_tier, 0) }));
-    else if (r.score_note === "not_scored_inverse") items.push(T("sc.not_scored_inverse"));
-    items.push(T("dc.composite", { signal: esc(I18.code("signal", String(r.signal || "").toLowerCase().replace(/\s+/g, "_"))), score: num(score) == null ? "—" : I18.fmtNum(score, 0) }));
     const sell = SELL.includes(c) || (c2 && c2.code === "sell_cci200");
+    const old = T("dc.composite", { signal: esc(I18.code("signal", String(r.signal || "").toLowerCase().replace(/\s+/g, "_"))), score: num(score) == null ? "—" : I18.fmtNum(score, 0) });
+    // 旧スコア（RSI・MACD・EMA・BB をまとめた従来の点）は畳んで残す（主表示は売買スコア）
+    const fold = `<details class="dc-old"><summary>${T("dc.old_title")}</summary>${old}<br><span class="sc-sub">${T("dc.old_help")}</span></details>`;
+    if (isInv(r)) return `<div class="dt-card">${T("dc.title")} ${NA()}<div class="sc-sub">${T("ub.etf_note")}</div>${fold}</div>`;
     return `<div class="dt-card" title="${esc(T("dt.judge_help"))}">${T("dc.title")} ${items.join(T("dc.sep"))}`
-      + (sell ? `<div class="dc-note">${T("code.sell_note.sell_note")}</div>` : "") + `</div>`;
+      + (sell ? `<div class="dc-note">${T("code.sell_note.sell_note")}</div>` : "") + fold + `</div>`;
+  }
+  // 銘柄詳細の見出し: 売買スコア（段階）。インバースは対象外
+  function scoreHead(r) {
+    if (isInv(r)) return T("sc.not_scored_inverse");
+    if (num(r.score) == null) return T("dc.trade_score", { v: "—", tier: "—" });
+    return T("dc.trade_score", { v: I18.fmtNum(r.score, 1), tier: I18.fmtNum(r.score_tier, 0) });
+  }
+  // 上部の要約: 市場ごとの段階の件数（構成銘柄だけ・指数の行は数えない）
+  function tierPills(rows) {
+    const cnt = {}; let na = 0;
+    (rows || []).forEach((r) => { if (!r || String(r.symbol || "").startsWith("^")) return; if (isInv(r)) { na++; return; } const t = num(r.score_tier); if (t != null) cnt[t] = (cnt[t] || 0) + 1; });
+    const cls = { 5: "sb", 4: "b", 3: "h", 2: "w", 1: "av" };
+    return [5, 4, 3, 2, 1].filter((t) => cnt[t]).map((t) => `<span class="sp ${cls[t]}">${T("sc.tier_n", { n: t })}\u00a0${I18.fmtNum(cnt[t], 0)}</span>`).join("")
+      + (na ? `<span class="sp h">${T("sc.not_scored_short")}\u00a0${I18.fmtNum(na, 0)}</span>` : "");
   }
 
   // ── 列（l は辞書キー） ──
@@ -198,10 +217,11 @@
   ];
   function cols(tab, base) {
     if (!EQ_TABS.includes(tab)) return base;
-    const head = base.slice(0, 2), rest = base.slice(2);   // Signal / Score はそのまま先頭
+    // 旧スコア（Signal / Score = composite_score）は一覧の主表示から外す（銘柄詳細の判断カードに「旧スコア」として畳む）
+    const rest = base.slice(2);
     // 魔法の公式・F（C_US）は公開版では値が無い（Mac mini 版のみ）ので列に出さない。上に注記を1行（renderMacOnlyNote）。
     const extra = tab === "nikkei225" ? C_JP : tab === "etf" ? C_ETF : C_USV;
-    return head.concat(C_SIG, rest.slice(0, 2), C_SCORE, extra, rest.slice(2), C_IND);   // 銘柄・名前のあとにスコア
+    return rest.slice(0, 2).concat(C_SCORE.slice(0, 1), C_SIG, C_SCORE.slice(1), extra, rest.slice(2), C_IND);   // 銘柄・名前・スコア（段階）・判定
   }
   const DASH = `<span style="color:var(--text-faint)">—</span>`;
   function cell(c, r, tab) {
@@ -220,6 +240,10 @@
       case "magic_rank": return num(r.magic_rank) == null ? DASH : T("col.rank_n", { n: I18.fmtNum(r.magic_rank, 0) });
       case "f_score": return num(r.f_score) == null ? DASH : `${r.f_score}/${r.f_max}`;
       case "__theory_price": case "__value_gap": case "__overall": return `<span class="login-only">${T("col.login_only")}</span>`;
+      case "score": case "score_value": case "score_chart": case "score_penalty": case "score_quality": case "score_sell":
+        if (isInv(r)) return NA();
+    }
+    switch (c.k) {
       case "score": return scoreCell(r);
       case "score_value": return tab === "nikkei225" ? `<span class="login-only">${T("col.login_only")}</span>` : n1(r.score_value);
       case "score_chart": return n1(r.score_chart);
@@ -318,9 +342,11 @@
   function renderWeakBanner(t) {
     const el = document.getElementById("weak-banner"); if (!el) return;
     const v = S.verify;
-    if (!v || v.weakened !== true || !(EQ_TABS.includes(t) || t === "verify")) { el.style.display = "none"; return; }
+    // 旧スコア（composite）の弱まりは主表示に出さない（検証タブの表には残す）。チャート判定・売買スコアの項目だけ
+    const items = (v && v.weakened === true ? v.weakened_items || [] : []).filter((x) => String(x).split(":")[1] !== "composite");
+    if (!items.length || !(EQ_TABS.includes(t) || t === "verify")) { el.style.display = "none"; return; }
     el.style.display = "block";
-    el.innerHTML = `<span class="wb">${T("banner.weak", { items: esc((v.weakened_items || []).map(weakItem).join(T("common.sep_list"))) })}</span>`;
+    el.innerHTML = `<span class="wb">${T("banner.weak", { items: esc(items.map(weakItem).join(T("common.sep_list"))) })}</span>`;
   }
 
   // ── 検証タブ ──
@@ -619,7 +645,7 @@
       + `<span><i style="border-color:${C_BLUE}"></i>BB48 ±2σ</span><span><i class="dot" style="border-color:${C_BLUE}"></i>BB48 ±3σ</span>`
       + `<span><i style="border-color:${C_ORANGE}"></i>BB288 ±2σ</span><span><i class="dot" style="border-color:${C_ORANGE}"></i>BB288 ±3σ</span>`
       + (marks ? `<span style="color:#16a34a">▲ ${sigText("buy")}</span><span style="color:#0d9488">▲ ${sigText("buy_long_oversold")}</span><span style="color:#dc2626">▼ ${sigText("sell")}</span>`
-        + `<span style="color:${C200.buy_cci200}">◆ ${sigText("buy_cci200")}</span><span style="color:${C200.sell_cci200}">◆ ${sigText("sell_cci200")}</span>`
+        + `<span style="color:${C200.buy_cci200}">◆ ${T("chart.leg_c2_buy")}</span><span style="color:${C200.sell_cci200}">◆ ${T("chart.leg_c2_sell")}</span>`
         + `<span>${T("chart.leg_band")}</span>` : "")
       + `<span>${T("chart.leg_lower")} <i style="border-color:${C_BLUE}"></i>CCI48 <i style="border-color:${C_ORANGE}"></i>CCI288 ${T("chart.leg_lines")}</span></div>`;
     const capTxt = T("chart.range_note") + " " + (marks ? T("chart.rule_cap", { sell: T("code.sell_note.sell_note") }) : T("chart.context_cap"));
@@ -627,5 +653,5 @@
   }
 
   window.SIG = { loadVerify, cols, cell, judgeCell, renderUsBuyList, renderMacOnlyNote, renderStaleBanner, renderWeakBanner,
-    showVerify, hideVerify, drawPriceCciChart, weakItem, decisionCard, EQ_TABS, BUY, SELL, state: S };
+    showVerify, hideVerify, drawPriceCciChart, weakItem, decisionCard, scoreHead, tierPills, EQ_TABS, BUY, SELL, state: S };
 })();

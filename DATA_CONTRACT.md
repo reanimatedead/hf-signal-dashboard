@@ -1716,3 +1716,8 @@ Stats = {n, mean, median, up_pct}
 - **点の自動 0**: 直近6か月で基準を下回った判定（売り目安は上回った判定）は 0 点（`score.gate_from_verify`）。
 - **米国の決算**: `data/us_fundamentals.json`（週次 universe.yml）に `hist`（過去24か月の各月初の決算）と `filed`（10-K/10-Q の提出日）。
   SEC は連絡先つき User-Agent を求めるので、リポジトリ変数 `SEC_USER_AGENT` が必要（未設定だと週次の更新は 403 で止まり前回のファイルのまま）。
+- **2026-11-06 追記（スコアを1本に）**: 株式・ETF のタブの主表示は売買スコア（段階）だけ。旧スコア（composite_score・signal の
+  STRONG BUY〜AVOID）は一覧の列・上部の要約・絞り込み・「根拠が弱まっています」のバナーから外し、銘柄詳細の判断カードの
+  「旧スコア」に畳む（data.json・verify.json の値と検証は従来どおり出す）。並び替えの既定は `score`（値の無い行は常に最後）。
+  インバース ETF は判定・スコアのどの欄も「対象外」。Mac mini は daily の最後に `out/today.html`（段階5/4 の上位・CCI ±200・
+  決算7日以内・段階の検証。J-Quants の数値を含むのでローカルだけ）を作る（`screener.today`）。

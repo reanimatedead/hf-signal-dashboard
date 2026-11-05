@@ -1024,7 +1024,7 @@ function renderDataNotice(){
 function esc2(s){return String(s==null?"":s).replace(/[&<>]/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[m]));}
 
 // ══ Summary bar ════════════════════════════════════
-const MKT_LBL=["nikkei225","dow30","nasdaq100","sp500","fx"];
+const MKT_LBL=["nikkei225","dow30","nasdaq100","sp500","etf","fx"];
 // data.json の signal はコード（strong_buy 等）。旧形式（"STRONG BUY"）も同じコードに読み替える。
 const S_STK=["strong_buy","buy","hold","watch","avoid"];
 const S_FX =["strong_long","long","neutral","short","strong_short"];
@@ -1050,6 +1050,11 @@ function renderSum(){
   const bar=document.getElementById("sum-bar");
   bar.innerHTML="";
   MKT_LBL.forEach(k=>{
+    if(k!=="fx" && window.SIG && SIG.tierPills){       // 株式: 売買スコアの段階の件数（旧スコアの HOLD/WATCH は出さない）
+      const el=document.createElement("div"); el.className="s-card";
+      el.innerHTML=`<div class="s-label">${T("tab."+k)}</div><div class="s-pills">${SIG.tierPills((DATA.markets||{})[k]||[])}</div>`;
+      bar.appendChild(el); return;
+    }
     const c=DATA.summary?.[k]||{};
     const ord=k==="fx"?S_FX:S_STK;
     const el=document.createElement("div");
@@ -1064,6 +1069,8 @@ function renderSum(){
 // ══ Tab switch ═════════════════════════════════════
 function sw(key,btn){
   tab=key; fsig=null; sv=""; wlOnly=false;
+  // 並び替えの既定: 株式・ETF は売買スコア（新）、それ以外は従来どおり
+  scol=(window.SIG&&SIG.EQ_TABS.includes(key))?"score":"composite_score"; sdir=-1;
   if (window.ABOUT) ABOUT.hide();
   // hide the universe badge; renderTbl() re-shows it only for equity tabs.
   const ub=document.getElementById("universe-badge"); if (ub) ub.style.display="none";
@@ -1107,11 +1114,17 @@ function sw(key,btn){
 function renderFBtns(){
   const fg=document.getElementById("fgrp");
   const EQ=["nikkei225","dow30","nasdaq100","sp500","etf"];
-  const sigs=tab==="fx"?S_FX:(EQ.includes(tab)?S_STK:[]);
+  const sigs=tab==="fx"?S_FX:[];
   fg.innerHTML=`<button class="fbtn${fsig===null?" active":""}" onclick="setF(null,this)">${T("tb.all")}</button>`;
   sigs.forEach(s=>{
     fg.innerHTML+=`<button class="fbtn${fsig===s?" active":""}" onclick="setF('${s}',this)">${T("sig.short."+s)}</button>`;
   });
+  if(EQ.includes(tab)){                                 // 株式・ETF: 売買スコアの段階で絞る（旧スコアの S.BUY/HOLD は使わない）
+    ["tier:5","tier:4","tier:3","tier:2","tier:1"].concat(tab==="etf"?["tier:na"]:[]).forEach(s=>{
+      const lab=s==="tier:na"?T("sc.not_scored_short"):T("sc.tier_n",{n:s.slice(5)});
+      fg.innerHTML+=`<button class="fbtn${fsig===s?" active":""}" onclick="setF('${s}',this)">${lab}</button>`;
+    });
+  }
 }
 function setF(sig,btn){
   fsig=sig; wlOnly=false;
@@ -1180,14 +1193,18 @@ function getRows(){
   if (tab === "rates_vol" || tab === "pos_val") return getCombinedRows();
   const market=DATA.markets?.[tab]||[];
   return market.filter(r=>{
-    if(fsig&&sigCode(r.signal)!==fsig) return false;
+    if(fsig&&String(fsig).startsWith("tier:")){
+      const t=fsig.slice(5);
+      if(t==="na"?r.score_note!=="not_scored_inverse":String(r.score_tier)!==t) return false;
+    } else if(fsig&&sigCode(r.signal)!==fsig) return false;
     if(wlOnly&&!WL.has(r.symbol)) return false;
     if(sv){const s=(r.symbol||"").toLowerCase(),n=(r.name||"").toLowerCase(); if(!s.includes(sv)&&!n.includes(sv)) return false;}
     return true;
   }).sort((a,b)=>{
     let va=a[scol],vb=b[scol];
-    if(va==null) va=sdir>0?Infinity:-Infinity;
-    if(vb==null) vb=sdir>0?Infinity:-Infinity;
+    // 値の無い行（インバース ETF の「対象外」など）は向きに関係なく最後
+    if((va==null)!==(vb==null)) return va==null?1:-1;
+    if(va==null) return 0;
     if(typeof va==="string") return sdir*va.localeCompare(vb);
     return sdir*(vb-va);
   });
@@ -1518,7 +1535,7 @@ function detailHTML(r){
   const sym = r.symbol || "";
   const tab = (tf,active)=> `<span class="dt-tab${active?" dt-tab-on":""}" onclick="showTF('${sym}','${tf}',this)">${T("tf.short_"+tf)}</span>`;
   return `<div class="dt-wrap">
-    <div class="dt-hd"><b>${esc(r.symbol||"—")}</b> &nbsp;${esc(companyName(r.name))}&nbsp;&middot;&nbsp;${sigLabel(r.signal)}&nbsp;&middot;&nbsp;${T("dt.score",{v:f(score,0)})}&nbsp;&middot;&nbsp;${r.error?`<span style="color:var(--red)">${T("dt.data_error")}</span>`:T("dt.ok")}</div>
+    <div class="dt-hd"><b>${esc(r.symbol||"—")}</b> &nbsp;${esc(companyName(r.name))}&nbsp;&middot;&nbsp;${(r.chart_signal!==undefined&&window.SIG&&SIG.scoreHead)?SIG.scoreHead(r):`${sigLabel(r.signal)}&nbsp;&middot;&nbsp;${T("dt.score",{v:f(score,0)})}`}&nbsp;&middot;&nbsp;${r.error?`<span style="color:var(--red)">${T("dt.data_error")}</span>`:T("dt.ok")}</div>
     ${(window.SIG&&SIG.decisionCard)?SIG.decisionCard(r, score):judgeLine(r, score)}
     <div class="dt-tabs">${tab("4h",false)}${tab("1d",true)}${tab("1w",false)}</div>
     <div class="dt-grid">
