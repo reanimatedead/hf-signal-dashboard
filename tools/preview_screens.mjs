@@ -114,7 +114,8 @@ for (const lang of langs) {
     // 買い判定一覧は Enter キーでも開くこと・cursor: pointer であることも見る。
     // （SURVIVAL の候補表は Take/Skip の操作用、金利・債券・VOL と ポジション/割安度 は詳細を出さない設計なので対象外）
     const opened = async (where) => {
-      try { await page.waitForSelector("tr.detail-row .dt-wrap", { timeout: 8000 }); }
+      // charts/sp500.json は 12MB 超。CI では読み込みに 8 秒を超えることがある → 25 秒待つ
+      try { await page.waitForSelector("tr.detail-row .dt-wrap", { timeout: 25000 }); }
       catch (e) { report.errors.push({ tag, type: "e2e", text: `${where}: 1行目を押しても銘柄詳細が開かない` }); return false; }
       await page.evaluate(() => document.querySelectorAll("tr.detail-row").forEach((e) => e.remove()));
       return true;
