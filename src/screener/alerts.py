@@ -23,14 +23,13 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
-import numpy as np
-
 from . import labels
 from .calc import events, ind
 
 Row = dict[str, Any]
 Xs = dict[str, tuple[dict[str, Any], list[str]]]
 TOP_N = 5
+SELL_NOTE_TEXT = "売り目安は利益確定・新しく買わない目安（空売りの根拠ではない）"
 ALERT_COLS = ["market", "watch", "code", "name", "cci48", "cci288", *ind.CCI_EVENTS]
 
 # 市場ごとの扱い（規則そのものは ind。ここは「一斉に割れ」を出すか・検証済みか・注記だけ）
@@ -48,15 +47,9 @@ MARKETS: dict[str, dict[str, Any]] = {
 
 
 def daily_counts(xs: Xs, key: str = "both_down") -> tuple[list[str], list[int], list[int]]:
-    """(日付, その抜けの件数, その日に日足がある銘柄の数)。0 件の日も含む。"""
-    cnt: collections.Counter[str] = collections.Counter()
-    active: collections.Counter[str] = collections.Counter()
-    for x, ds in xs.values():
-        active.update(ds)
-        for i in np.flatnonzero(ind.cci_events(x)[key]):
-            cnt[ds[i]] += 1
-    dates = sorted(active)
-    return dates, [cnt.get(d, 0) for d in dates], [active[d] for d in dates]
+    """(日付, その抜けの件数, その日に日足がある銘柄の数)。0 件の日も含む（式は ind.daily_event_counts）。"""
+    dates, counts, active = ind.daily_event_counts(xs, key)
+    return list(dates), list(counts), list(active)
 
 
 def _today_rows(market: str, xs: Xs, rows: dict[str, Row], asof: str) -> list[Row]:
@@ -111,6 +104,8 @@ def build(markets: dict[str, tuple[Xs, dict[str, Row]]], watchlist: list[str] | 
             "verified": spec["verified"],
             "note": spec["note"],
             "both_down": [r for r in mi if r["both_down"]],
+            # 売り目安（CCI +200）= ind.cci200_days の sell_cci200（both_up と同じ日）。利益確定・新しく買わない目安
+            ind.CCI200_SELL: [r for r in mi if r["both_up"]],
         }
     watched = [r for r in items if r["watch"] and any(r[k] for k in ind.NOTIFY_EVENTS)]
     asof = (per.get("jp") or {}).get("asof") or max((v["asof"] or "" for v in per.values()), default="") or None
@@ -248,10 +243,24 @@ def message(a: dict[str, Any]) -> tuple[str, str] | None:
             parts.append(f"{m['label']}（未検証）{len(bd)} 件: {_names(bd, n=len(bd))}")
     if a["watch_hits"]:
         parts.append(f"ウォッチ {len(a['watch_hits'])} 件: {_names(a['watch_hits'])}")
+    sells = []  # 2026-11 追加: 売り目安（CCI +200）。既存の両方割れの文はそのまま、その後ろに足す
+    for m in a["markets"].values():
+        su = m.get(ind.CCI200_SELL) or []
+        if su:
+            tag = "" if m["verified"] else "（未検証）"
+            names = _names(su, n=TOP_N if m["verified"] else len(su))
+            sells.append(f"{m['label']}{tag} 売り目安（CCI +200）{len(su)} 件: {names}")
+    if sells:
+        parts += sells + [SELL_NOTE_TEXT]
     if not parts:
         return None
     spiked = [m["label"] for m in a["markets"].values() if m["spike"]]
-    title = f"⚠ 一斉に割れ（暴落の可能性）: {'・'.join(spiked)}" if spiked else f"CCI −200 割れ {a['asof']}"
+    if spiked:
+        title = f"⚠ 一斉に割れ（暴落の可能性）: {'・'.join(spiked)}"
+    elif any(m["both_down"] for m in a["markets"].values()) or a["watch_hits"]:
+        title = f"CCI −200 割れ {a['asof']}"
+    else:
+        title = f"売り目安（CCI +200） {a['asof']}"
     return title, " ／ ".join(parts)
 
 

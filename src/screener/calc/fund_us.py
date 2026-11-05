@@ -4,7 +4,7 @@
 import bisect
 import datetime as dt
 
-from .value import RI, FScore, magic_rank, ri_ratio
+from .value import RI, FScore, magic_rank, one_off_flag, ri_ratio
 
 TAGS = {
     "ni": ["NetIncomeLoss", "ProfitLoss"],
@@ -29,7 +29,11 @@ TAGS = {
     ],
     "gp": ["GrossProfit"],
     "dsh": ["WeightedAverageNumberOfDilutedSharesOutstanding"],
+    "div": ["PaymentsOfDividendsCommonStock", "PaymentsOfDividends"],
 }
+FILED_FORMS = ("10-K", "10-K/A", "10-Q", "10-Q/A")
+FILED_TAGS = ("NetIncomeLoss", "Assets", "StockholdersEquity")
+FILED_KEEP = 12  # 次の決算の推定（calc.score.next_earnings）に使う直近の提出日の数
 CORE_TAGS = ("NetIncomeLoss", "StockholdersEquity", "Assets")  # 契約テストで「取れること」を確かめるタグ
 FIN_SECTORS = ("Financial", "Real Estate", "Utilities")
 STALE_DAYS = 550  # 決算が18か月超古いものは除外
@@ -67,7 +71,7 @@ def parse_yahoo_chart(j):
         (dt.datetime.fromtimestamp(int(k), dt.UTC).strftime("%Y-%m-%d"), v["numerator"] / v["denominator"])
         for k, v in (r.get("events", {}) or {}).get("splits", {}).items()
     )
-    return {"d": ts, "c": q["close"], "a": a, "h": q.get("high"), "l": q.get("low"), "splits": sp}
+    return {"d": ts, "c": q["close"], "a": a, "h": q.get("high"), "l": q.get("low"), "v": q.get("volume"), "splits": sp}
 
 
 def price_at(p, d, adj=False, raw=False):
@@ -102,6 +106,18 @@ def split_adjust(sh, shd, splits):
         if sd > shd:
             sh *= rr
     return sh
+
+
+def filed_dates(F, asof):
+    """10-K / 10-Q の提出日（asof より前・新しい順に FILED_KEEP 件・昇順で返す）。次の決算の推定に使う。"""
+    ds = set()
+    for tg in FILED_TAGS:
+        for unit in (F.get("us-gaap", {}).get(tg, {}).get("units", {}) or {}).values():
+            for v in unit:
+                f = v.get("filed")
+                if f and f < asof and v.get("form") in FILED_FORMS:
+                    ds.add(f)
+    return sorted(ds)[-FILED_KEEP:]
 
 
 def fundamentals(F, asof, splits=()):
@@ -146,7 +162,21 @@ def fundamentals(F, asof, splits=()):
         "roe": roe,
         "f_score": fs.score,
         "f_max": fs.max,
+        "ta": ta,
+        "div": g["div"][0],
+        "one_off": one_off_flag(net_income=ni, op_income=g["ebit"][0])["flag"],
+        "filed": filed_dates(F, asof),
     }
+
+
+def value_inputs(ni, eq, sh, roe, px):
+    """(上値余地%, PBR, PER)（丸めなし）。metrics と 売買スコアの検証（月初ごと）の両方がこれを使う。"""
+    mcap = px * sh
+    pbr = mcap / eq if eq and eq > 0 else None
+    tpbr = ri_ratio(roe, RI) if roe is not None else None
+    up = 100 * (tpbr / pbr - 1) if tpbr and pbr else None
+    per = mcap / ni if ni and ni > 0 else None
+    return up, pbr, per
 
 
 def metrics(fd, px):
@@ -155,15 +185,19 @@ def metrics(fd, px):
     ev = mcap + fd["debt"] - fd["cash"]
     ni, eq, ebit, cap, roe = fd["ni"], fd["eq"], fd["ebit"], fd["cap"], fd["roe"]
     tpbr = ri_ratio(roe, RI) if roe is not None else None
-    pbr = mcap / eq if eq > 0 else None
+    up, pbr, per = value_inputs(ni, eq, fd["sh"], roe, px)
     return {
         "mcap_bn": round(mcap / 1e9, 1),
-        "PER": round(mcap / ni, 1) if ni > 0 else None,
+        "PER": round(per, 1) if per is not None else None,
         "PBR": round(pbr, 2) if pbr else None,
         "roe_pct": round(100 * roe, 1) if roe is not None else None,
-        "ri_upside_pct": round(100 * (tpbr / pbr - 1), 1) if tpbr and pbr else None,
+        "ri_upside_pct": round(up, 1) if up is not None else None,
         "earnings_yield_pct": round(100 * ebit / ev, 1) if ebit and ev > 0 else None,
         "roc_pct": round(100 * ebit / cap, 1) if ebit and cap > 0 else None,
+        # 2026-11 追加（売買スコア・公開の米国株の列）。古い us_fundamentals.json に無い項目は None。
+        "equity_ratio_pct": round(100 * eq / fd["ta"], 1) if fd.get("ta") and eq > 0 else None,
+        "div_yield_pct": round(100 * abs(fd["div"]) / mcap, 2) if fd.get("div") and mcap > 0 else None,
+        "fair_price": round(px * tpbr / pbr, 2) if tpbr and pbr else None,
     }
 
 
@@ -190,6 +224,8 @@ def screen_one(ticker, info, F, p, asof, p1y=None, p1m=None):
         "F": fd["f_score"],
         "f_max": fd["f_max"],
         "fin": is_fin(info.get("sector")),
+        "one_off_flag": bool(fd.get("one_off")),
+        "filed": fd.get("filed") or [],
     }
     if p1y and p1m:
         a, b = price_at(p, p1y, True), price_at(p, p1m, True)

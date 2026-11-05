@@ -162,7 +162,8 @@ def merge_chart(old: dict[str, Any], new: dict[str, Any]) -> dict[str, Any] | No
         a = (r["indicators"].get("adjclose") or [{"adjclose": q["close"]}])[0]["adjclose"]
         for i, ts in enumerate(r["timestamp"]):
             day = dt.datetime.fromtimestamp(ts, dt.UTC).strftime("%Y-%m-%d")
-            rows[day] = (ts, q["high"][i], q["low"][i], q["close"][i], a[i])
+            vol = q.get("volume")
+            rows[day] = (ts, q["high"][i], q["low"][i], q["close"][i], a[i], vol[i] if vol else None)
     days = sorted(rows)
     out: dict[str, Any] = json.loads(json.dumps(old))
     r = out["chart"]["result"][0]
@@ -171,6 +172,7 @@ def merge_chart(old: dict[str, Any], new: dict[str, Any]) -> dict[str, Any] | No
         "high": [rows[d][1] for d in days],
         "low": [rows[d][2] for d in days],
         "close": [rows[d][3] for d in days],
+        "volume": [rows[d][5] for d in days],  # 2026-11: 売買代金（売買スコアの減点）に使う
     }
     r["indicators"]["adjclose"] = [{"adjclose": [rows[d][4] for d in days]}]
     if rn.get("events"):

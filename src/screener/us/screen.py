@@ -65,6 +65,59 @@ def screen(
     return rows
 
 
+SCORE_INPUTS_CACHE = "score_inputs_v1"
+
+
+def monthly_score_inputs(
+    cfg: Config, months: list[str], uni: dict[str, Any] | None = None
+) -> dict[str, dict[str, Any]]:
+    """各月初の {ticker: [上値余地, PBR, PER, 一時利益の目印]}（売買スコアの検証用）。その月初より前に提出された決算
+    （fund_us.fundamentals）× その月初の終値（Yahoo の分割調整済み close。株数も今の分割基準）。
+    式は fund_us.value_inputs。
+    過去の月初は変わらないので <data_dir>/us/derived/ に控える。"""
+    import bisect
+    import os
+
+    uni = uni if uni is not None else universe(cfg)
+    cdir = cfg.us("derived", SCORE_INPUTS_CACHE)
+    out: dict[str, dict[str, Any]] = {}
+    todo = []
+    for m in months:
+        cp = cdir / f"{m}.json"
+        if cp.exists():
+            with open(cp) as fh:
+                out[m] = json.load(fh)
+        else:
+            todo.append(m)
+            out[m] = {}
+    if not todo:
+        return out
+    for t in uni:
+        facts = load_facts(t, cfg)  # 1社ずつ
+        p = load_px(t, cfg)
+        if not facts or not p:
+            continue
+        for m in todo:
+            fd = fund_us.fundamentals(facts, m, p["splits"])
+            k = bisect.bisect_right(p["d"], m) - 1
+            while k >= 0 and p["c"][k] is None:
+                k -= 1
+            if not fd or k < 0:
+                continue
+            up, pbr, per = fund_us.value_inputs(fd["ni"], fd["eq"], fd["sh"], fd["roe"], float(p["c"][k]))
+            out[m][t] = [up, pbr, per, bool(fd.get("one_off"))]
+        del facts
+    cdir.mkdir(parents=True, exist_ok=True)
+    last = max(months) if months else None
+    for m in todo:
+        if m == last:
+            continue  # 今月はまだ決算が増えうるので控えない
+        tmp = cdir / f"{m}.json.tmp"
+        tmp.write_text(json.dumps(out[m]))
+        os.replace(tmp, cdir / f"{m}.json")
+    return out
+
+
 def fwd(t: str, a: str, b: str, cfg: Config) -> float | None:
     p = load_px(t, cfg)
     if not p:

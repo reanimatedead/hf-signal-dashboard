@@ -17,8 +17,10 @@
   const BUY = ["buy_strong", "buy", "buy_long_oversold"];
   const SELL = ["sell", "sell_strong"];
   const US_TABS = ["dow30", "nasdaq100", "sp500"];
-  const EQ_TABS = ["nikkei225"].concat(US_TABS);
+  const EQ_TABS = ["nikkei225"].concat(US_TABS, ["etf"]);
   const C_BLUE = "#3b82f6", C_ORANGE = "#f97316";
+  // CCI ±200 の判定（marketcalc.ind.cci200_days）: ◆ ＋ その日の縦の点線。既存の ▲▼ と形・色で分ける
+  const C200 = { buy_cci200: "#22d3ee", sell_cci200: "#e879f9" };
   const S = { verify: null, state: "loading" };
 
   const esc = (s) => String(s == null ? "" : s).replace(/[&<>"]/g, (m) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[m]));
@@ -57,6 +59,14 @@
   #us-buy-list tr.ub-row:hover{background:var(--bg2)}
   #us-buy-list tr.ub-row:focus{outline:1px solid var(--accent, #3b82f6);outline-offset:-1px}
   .mac-only-note{display:none;padding:6px 16px 0;font-size:11px;color:var(--text-faint)}
+  .js-c2{font-weight:700;font-size:11px;padding:1px 6px;border-radius:3px;white-space:nowrap;border:1px solid}
+  .js-c2b{color:#22d3ee;border-color:#22d3ee;background:rgba(34,211,238,.10)} .js-c2s{color:#e879f9;border-color:#e879f9;background:rgba(232,121,249,.10)}
+  .dt-card{margin:6px 0 4px;padding:6px 10px;border:1px solid var(--border);border-radius:5px;background:var(--bg2);font-size:12px;line-height:1.5;white-space:normal}
+  .dt-card b{color:var(--text)} .dt-card .dc-note{font-size:11px;color:#dc2626}
+  .sc-cell{display:flex;flex-direction:column;gap:1px;line-height:1.2;font-size:11px}
+  .sc-tot{font-weight:700;font-size:13px} .sc-tier{font-size:10px;padding:0 5px;border-radius:3px;border:1px solid var(--border);color:var(--text-dim);white-space:nowrap}
+  .sc-t5{color:#fff;background:#16a34a;border-color:#16a34a} .sc-t4{color:#16a34a;border-color:#16a34a}
+  .sc-sub{font-size:10px;color:var(--text-faint);white-space:normal} .sc-sell{color:#dc2626}
   #verify-pane{display:none;padding:12px 16px;overflow-x:auto}
   #verify-pane h2{font-size:15px;margin:4px 0 8px} #verify-pane h3{font-size:13px;margin:14px 0 6px}
   #verify-pane table{border-collapse:collapse;font-size:12px;min-width:560px}
@@ -86,15 +96,20 @@
     if (typeof window.__sigRerender === "function") window.__sigRerender();   // index.html が今のタブを再描画
   }
   function mkt(tab) { return tab === "nikkei225" ? "nikkei225" : "us"; }
-  function statsFor(tab, code, kind = "chart") {
+  function statsFor(tab, code, kind = "chart", r) {
+    if (tab === "etf") {   // ETF は銘柄ごとの成績（verify.json の etf.symbols）
+      const e = S.verify && S.verify.etf && S.verify.etf.symbols && r && S.verify.etf.symbols[r.symbol];
+      if (!e || !e.chart) return null;
+      return { sig: byCode(e.chart, code) || null, base: e.base || null };
+    }
     const m = S.verify && S.verify.markets && S.verify.markets[mkt(tab)];
     if (!m || !m.full) return null;
     return { sig: byCode(m.full[kind], code) || null, base: m.full.base || null };
   }
-  function vsText(tab, code) {
+  function vsText(tab, code, r) {
     if (S.state === "loading") return T("vf.vs_loading");
     if (S.state !== "ok") return T("vf.vs_unreadable");
-    const st = statsFor(tab, code);
+    const st = statsFor(tab, code, "chart", r);
     if (!st || !st.base) return T("vf.vs_none");
     const b = st.base;
     const baseT = T("vf.vs_base", { median: pct(b.median), up: b.up_pct == null ? "—" : I18.fmtNum(b.up_pct, 0) + "%" });
@@ -109,8 +124,33 @@
   function judgeCell(r, tab) {
     const c = sig(r.chart_signal);
     if (!c) return `<div class="js-cell"><span class="js-lab js-wait">${T("sig.none")}</span><span class="js-vs">${esc(r.chart_signal_note ? I18.code("chart_signal_note", r.chart_signal_note) : T("sig.short_bars"))}</span></div>`;
-    const note = SELL.includes(c) ? `<span class="js-note">${T("code.sell_note.sell_note")}</span>` : "";
-    return `<div class="js-cell"><span class="js-lab ${labCls(c)}">${esc(sigText(c))}</span><span class="js-vs">${vsText(tab, c)}</span>${note}</div>`;
+    const c2 = r.cci200_recent && r.cci200_recent.code ? r.cci200_recent : null;
+    const note = SELL.includes(c) || (c2 && c2.code === "sell_cci200") ? `<span class="js-note">${T("code.sell_note.sell_note")}</span>` : "";
+    return `<div class="js-cell"><span class="js-lab ${labCls(c)}">${esc(sigText(c))}</span><span class="js-vs">${vsText(tab, c, r)}</span>${c2 ? c200Badge(c2, tab) : ""}${note}</div>`;
+  }
+  function when(c2) { return c2.bars_ago === 0 ? T("dc.today") : T("dc.days_ago", { n: I18.fmtNum(c2.bars_ago, 0) }); }
+  // CCI ±200 の判定のバッジ（一覧）: ◆ 名前・いつ（本日 / n 日前）・その市場の検証（全期間 20 営業日後 vs 基準）
+  function c200Badge(c2, tab) {
+    const cls = c2.code === "buy_cci200" ? "js-c2b" : "js-c2s";
+    const m = S.verify && S.verify.cci200 && S.verify.cci200[tab === "etf" ? "etf" : mkt(tab)];
+    const st = m && m[c2.code] && m[c2.code].full, b = m && m.base && m.base.full;
+    const vs = st && b && st.n ? T("vf.vs_stats", { median: pct(st.median), up: I18.fmtNum(st.up_pct, 0), n: I18.fmtNum(st.n, 0),
+      base: T("vf.vs_base", { median: pct(b.median), up: b.up_pct == null ? "—" : I18.fmtNum(b.up_pct, 0) + "%" }) }) : "";
+    return `<span class="js-c2 ${cls}">◆ ${esc(sigText(c2.code))}・${when(c2)}</span>${vs ? `<span class="js-vs">${vs}</span>` : ""}`;
+  }
+  // 銘柄詳細の判断カード: 今出ている判定を全部まとめて1行（CCI ±200・チャート判定・売買スコア・総合スコア）
+  function decisionCard(r, score) {
+    const items = [];
+    const c2 = r.cci200_recent && r.cci200_recent.code ? r.cci200_recent : null;
+    if (c2) items.push(`<b style="color:${C200[c2.code]}">◆ ${esc(sigText(c2.code))}</b>・${when(c2)}`);
+    const c = sig(r.chart_signal);
+    items.push(T("dc.chart", { v: c && c !== "neutral" ? `<b>${esc(sigText(c))}</b>` : T("dc.none") }));
+    if (num(r.score) != null) items.push(T("dc.trade_score", { v: I18.fmtNum(r.score, 1), tier: I18.fmtNum(r.score_tier, 0) }));
+    else if (r.score_note === "not_scored_inverse") items.push(T("sc.not_scored_inverse"));
+    items.push(T("dc.composite", { signal: esc(I18.code("signal", String(r.signal || "").toLowerCase().replace(/\s+/g, "_"))), score: num(score) == null ? "—" : I18.fmtNum(score, 0) }));
+    const sell = SELL.includes(c) || (c2 && c2.code === "sell_cci200");
+    return `<div class="dt-card" title="${esc(T("dt.judge_help"))}">${T("dc.title")} ${items.join(T("dc.sep"))}`
+      + (sell ? `<div class="dc-note">${T("code.sell_note.sell_note")}</div>` : "") + `</div>`;
   }
 
   // ── 列（l は辞書キー） ──
@@ -127,6 +167,30 @@
     { k: "magic_rank", l: "col.magic_rank", a: "right", w: 90 },
     { k: "f_score", l: "col.f_score", a: "center", w: 52 },
   ];
+  // 売買スコア（marketcalc.score。配分は about.json の rules.score）
+  const C_SCORE = [
+    { k: "score", l: "col.score_total", a: "left", w: 92 },
+    { k: "score_value", l: "col.score_value", a: "right", w: 62 },
+    { k: "score_chart", l: "col.score_chart", a: "right", w: 62 },
+    { k: "score_penalty", l: "col.score_penalty", a: "left", w: 96 },
+    { k: "score_quality", l: "col.score_quality", a: "left", w: 72 },
+    { k: "score_sell", l: "col.score_sell", a: "left", w: 92 },
+  ];
+  const C_USV = [
+    { k: "PER", l: "col.per", a: "right", w: 58 },
+    { k: "PBR", l: "col.pbr", a: "right", w: 54 },
+    { k: "roe_pct", l: "col.roe", a: "right", w: 60 },
+    { k: "div_yield_pct", l: "col.div_yield", a: "right", w: 66 },
+    { k: "equity_ratio_pct", l: "col.equity_ratio", a: "right", w: 70 },
+    { k: "fair_price", l: "col.theory_price", a: "right", w: 82 },
+    { k: "upside_pct", l: "col.upside", a: "right", w: 74 },
+    { k: "turnover_20d", l: "col.turnover", a: "right", w: 86 },
+    { k: "next_earnings", l: "col.next_earnings", a: "left", w: 96 },
+  ];
+  const C_ETF = [
+    { k: "etf_kind", l: "col.etf_kind", a: "center", w: 92 },
+    { k: "turnover_20d", l: "col.turnover", a: "right", w: 86 },
+  ];
   const C_JP = [
     { k: "__theory_price", l: "col.theory_price", a: "center", w: 92 },
     { k: "__value_gap", l: "col.value_gap", a: "center", w: 92 },
@@ -136,7 +200,8 @@
     if (!EQ_TABS.includes(tab)) return base;
     const head = base.slice(0, 2), rest = base.slice(2);   // Signal / Score はそのまま先頭
     // 魔法の公式・F（C_US）は公開版では値が無い（Mac mini 版のみ）ので列に出さない。上に注記を1行（renderMacOnlyNote）。
-    return head.concat(C_SIG, rest, C_IND, tab === "nikkei225" ? C_JP : []);
+    const extra = tab === "nikkei225" ? C_JP : tab === "etf" ? C_ETF : C_USV;
+    return head.concat(C_SIG, rest.slice(0, 2), C_SCORE, extra, rest.slice(2), C_IND);   // 銘柄・名前のあとにスコア
   }
   const DASH = `<span style="color:var(--text-faint)">—</span>`;
   function cell(c, r, tab) {
@@ -155,8 +220,40 @@
       case "magic_rank": return num(r.magic_rank) == null ? DASH : T("col.rank_n", { n: I18.fmtNum(r.magic_rank, 0) });
       case "f_score": return num(r.f_score) == null ? DASH : `${r.f_score}/${r.f_max}`;
       case "__theory_price": case "__value_gap": case "__overall": return `<span class="login-only">${T("col.login_only")}</span>`;
+      case "score": return scoreCell(r);
+      case "score_value": return tab === "nikkei225" ? `<span class="login-only">${T("col.login_only")}</span>` : n1(r.score_value);
+      case "score_chart": return n1(r.score_chart);
+      case "score_penalty": {
+        const v = num(r.score_penalty); if (v == null) return DASH;
+        const why = String(r.score_penalties || "").split("|").filter(Boolean).map((x) => esc(I18.code("score_penalty", x))).join(T("common.sep_list"));
+        return `<div class="sc-cell"><span>${I18.fmtNum(v, 0)}</span>${why ? `<span class="sc-sub">${why}</span>` : ""}</div>`;
+      }
+      case "score_quality": return num(r.score_quality) == null ? DASH
+        : `<div class="sc-cell"><span>${I18.fmtNum(r.score_quality, 1)}</span><span class="sc-sub">${T("sc.unverified")}</span></div>`;
+      case "score_sell": return !num(r.score_sell) ? DASH
+        : `<div class="sc-cell"><span class="sc-sell">${I18.fmtNum(r.score_sell, 0)}</span><span class="sc-sub">${T("sc.sell_hint")}</span></div>`;
+      case "PER": case "PBR": return num(r[c.k]) == null ? DASH : I18.fmtNum(r[c.k], c.k === "PBR" ? 2 : 1);
+      case "roe_pct": case "div_yield_pct": case "equity_ratio_pct": return num(r[c.k]) == null ? DASH : I18.fmtNum(r[c.k], 1) + "%";
+      case "fair_price": return num(r.fair_price) == null ? DASH : I18.fmtNum(r.fair_price, 2);
+      case "upside_pct": return num(r.upside_pct) == null ? DASH : pct(r.upside_pct);
+      case "turnover_20d": return num(r.turnover_20d) == null ? DASH : compact(r.turnover_20d);
+      case "next_earnings": return !r.next_earnings ? DASH
+        : `<div class="sc-cell"><span>${esc(I18.fmtDate(r.next_earnings, "ymd"))}</span><span class="sc-sub">${T(r.earnings_soon ? "sc.earn_soon" : "sc.earn_est")}</span></div>`;
+      case "etf_kind": return r.etf_kind ? esc(I18.code("etf_kind", r.etf_kind)) : DASH;
     }
     return null;
+  }
+  function n1(v) { return num(v) == null ? DASH : I18.fmtNum(v, 1); }
+  function compact(v) {   // 百万単位（日本円・米ドルとも同じ表し方）
+    return Math.abs(v) >= 1e6 ? T("num.mn", { v: I18.fmtNum(v / 1e6, Math.abs(v) >= 1e8 ? 0 : 1) }) : I18.fmtNum(v, 0);
+  }
+  function scoreCell(r) {
+    if (num(r.score) == null) {
+      return r.score_note === "not_scored_inverse" ? `<span class="login-only">${T("sc.not_scored_inverse")}</span>` : DASH;
+    }
+    const t = num(r.score_tier);
+    return `<div class="sc-cell"><span class="sc-tot">${I18.fmtNum(r.score, 1)}</span>`
+      + (t == null ? "" : `<span class="sc-tier sc-t${t}">${T("sc.tier_n", { n: I18.fmtNum(t, 0) })}</span>`) + `</div>`;
   }
 
   // ── 米国の買い判定一覧（Nasdaq 100 タブの上） ──
@@ -189,9 +286,9 @@
   // ── 「理論株価・魔法の公式・F は Mac mini 版のみ」（米国タブの表の上に1行） ──
   function renderMacOnlyNote(tab) {
     const el = document.getElementById("mac-only-note"); if (!el) return;
-    const show = US_TABS.includes(tab);
-    el.style.display = show ? "block" : "none";
-    el.textContent = show ? T("ub.mac_only_note") : "";
+    const key = US_TABS.includes(tab) ? "ub.mac_only_note" : tab === "nikkei225" ? "ub.jp_chart_only_note" : tab === "etf" ? "ub.etf_note" : null;
+    el.style.display = key ? "block" : "none";
+    el.textContent = key ? T(key) : "";
   }
 
   // ── バナー ──
@@ -212,6 +309,7 @@
     if (p.length < 2) return String(x || "");
     // 1 項目に出す判定の名前は 1 つだけ（チャート判定 か 総合スコア のどちらか）
     const kind = p.length >= 3 ? p[1] : "chart", c = p[p.length - 1];
+    if (kind === "score") return T("vf.weak_item_score", { market: I18.code("verify_market", I18.norm("verify_market", p[0])) });
     const composite = kind === "composite";
     const label = composite ? I18.code("signal", I18.norm("signal", c)) : sigText(sig(c));
     return T(composite ? "vf.weak_item_composite" : "vf.weak_item_chart",
@@ -267,7 +365,68 @@
       h += `<div class="vf-meta">${T("vf.full")}</div>` + vtable(mk.full, null);
       h += `<div class="vf-meta" style="margin-top:6px">${T("vf.recent", { since: esc((mk.recent6m || {}).since ? I18.fmtDate(mk.recent6m.since, "ymd") : "") })}</div>` + vtable(mk.recent6m, mk.weakened);
     });
+    h += cci200Table(v) + scoreTiers(v) + etfTable(v);
     p.innerHTML = h;
+  }
+  // CCI ±200 の判定の 20 営業日後（verify.json の cci200: 全期間・一斉に割れの日を除く・直近6か月・件数）
+  function cci200Table(v) {
+    const cc = v.cci200 || {};
+    if (!Object.keys(cc).length) return "";
+    let h = `<h2 style="margin-top:18px">${T("vf.c200_title")}</h2><div class="vf-meta">${T("vf.c200_meta")}</div>`;
+    const cols = ["full", "excluding_spike_days", "recent6m"];
+    const head = "<tr>" + [T("vf.th_judge")].concat(cols.map((k) => T("vf.c200_" + k)), [T("vf.c200_points")]).map((x) => `<th>${esc(x)}</th>`).join("") + "</tr>";
+    Object.entries(cc).forEach(([k, m]) => {
+      const label = I18.code("verify_market", I18.norm("verify_market", k === "us" ? "us_union" : k));
+      const cellS = (s, b) => (s && s.n ? `${pct(s.median, 2)}<br><span class="sc-sub">${T("vf.n_short", { n: I18.fmtNum(s.n, 0) })}${b && num(b.median) != null && num(s.median) != null ? " · " + T("vf.pt", { v: I18.fmtSigned(s.median - b.median, 2) }) : ""}</span>` : "—");
+      const pts = m.points || {};
+      const row = (code) => {
+        const p = code === "buy_cci200" && "buy_cci200_spike" in pts ? T("vf.c200_pts_spike", { a: I18.fmtNum(pts.buy_cci200 || 0, 0), b: I18.fmtNum(pts.buy_cci200_spike || 0, 0) }) : I18.fmtNum(pts[code] || 0, 0);
+        return `<tr><td>${esc(sigText(code))}</td>${cols.map((c) => `<td>${cellS((m[code] || {})[c], (m.base || {})[c])}</td>`).join("")}<td>${p}</td></tr>`;
+      };
+      h += `<h3>${esc(label)}${m.verified === false ? " " + T("vf.c200_unverified") : ""}${m.spike_today ? ` <span class="vf-weak">${T("vf.c200_spike_today")}</span>` : ""}</h3>`
+        + `<table><thead>${head}</thead><tbody><tr><td>${T("vf.base_row")}</td>${cols.map((c) => `<td>${cellS((m.base || {})[c])}</td>`).join("")}<td>—</td></tr>${row("buy_cci200")}${row("sell_cci200")}</tbody></table>`;
+    });
+    return h;
+  }
+  // 売買スコアの段階ごとの 20 営業日後（verify.json の score_tiers）
+  const TIERS = ["tier5", "tier4", "tier3", "tier2", "tier1"];
+  function scoreTiers(v) {
+    const st = v.score_tiers || {};
+    if (!Object.keys(st).length) return "";
+    let h = `<h2 style="margin-top:18px">${T("vf.score_title")}</h2><div class="vf-meta">${T("vf.score_meta")}</div>`;
+    Object.entries(st).forEach(([k, t]) => {
+      const label = I18.code("verify_market", I18.norm("verify_market", k === "us" ? "us_union" : k));
+      const parts = (t.parts || []).map((x) => T("sc.part_" + x)).join(T("common.sep_list"));
+      h += `<h3>${T("vf.score_h", { label: esc(label), n: I18.fmtNum(t.symbols, 0), parts: esc(parts) })}</h3>`;
+      const head = "<tr>" + ["vf.th_tier", "vf.th_n", "vf.th_median", "vf.th_up", "vf.th_diff", "vf.th_n6", "vf.th_median6", "vf.th_diff6"].map((x) => `<th>${T(x)}</th>`).join("") + "</tr>";
+      const row = (name, a, b, fa, fb, mark) => {
+        const d = (s, base) => (s && base && num(s.median) != null && num(base.median) != null ? T("vf.pt", { v: I18.fmtSigned(s.median - base.median, 2) }) : "—");
+        return `<tr><td>${name}${mark || ""}</td><td>${a ? I18.fmtNum(a.n, 0) : "—"}</td><td>${a ? pct(a.median, 2) : "—"}</td>`
+          + `<td>${a && a.up_pct != null ? I18.fmtNum(a.up_pct, 0) + "%" : "—"}</td><td>${d(a, fa)}</td>`
+          + `<td>${b ? I18.fmtNum(b.n, 0) : "—"}</td><td>${b ? pct(b.median, 2) : "—"}</td><td>${d(b, fb)}</td></tr>`;
+      };
+      const F = t.full || {}, R = t.recent6m || {};
+      const body = row(T("vf.base_row"), F.base, R.base, F.base, R.base)
+        + TIERS.map((x) => row(T("sc.tier_n", { n: x.slice(4) }), F[x], R[x], F.base, R.base,
+          x === "tier5" && t.weakened === true ? ` <span class="vf-weak">${T("vf.weak_mark")}</span>` : "")).join("");
+      h += `<table><thead>${head}</thead><tbody>${body}</tbody></table>`;
+    });
+    return h;
+  }
+  // ETF ごとの判定別の 20 営業日後（verify.json の etf.symbols）。inverse はスコアの物差しの対象外。
+  function etfTable(v) {
+    const e = (v.etf || {}).symbols || {};
+    const syms = Object.keys(e);
+    if (!syms.length) return "";
+    const labs = BUY.concat(SELL);
+    const head = "<tr>" + [T("col.symbol"), T("col.etf_kind"), T("vf.base_row")].concat(labs.map(sigText)).map((x) => `<th>${esc(x)}</th>`).join("") + "</tr>";
+    const cellS = (s) => (s && s.n ? `${pct(s.median, 2)}<br><span class="sc-sub">${T("vf.n_short", { n: I18.fmtNum(s.n, 0) })}</span>` : "—");
+    const body = syms.map((s) => {
+      const r = e[s], ch = r.chart || {};
+      const kind = esc(I18.code("etf_kind", r.kind || "unknown")) + (r.scored === false ? `<br><span class="vf-weak">${T("sc.not_scored_inverse")}</span>` : "");
+      return `<tr><td>${esc(s)}</td><td>${kind}</td><td>${cellS(r.base)}</td>${labs.map((c) => `<td>${cellS(byCode(ch, c))}</td>`).join("")}</tr>`;
+    }).join("");
+    return `<h2 style="margin-top:18px">${T("vf.etf_title")}</h2><div class="vf-meta">${T("vf.etf_meta")}</div><table><thead>${head}</thead><tbody>${body}</tbody></table>`;
   }
   function showVerify() {
     const p = document.getElementById("verify-pane"); if (p) p.style.display = "block";
@@ -416,11 +575,30 @@
     svg += line(d.bb48.p3, Y, C_BLUE, 1, "1.5 2.5", cp, true) + line(d.bb48.m3, Y, C_BLUE, 1, "1.5 2.5", cp, true);
     svg += line(d.bb48.p2, Y, C_BLUE, 1.2, "", cp, true) + line(d.bb48.m2, Y, C_BLUE, 1.2, "", cp, true);
     svg += line(d.close, Y, "var(--text)", 1.6, "", cp, true);
-    (d.marks || []).forEach((m) => {
-      const v = num(d.close[m.i]); if (v == null || v < 0) return;
-      const x = X(m.i).toFixed(1);
-      if (m.type === "sell") svg += `<text x="${x}" y="${(Y(v) - 6).toFixed(1)}" text-anchor="middle" font-size="11" fill="#dc2626" clip-path="url(#${cp})">▼</text>`;
-      else svg += `<text x="${x}" y="${(Y(v) + 14).toFixed(1)}" text-anchor="middle" font-size="11" fill="${m.type === "long_oversold" ? "#0d9488" : "#16a34a"}" clip-path="url(#${cp})">▲</text>`;
+    // 既存の ▲▼: 連続して出る期間は最初の日だけ印を出し、続く日は細い帯（印だらけにしない）
+    const old = (d.marks || []).filter((m) => !C200[m.type]).sort((a, b) => (a.type < b.type ? -1 : a.type > b.type ? 1 : a.i - b.i));
+    const colOf = (t) => (t === "sell" ? "#dc2626" : t === "long_oversold" ? "#0d9488" : "#16a34a");
+    const runs = [];
+    old.forEach((m) => { const r = runs[runs.length - 1]; if (r && r.type === m.type && m.i === r.end + 1) r.end = m.i; else runs.push({ type: m.type, i: m.i, end: m.i }); });
+    runs.forEach((r) => {
+      const v = num(d.close[r.i]); if (v == null || v < 0) return;
+      const x = X(r.i).toFixed(1), col = colOf(r.type);
+      if (r.end > r.i) {
+        const yb = r.type === "sell" ? pTop + 2 : pBot - 5;
+        svg += `<rect x="${x}" y="${yb.toFixed(1)}" width="${Math.max(1, X(r.end) - X(r.i)).toFixed(1)}" height="3" fill="${col}" opacity="0.45" clip-path="url(#${cp})"/>`;
+      }
+      if (r.type === "sell") svg += `<text x="${x}" y="${(Y(v) - 6).toFixed(1)}" text-anchor="middle" font-size="11" fill="${col}" clip-path="url(#${cp})">▼</text>`;
+      else svg += `<text x="${x}" y="${(Y(v) + 14).toFixed(1)}" text-anchor="middle" font-size="11" fill="${col}" clip-path="url(#${cp})">▲</text>`;
+    });
+    // CCI ±200 の判定: ◆（ひし形）＋ その日の縦の点線（上段・下段とも）。下段は CCI48・CCI288 に同じ色の丸
+    const c2m = (d.marks || []).filter((m) => C200[m.type]);
+    c2m.forEach((m) => {
+      const x = X(m.i), col = C200[m.type], v = num(d.close[m.i]);
+      [[pTop, pBot], [cTop, cBot]].forEach(([a, b]) => { svg += `<line x1="${x.toFixed(1)}" x2="${x.toFixed(1)}" y1="${a}" y2="${b}" stroke="${col}" stroke-width="1" stroke-dasharray="2 2" opacity="0.8"/>`; });
+      if (v != null && v >= 0) {
+        const y = m.type === "buy_cci200" ? Y(v) + 12 : Y(v) - 12, k = 5;
+        svg += `<polygon points="${x.toFixed(1)},${(y - k).toFixed(1)} ${(x + k).toFixed(1)},${y.toFixed(1)} ${x.toFixed(1)},${(y + k).toFixed(1)} ${(x - k).toFixed(1)},${y.toFixed(1)}" fill="${col}" stroke="var(--bg)" stroke-width="0.8" clip-path="url(#${cp})"/>`;
+      }
     });
     // 下段 CCI: 見出し・±100・±200・0 の線（ラベルは左の余白＝線にも枠にも重ねない）
     svg += `<text x="${x0}" y="${(cTop - TT / 2).toFixed(1)}" dominant-baseline="middle" font-size="11" font-weight="700" fill="var(--text-dim)">${esc(T("chart.cci_title"))}</text>`;
@@ -431,17 +609,23 @@
         + txt(x0 - 6, y, g > 0 ? "+" + g : String(g), "end");
     });
     svg += line(d.cci288, YC, C_ORANGE, 1.3, "", cc) + line(d.cci48, YC, C_BLUE, 1.3, "", cc);
+    c2m.forEach((m) => [d.cci48, d.cci288].forEach((a) => {
+      const v = num((a || [])[m.i]); if (v == null) return;
+      svg += `<circle cx="${X(m.i).toFixed(1)}" cy="${YC(v).toFixed(1)}" r="3.2" fill="${C200[m.type]}" stroke="var(--bg)" stroke-width="0.8" clip-path="url(#${cc})"/>`;
+    }));
     svg += `</svg>`;
     const marks = (d.marks || []).length > 0;
     const leg = `<div class="sg-leg"><span><i style="border-color:var(--text)"></i>${T("chart.leg_close")}</span>`
       + `<span><i style="border-color:${C_BLUE}"></i>BB48 ±2σ</span><span><i class="dot" style="border-color:${C_BLUE}"></i>BB48 ±3σ</span>`
       + `<span><i style="border-color:${C_ORANGE}"></i>BB288 ±2σ</span><span><i class="dot" style="border-color:${C_ORANGE}"></i>BB288 ±3σ</span>`
-      + (marks ? `<span style="color:#16a34a">▲ ${sigText("buy")}</span><span style="color:#0d9488">▲ ${sigText("buy_long_oversold")}</span><span style="color:#dc2626">▼ ${sigText("sell")}</span>` : "")
+      + (marks ? `<span style="color:#16a34a">▲ ${sigText("buy")}</span><span style="color:#0d9488">▲ ${sigText("buy_long_oversold")}</span><span style="color:#dc2626">▼ ${sigText("sell")}</span>`
+        + `<span style="color:${C200.buy_cci200}">◆ ${sigText("buy_cci200")}</span><span style="color:${C200.sell_cci200}">◆ ${sigText("sell_cci200")}</span>`
+        + `<span>${T("chart.leg_band")}</span>` : "")
       + `<span>${T("chart.leg_lower")} <i style="border-color:${C_BLUE}"></i>CCI48 <i style="border-color:${C_ORANGE}"></i>CCI288 ${T("chart.leg_lines")}</span></div>`;
     const capTxt = T("chart.range_note") + " " + (marks ? T("chart.rule_cap", { sell: T("code.sell_note.sell_note") }) : T("chart.context_cap"));
     return `<div class="sg-chart">${svg}${leg}<div class="dt-cap">${capTxt}</div></div>`;
   }
 
   window.SIG = { loadVerify, cols, cell, judgeCell, renderUsBuyList, renderMacOnlyNote, renderStaleBanner, renderWeakBanner,
-    showVerify, hideVerify, drawPriceCciChart, weakItem, EQ_TABS, BUY, SELL, state: S };
+    showVerify, hideVerify, drawPriceCciChart, weakItem, decisionCard, EQ_TABS, BUY, SELL, state: S };
 })();

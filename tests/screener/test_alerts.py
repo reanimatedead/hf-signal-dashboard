@@ -53,7 +53,10 @@ def test_build_all_markets_with_watchlist_and_no_up_notify():
     assert sorted(r["code"] for r in a["watch_hits"]) == ["1002", "AAA"]
     assert {r["code"] for r in a["items"]} == {"1001", "1002", "1003", "AAA", "BBB", "USDJPY=X"}  # +200 は一覧に残る
     title, body = alerts.message(a)
-    assert title.startswith("CCI −200 割れ") and "1003" not in body
+    assert title.startswith("CCI −200 割れ")
+    # 2026-11: +200 は「売り目安（CCI +200）」として両方割れの文の後ろに足す（両方割れの文には入らない）
+    down, _, sell = body.partition("売り目安（CCI +200）")
+    assert "1003" not in down and "1003" in sell and "空売りの根拠ではない" in body
     assert "日本株 両方割れ 1 件: 1001 名1001" in body and "米国株 両方割れ 1 件: BBB" in body
     assert "FX（未検証）1 件: USDJPY=X 名USDJPY=X" in body and "ウォッチ 2 件" in body
     assert "生き残りの偏り" in m["us"]["note"]

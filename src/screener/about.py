@@ -4,6 +4,7 @@
 - 判定の規則: ind.signals / long_oversold / day_labels と同じ形を、P の値から条件の並びとして出す
   （tests/test_about.py がこの並びを評価して ind.day_labels と一致することを確かめる）
 - 総合スコア: screener.calc.composite.rules()
+- 売買スコア（割安・質・チャート・減点・売りの点と5段階）: screener.calc.score.rules()（配分 W はそこ1か所）
 - 更新の時刻: deploy.yml の cron（screener.calc.schedule。画面の「次回」と同じ関数）
 - 検証の成績・「根拠が弱まっています」: docs/verify.json
 - 取得元・件数・取得失敗・最終更新: docs/data.json の meta
@@ -21,7 +22,7 @@ from pathlib import Path
 from typing import Any
 
 from . import alerts
-from .calc import composite, ind, schedule, value
+from .calc import assets, composite, ind, schedule, score, value
 from .japan import screen
 
 SCHEMA = "about/1"
@@ -104,8 +105,21 @@ def verify_summary(v: dict[str, Any] | None) -> dict[str, Any]:
             "recent6m": {"since": rec.get("since"), "base": rec.get("base"), "chart": rec.get("chart")},
             "weakened": m.get("weakened"),
         }
+    tiers = {}
+    for k, t in (v.get("score_tiers") or {}).items():
+        if isinstance(t, dict):
+            tiers[k] = {
+                "parts": t.get("parts"),
+                "symbols": t.get("symbols"),
+                "full": t.get("full"),
+                "recent6m": t.get("recent6m"),
+                "since": t.get("since"),
+                "weakened": t.get("weakened"),
+                "gate": t.get("gate"),
+            }
     return {
         "available": True,
+        "score_tiers": tiers,
         "generated_at": v.get("generated_at"),
         "as_of": v.get("as_of"),
         "method": v.get("method"),
@@ -177,6 +191,7 @@ def mac_mini() -> dict[str, Any]:
                 "min_market_cap_oku_jpy": screen.QUINTILE_MIN_MCAP_OKU,
             },
         },
+        "score": {"japan_parts": list(score.ALL_PARTS), "etf_source": "jquants_market_other_etf"},
         "cci_notify": {
             "markets": list(alerts.MARKETS),
             "spike_markets": [k for k, m in alerts.MARKETS.items() if m.get("spike")],
@@ -233,6 +248,18 @@ def build(
             "sell_type": list(ind.SELL_LABELS),
             "composite": composite.rules(),
             "cci_events": cci_event_rules(),
+            "score": score.rules(),
+            "cci200": {
+                "labels": list(ind.CCI200_LABELS),
+                "level": ind.CCI_ALERT_LEVEL,
+                "periods": [ind.P["cci_short"], ind.P["cci_long"]],
+                "events": {ind.CCI200_BUY: "both_down", ind.CCI200_SELL: "both_up"},
+                "recent_bars": ind.CCI200_RECENT_BARS,
+                "points": {m: dict(v) for m, v in score.CCI200.items()},
+                "unverified_markets": list(score.CCI200_UNVERIFIED),
+                "sell_note": ind.SELL_NOTE,
+            },
+            "etf": {"symbols": {s: k for s, (_n, k) in assets.ETFS.items()}, "kinds": list(assets.ETF_KINDS)},
         },
         "schedule": schedule_summary(now, deploy_yml),
         "verify": verify_summary(verify),

@@ -104,6 +104,14 @@
       + `<p>${T("ab.chart_order", { buy: (r.buy_type || []).map(sig).join(sep()) })}</p>`
       + `<p>${T("ab.chart_th_note", { th: n0(p.cci_th), lv: n0((a.params || {}).cci_alert_level) })}</p>`);
   }
+  function cci200(a) {
+    const c2 = (a.rules || {}).cci200;
+    if (!c2) return "";
+    const per = c2.periods || [], v = { level: n0(c2.level), s: n0(per[0]), l: n0(per[1]) };
+    return sec("ab.h_c2", `<ul><li><b style="color:#22d3ee">◆ ${esc(sig("buy_cci200"))}</b>: ${T("ab.c2_buy", v)}</li>`
+      + `<li><b style="color:#e879f9">◆ ${esc(sig("sell_cci200"))}</b>: ${T("ab.c2_sell", v)}</li></ul>`
+      + `<p>${T("code.sell_note.sell_note")}</p><p>${T("ab.c2_points")}</p>`);
+  }
   function cciEvents(a) {
     const e = (a.rules || {}).cci_events || {};
     const per = e.periods || [], lv = n0(e.level), sp = e.spike || {};
@@ -128,6 +136,39 @@
     const labs = (c.label_cuts || []).map((t) => `${esc(I18.code("signal", t.label))} ≥ ${n0(t.ge)}`).concat([`${esc(I18.code("signal", c.label_else))}: ${T("ab.below")}`]).join(sep());
     return sec("ab.h_score", `<p>${T("ab.cp_intro", { max: n0(c.max) })}</p>`
       + table([{ t: T("ab.th_part") }, { t: T("ab.th_points") }], rows) + `<p>${T("ab.cp_labels", { items: labs })}</p>`);
+  }
+  // 売買スコア（about.json の rules.score = marketcalc.score.rules()。配分を手で書かない）
+  function tradeScore(a) {
+    const r = (a.rules || {}).score;
+    if (!r) return "";
+    const w = r.weights || {}, mx = r.max || {};
+    const part = (k) => T("sc.part_" + k);
+    const item = (grp, k) => (grp === "chart" || grp === "sell") && k !== "cci_both_down" ? esc(sig(k)) : T("ab.sc_item." + k);
+    const rows = ["value", "quality", "chart", "penalty", "sell"].map((g) => [
+      (g === "sell" ? T("col.score_sell") : part(g)) + (g === "quality" ? `<br><span>${T("sc.unverified")}</span>` : ""),
+      Object.entries(w[g] || {}).map(([k, v]) => `${item(g, k)} ${g === "penalty" ? "−" : ""}${n0(v)}`).join(sep()),
+      g in mx ? n0(mx[g]) : "—",
+    ]);
+    const c2 = (a.rules || {}).cci200 || {};
+    const pt = c2.points || {};
+    if (Object.keys(pt).length) {
+      const per = c2.periods || [];
+      rows.splice(3, 0, [T("ab.c2_row", { l: n0(c2.level), s: n0(per[0]), ll: n0(per[1]) }),
+        Object.entries(pt).map(([m, v]) => `${T("ab.mkt." + m)}: ` + Object.entries(v).map(([k, p]) => `${k.endsWith("_spike") ? T("ab.c2_spike") : esc(sig(k))} ${p > 0 ? "+" : p < 0 ? "−" : ""}${n0(Math.abs(p))}`).join(sep())
+          + ((c2.unverified_markets || []).includes(m) ? ` ${T("vf.c200_unverified")}` : "")).join("<br>"), "—"]);
+    }
+    const tiers = (r.tiers || []).map((t) => `${T("sc.tier_n", { n: n0(t.tier) })} ≥ ${n0(t.ge)}`).concat([T("sc.tier_n", { n: n0(r.tier_else) }) + ": " + T("ab.below")]).join(sep());
+    const st = ((a.verify || {}).score_tiers) || {};
+    const res = Object.entries(st).map(([k, t]) => {
+      const f = (t.full || {}).tier5 || {}, b = (t.full || {}).base || {};
+      return `<li>${esc(I18.code("verify_market", k === "us" ? "us_union" : k))}: ${T("ab.sc_top", { n: n0(f.n), m: pct(f.median), base: pct(b.median) })}`
+        + (t.weakened === true ? ` <span class="ab-bad">${T("vf.weak_mark")}</span>` : "") + `</li>`;
+    }).join("");
+    return sec("ab.h_trade_score", `<p>${T("ab.sc_intro", { total: (r.total || []).map(part).join(" + ") })}</p>`
+      + table([{ t: T("ab.th_part") }, { t: T("ab.th_points") }, { t: T("ab.sc_th_max"), r: 1 }], rows)
+      + `<p>${T("ab.sc_rules", { pct: nn(num(r.low_turnover_q) == null ? null : r.low_turnover_q * 100), days: n0(r.turnover_days), bd: n0(r.earnings_soon_bdays) })}</p>`
+      + `<p>${T("ab.sc_tiers", { items: tiers })}</p><p>${T("ab.sc_gate")}</p><p>${T("ab.sc_public_jp")}</p>`
+      + `<p>${T("code.sell_note.sell_note")}</p>` + (res ? `<p>${T("ab.sc_results")}</p><ul>${res}</ul>` : ""));
   }
   function indicators(a) {
     const P = (a.params || {}).P || {}, p = (a.params || {}).composite_periods || {}, md = p.macd || [], e = p.ema || [];
@@ -178,7 +219,7 @@
   function render(a) {
     if (!a) return `<h2>${T("tab.about")}</h2><p>${T(S.state === "loading" ? "ab.loading" : "ab.unreadable")}</p>`;
     return `<h2>${T("ab.title")}</h2><p class="ab-disc">${T("ab.disclaimer")}</p><p>${T("ab.intro")}</p>`
-      + status(a) + tabs(a) + chartRules(a) + composite(a) + cciEvents(a) + indicators(a) + verify(a) + sources(a) + limits(a) + mac(a)
+      + status(a) + tabs(a) + chartRules(a) + cci200(a) + tradeScore(a) + composite(a) + cciEvents(a) + indicators(a) + verify(a) + sources(a) + limits(a) + mac(a)
       + sec("ab.h_json", `<p>${T("ab.json_text", { link: `<a href="about.json" target="_blank" rel="noopener">about.json</a>` })}</p>`);
   }
 
