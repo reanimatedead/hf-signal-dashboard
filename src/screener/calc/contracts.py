@@ -81,3 +81,26 @@ def summarize(results):
     ok = all(r[0] for r in results)
     body = "\n".join(("✅ " if r[0] else "❌ ") + r[1] for r in results)
     return ok, body
+
+
+# ── 価格の単位の誤り（Yahoo の日本の ETF で 1 本だけ 1/100・1/10 になる等）──────────────────
+GLITCH_FACTOR = 3.0  # 前後の終値の中央値から 3 倍以上（1/3 以下）離れた 1 本を誤りとみなす
+GLITCH_WINDOW = 2  # 前後それぞれ 2 本ずつ
+
+
+def price_glitch_mask(close, factor=GLITCH_FACTOR, w=GLITCH_WINDOW):
+    """終値の配列 → 単位の誤りとみなす日の bool 配列（前後 w 本ずつの中央値から factor 倍以上離れた日）。"""
+    import numpy as np
+
+    c = np.asarray(close, dtype=float)
+    out = np.zeros(len(c), dtype=bool)
+    for i in range(len(c)):
+        if not np.isfinite(c[i]) or c[i] <= 0:
+            continue
+        nb = np.concatenate([c[max(0, i - w) : i], c[i + 1 : i + 1 + w]])
+        nb = nb[np.isfinite(nb) & (nb > 0)]
+        if len(nb) < 2:
+            continue
+        m = float(np.median(nb))
+        out[i] = c[i] > m * factor or c[i] < m / factor
+    return out
