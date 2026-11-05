@@ -38,6 +38,7 @@ SUBMIT_URL = "https://data.sec.gov/submissions/CIK{cik:010d}.json"
 SPLIT_URL = "https://query1.finance.yahoo.com/v8/finance/chart/{sym}?range=10y&interval=1mo&events=split"
 SEC_PAUSE = 0.12
 MIN_COVERAGE = 0.5
+HIST_MONTHS = 24     # 売買スコアの検証用: 過去 24 か月の各月初で「その時点で入手できた決算」（hist）
 
 
 def http_json(url):
@@ -88,9 +89,34 @@ def splits_of(get_json, sym):
         return []
 
 
+def month_firsts(asof, n=HIST_MONTHS):
+    d = dt.date.fromisoformat(asof[:10])
+    y, m = d.year, d.month
+    out = []
+    for _ in range(n):
+        out.append(dt.date(y, m, 1).isoformat())
+        m -= 1
+        if m == 0:
+            y, m = y - 1, 12
+    return sorted(out)
+
+
+def history(F, asof, splits):
+    """{月初: [純利益, 自己資本, 株数, ROE, 一時利益の目印 0/1]}（その月初より前に提出された決算だけ。fund_us.fundamentals と同じ式）。"""
+    out = {}
+    for m in month_firsts(asof):
+        fd = fund_us.fundamentals(F, m, splits)
+        if fd:
+            out[m] = [fd["ni"], fd["eq"], fd["sh"], round(fd["roe"], 5) if fd.get("roe") is not None else None,
+                      int(bool(fd.get("one_off")))]
+    return out
+
+
 def one(get_json, sym, cik, asof):
     F = get_json(FACTS_URL.format(cik=cik))["facts"]
-    fd = fund_us.fundamentals(F, asof, splits_of(get_json, sym))
+    sp = splits_of(get_json, sym)
+    fd = fund_us.fundamentals(F, asof, sp)
+    hist = history(F, asof, sp) if fd else {}
     del F                                              # 1社分ずつ捨てる（全部をメモリに載せない）
     if not fd:
         return None
@@ -98,7 +124,9 @@ def one(get_json, sym, cik, asof):
         sic = get_json(SUBMIT_URL.format(cik=cik)).get("sic")
     except Exception:  # noqa: BLE001
         sic = None
-    row = {k: fd[k] for k in ("fy", "ni", "eq", "ebit", "sh", "debt", "cash", "cap", "f_score", "f_max")}
+    row = {k: fd[k] for k in ("fy", "ni", "eq", "ebit", "sh", "debt", "cash", "cap", "f_score", "f_max",
+                              "ta", "div", "one_off", "filed")}
+    row["hist"] = hist
     row["roe"] = round(fd["roe"], 5) if fd.get("roe") is not None else None
     row["sic"] = sic
     row["fin"] = sic_is_fin(sic)

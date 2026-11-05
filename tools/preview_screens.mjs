@@ -22,8 +22,10 @@ const offline = args.includes("--offline");
 const warnOnly = args.includes("--warn-only");
 const langs = opt("--langs", "ja,en").split(",");
 const widths = opt("--widths", "1280,390").split(",").map(Number);
-const TABS = ["survival", "nikkei225", "dow30", "nasdaq100", "sp500", "fx", "rates_vol", "pos_val", "relations", "moneyflow", "verify", "about"];
+const TABS = ["survival", "nikkei225", "dow30", "nasdaq100", "sp500", "etf", "fx", "rates_vol", "pos_val", "relations", "moneyflow", "verify", "about"];
 const JP_SYMBOL = "7735.T";
+// --symbols 7267.T,1925.T: 日経225 タブの銘柄詳細を追加で撮る（CCI ±200 の ◆ の確認など）
+const EXTRA_SYMBOLS = opt("--symbols", "").split(",").filter(Boolean);
 fs.mkdirSync(out, { recursive: true });
 
 const origin = new URL(base).origin;
@@ -117,7 +119,7 @@ for (const lang of langs) {
       await page.evaluate(() => document.querySelectorAll("tr.detail-row").forEach((e) => e.remove()));
       return true;
     };
-    for (const t of ["nikkei225", "dow30", "nasdaq100", "sp500", "fx"]) {
+    for (const t of ["nikkei225", "dow30", "nasdaq100", "sp500", "etf", "fx"]) {
       await page.click(`.tab[data-tab="${t}"]`);
       await page.waitForTimeout(400);
       const first = await page.$("#tbody tr[data-sym]:not([data-sym=''])");
@@ -141,6 +143,10 @@ for (const lang of langs) {
       report.errors.push({ tag, type: "e2e", text: "米国の買い判定一覧: 表はあるのに押せる行（tr.ub-row）が無い" });
     }
     await detail("nikkei225", (s) => (document.querySelector(`#tbody tr[data-sym="${s}"]`) ? s : null), "detail_7735T").catch((e) => report.errors.push({ tag, type: "script", text: String(e) }));
+    for (const xs of EXTRA_SYMBOLS) {
+      const pick = new Function("s", `return document.querySelector('#tbody tr[data-sym="${xs}"]') ? "${xs}" : null;`);
+      await detail("nikkei225", pick, "detail_" + xs.replace(/\W/g, "")).catch((e) => report.errors.push({ tag, type: "script", text: String(e) }));
+    }
     await detail("fx", () => {
       const rows = [...document.querySelectorAll("#tbody tr[data-sym]")].map((r) => r.getAttribute("data-sym"));
       return rows.find((s) => /^USDJPY/.test(s)) || rows[0] || null;

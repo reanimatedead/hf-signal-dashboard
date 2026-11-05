@@ -15,7 +15,7 @@ import pandas as pd
 import yfinance as yf
 
 # 計算式は marketcalc/ だけ（DATA_CONTRACT §21）。import はここ1か所。
-from marketcalc import assets, composite, contracts, fund_us, ind, schedule  # noqa: E402
+from marketcalc import assets, composite, contracts, fund_us, ind, schedule, score  # noqa: E402
 
 warnings.filterwarnings("ignore")
 
@@ -2206,9 +2206,13 @@ ROOT_DIR = Path(__file__).parent
 UNIVERSE_DIR = ROOT_DIR / "data" / "universe"
 US_FUND_FILE = ROOT_DIR / "data" / "us_fundamentals.json"
 VERIFY_FILE = OUTPUT_DIR / "verify.json"
-SIGNAL_FIELDS = ("chart_signal", "chart_signal_code", "long_oversold", "trend",
+SIGNAL_FIELDS = ("chart_signal", "chart_signal_code", "long_oversold", "trend", "cci200_signal", "cci200_recent",
                  "cci288", "cci48", "bb48_z", "bb288_z")
 US_FUND_FIELDS = ("magic_rank", "f_score", "f_max")
+# 2026-11: 米国株の公開の列（SEC の決算 × Yahoo の株価。式は marketcalc.fund_us・score）
+US_VALUE_FIELDS = ("PER", "PBR", "roe_pct", "div_yield_pct", "equity_ratio_pct", "fair_price", "upside_pct",
+                   "one_off_flag", "next_earnings", "earnings_soon")
+ETF_TAB = "etf"
 
 
 def load_universe(name, default, udir=None):
@@ -2240,6 +2244,29 @@ def _finite_hlc(df):
         if k in fin.columns else pd.to_numeric(fin["Close"].squeeze(), errors="coerce").to_numpy(dtype=float)
     dates = [ts.strftime("%Y-%m-%d") if hasattr(ts, "strftime") else str(ts)[:10] for ts in fin.index]
     return dates, col("High"), col("Low"), col("Close")
+
+
+def _volume(df, n):
+    """Close が有限な行の出来高（_finite_hlc と同じ行選択）。無ければ None。"""
+    if "Volume" not in df.columns:
+        return None
+    c = pd.to_numeric(df["Close"].squeeze(), errors="coerce").to_numpy()
+    v = pd.to_numeric(df["Volume"].squeeze(), errors="coerce").to_numpy(dtype=float)[np.isfinite(c)]
+    return v if len(v) == n else None
+
+
+def attach_market_fields(row, df, with_turnover=True):
+    """売買スコア用: turnover_20d（売買代金の20日平均・score.rolling_mean）。日経225 は公開しない（with_turnover=False）。
+    CCI ±200 の判定（cci200_signal / cci200_recent）は attach_signal_fields（ind.summary）が付ける。"""
+    try:
+        _, h, l, c = _finite_hlc(df)
+        if with_turnover:
+            v = _volume(df, len(c))
+            t = score.rolling_mean(score.turnover_values(c, v))[-1] if v is not None else float("nan")
+            row["turnover_20d"] = round(float(t)) if np.isfinite(t) else None
+    except Exception as exc:  # noqa: BLE001
+        print(f"  [score] {row.get('symbol')}: {type(exc).__name__}")
+    return row
 
 
 def attach_signal_fields(row, df, chart=None, dp=2):
@@ -2300,6 +2327,7 @@ def attach_us_fundamentals(tabs, path=None):
         print(f"  [us_fund] {p.name} unreadable ({type(exc).__name__})")
         j, fdmap = {}, None
     calc = {}
+    today = datetime.now(JST).date().isoformat()
     if fdmap:
         for rows in tabs:
             for r in rows:
@@ -2313,7 +2341,10 @@ def attach_us_fundamentals(tabs, path=None):
                     m = fund_us.metrics(fd, float(px))
                 except Exception:  # noqa: BLE001
                     continue
-                calc[sym] = {**m, "fin": bool(fd.get("fin")), "f_score": fd.get("f_score"), "f_max": fd.get("f_max")}
+                calc[sym] = {**m, "fin": bool(fd.get("fin")), "f_score": fd.get("f_score"), "f_max": fd.get("f_max"),
+                             "upside_pct": m.get("ri_upside_pct"), "one_off_flag": bool(fd.get("one_off")),
+                             "next_earnings": score.next_earnings(fd.get("filed") or [], today),
+                             "earnings_soon": score.earnings_soon(fd.get("filed") or [], today)}
         fund_us.rank(list(calc.values()))
     for rows in tabs:
         for r in rows:
@@ -2323,13 +2354,40 @@ def attach_us_fundamentals(tabs, path=None):
             r["magic_rank"] = cr.get("magic_rank") if cr else None
             r["f_score"] = cr.get("f_score") if cr else None
             r["f_max"] = cr.get("f_max") if cr else None
+            for k in US_VALUE_FIELDS:
+                r[k] = cr.get(k) if cr else None
     ranked = sum(1 for v in calc.values() if v.get("magic_rank"))
     rec = {"available": bool(fdmap), "as_of": j.get("as_of"), "with_fundamentals": len(calc), "ranked": ranked}
     print(f"[US fundamentals] {rec}")
     return rec
 
 
-def build_and_write_verify(collect, path=None):
+def load_us_fund_rows(path=None):
+    """data/us_fundamentals.json の rows（売買スコアの検証の hist / filed 用）。無ければ {}。"""
+    try:
+        return json.loads(Path(path or US_FUND_FILE).read_text(encoding="utf-8")).get("rows") or {}
+    except Exception:  # noqa: BLE001
+        return {}
+
+
+def _score_entries(collect):
+    """collect（タブ → {銘柄: 2y 日足}）→ 売買スコアの検証用 {nikkei225|us|etf: [entry]}（米国は和集合で1回ずつ）。"""
+    out = {"nikkei225": [], "us": [], "etf": []}
+    seen = set()
+    for tab, frames in (collect or {}).items():
+        key = "nikkei225" if tab == "nikkei225" else ETF_TAB if tab == ETF_TAB else "us"
+        for sym, df in frames.items():
+            if key == "us":
+                if sym in seen:
+                    continue
+                seen.add(sym)
+            dates, h, l, c = _finite_hlc(df)
+            out[key].append({"sym": sym, "dates": dates, "h": h, "l": l, "c": c,
+                             "v": None if key == "nikkei225" else _volume(df, len(c))})
+    return out
+
+
+def build_and_write_verify(collect, path=None, us_fund=None, gates_out=None):
     """attach_equity_charts が集めた 2y 日足フレームから docs/verify.json を書く（再取得しない）。
     失敗しても本体（data.json）は止めない: meta.verify に失敗理由を残す（サイレントにしない）。"""
     path = Path(path or VERIFY_FILE)
@@ -2349,15 +2407,52 @@ def build_and_write_verify(collect, path=None):
                 dates, h, l, c = _finite_hlc(df)
                 markets[key].append((dates, h, l, c, composite_label_series(c)))
         obj = _bv.build(markets, generated_at=datetime.now(JST).isoformat())
+        gates = {}
+        try:   # 売買スコアの段階別成績・ETF ごと（失敗しても既存の検証は出す）
+            kinds = {s: k for s, (_n, k) in assets.ETFS.items()}
+            gates = _bv.build_scores(obj, _score_entries(collect), fund=us_fund, etf_kinds=kinds)
+        except Exception as exc:  # noqa: BLE001
+            obj["score_tiers_error"] = f"{type(exc).__name__}: {str(exc)[:120]}"
+            print(f"[verify] score tiers failed: {obj['score_tiers_error']}")
         obj = _json_safe(obj)
         _bv.write(obj, path)
         rec = {"available": True, "file": path.name, "as_of": obj.get("as_of"),
                "weakened": obj.get("weakened"),
-               "symbols": {k: v.get("symbols") for k, v in obj["markets"].items()}}
+               "symbols": {k: v.get("symbols") for k, v in obj["markets"].items()},
+               "score_tiers": sorted((obj.get("score_tiers") or {}).keys())}
     except Exception as exc:  # noqa: BLE001
         rec = {"available": False, "error": f"{type(exc).__name__}: {str(exc)[:120]}"}
+        gates = {}
+    if gates_out is not None:
+        gates_out.update(gates)
     print(f"[verify] {rec}")
     return rec
+
+
+def attach_scores(nk, us_tabs, etf, gates):
+    """売買スコア（marketcalc.score.score_rows）。日経225 はチャートの点だけ（J-Quants 由来の割安の点は公開しない）。
+    米国は Dow/NDX/S&P の和集合で順位を付け、同じ銘柄の行に同じ値を写す。ETF はチャート＋減点（inverse は付けない）。"""
+    con = lambda rows: [r for r in rows if not str(r.get("symbol", "")).startswith("^") and not r.get("error")]
+    sp = gates.get("_spike_today") or {}
+    for key, rows in (("nikkei225", nk), ("us", [r for t in us_tabs for r in t]), (ETF_TAB, etf)):
+        for r in con(rows):
+            r["cci200_spike"] = bool(sp.get(key)) if r.get("cci200_signal") == ind.CCI200_BUY else False
+    score.score_rows(con(nk), gates.get("nikkei225"), score.CHART_ONLY, market="jp")
+    uniq = {}
+    for rows in us_tabs:
+        for r in con(rows):
+            uniq.setdefault(r["symbol"], r)
+    score.score_rows(list(uniq.values()), gates.get("us"), score.ALL_PARTS, {"f": "f_score"}, market="us")
+    for rows in us_tabs:
+        for r in con(rows):
+            src = uniq[r["symbol"]]
+            if src is not r:
+                for k in score.OUT_KEYS:
+                    r[k] = src.get(k)
+    score.score_rows(con(etf), gates.get(ETF_TAB), ("chart", "penalty"), market="etf")
+    n = sum(1 for rows in (nk, etf, *us_tabs) for r in rows if r.get("score") is not None)
+    print(f"[score] scored rows: {n}")
+    return n
 
 
 def attach_equity_charts(equity_markets, collect=None):
@@ -2422,7 +2517,7 @@ def attach_equity_charts(equity_markets, collect=None):
     # ── P2: every constituent gets a full-length 1d chart ───────────────────
     targets = []            # [(row, dp)] to chart, in fetch order
     tab_of = {}             # symbol -> [tabs]（検証用に市場ごとのフレームを集める）
-    for grp in ("nikkei225", "dow30", "nasdaq100", "sp500"):
+    for grp in ("nikkei225", "dow30", "nasdaq100", "sp500", "etf"):
         for r in equity_markets.get(grp, []):
             sym = r.get("symbol", "")
             if sym.startswith("^"):
@@ -2453,6 +2548,7 @@ def attach_equity_charts(equity_markets, collect=None):
             dp = 2 if (price or 0) >= 100 else 3 if (price or 0) >= 1 else 5
             chart = build_equity_chart_1d(df, sym, now, dp)
             attach_signal_fields(r, df, chart, dp)
+            attach_market_fields(r, df, with_turnover=tab_of.get(sym, [""])[0] != "nikkei225")
             if collect is not None:
                 for g in tab_of.get(sym, []):
                     collect.setdefault(g, {})[sym] = df
@@ -2920,9 +3016,9 @@ def attach_links(markets):
 #   P1  fx / rates / crypto                      : 4h + 1d + 1w
 #   P2  every equity constituent (all 4 tabs)    : 1d full length (no thinning)
 # Equity 4h/1w are intentionally NOT provided (only the 1d full-length chart).
-_CHART_TABS  = ("nikkei225", "dow30", "nasdaq100", "sp500",
+_CHART_TABS  = ("nikkei225", "dow30", "nasdaq100", "sp500", "etf",
                 "fx", "rates", "crypto", "volatility", "valuation")
-_EQUITY_TABS = ("nikkei225", "dow30", "nasdaq100", "sp500")
+_EQUITY_TABS = ("nikkei225", "dow30", "nasdaq100", "sp500", "etf")
 
 
 def _is_ready(charts):
@@ -3035,6 +3131,10 @@ def main():
     nq_results  = process_market(nq_dict,    "Nasdaq100")
     sp_results  = process_market(sp500_dict, "S&P500")
     fx_results  = process_fx_advanced(FX_PAIRS)
+    # 2026-11: ETF（主要 ETF・一覧は marketcalc.assets.ETFS の1か所）
+    etf_results = process_market({s: n for s, (n, _k) in assets.ETFS.items()}, "ETF")
+    for r in etf_results:
+        r["etf_kind"] = assets.ETFS.get(r.get("symbol"), ("", "unknown"))[1]
 
     # v2.5: macro / crypto categories (yfinance only; failures fall back)
     rates_results = build_rates_market()
@@ -3062,15 +3162,19 @@ def main():
     # v3.5: equity charts — index proxies + selected constituents (1d only)
     _verify_frames = {}
     attach_equity_charts({"nikkei225": nk_results, "dow30": dj_results,
-                          "nasdaq100": nq_results, "sp500": sp_results},
+                          "nasdaq100": nq_results, "sp500": sp_results, ETF_TAB: etf_results},
                          collect=_verify_frames)
 
-    # §21: 判定の検証（docs/verify.json）— 上の 2y フレームを再利用（追加取得なし）。
-    verify_meta = build_and_write_verify(_verify_frames)
-    del _verify_frames
-
-    # §21: 米国3タブに magic_rank / f_score / f_max（決算は data/us_fundamentals.json・週次）。
+    # §21: 米国3タブに magic_rank / f_score / f_max と PER・PBR・ROE など（決算は data/us_fundamentals.json・週次）。
     us_fund_meta = attach_us_fundamentals((dj_results, nq_results, sp_results))
+    _us_fund, _gates = load_us_fund_rows(), {}
+
+    # §21: 判定の検証（docs/verify.json）— 上の 2y フレームを再利用（追加取得なし）。売買スコアの段階別成績も。
+    verify_meta = build_and_write_verify(_verify_frames, us_fund=_us_fund, gates_out=_gates)
+    del _verify_frames, _us_fund
+
+    # 2026-11: 売買スコア（規則と配分は marketcalc.score の1か所）
+    attach_scores(nk_results, (dj_results, nq_results, sp_results), etf_results, _gates)
 
     # 次回 = deploy.yml の full の cron から計算（時刻を固定の文字で書かない）。読めなければ None →「—」。
     next_run = schedule.next_job_run("full", now_jst)
@@ -3136,7 +3240,7 @@ def main():
             "counts": {
                 "nikkei225": len(nk_results), "dow30": len(dj_results),
                 "nasdaq100": len(nq_results), "sp500": len(sp_results),
-                "fx": len(fx_results), "rates": len(rates_results),
+                "fx": len(fx_results), "rates": len(rates_results), ETF_TAB: len(etf_results),
                 "volatility": len(vol_results), "imm": len(imm_results),
                 "crypto": len(crypto_results), "valuation": len(valuation_results),
             },
@@ -3166,11 +3270,12 @@ def main():
             "nasdaq100": build_summary(nq_results),
             "sp500":     build_summary(sp_results),
             "fx":        build_summary(fx_results),
+            ETF_TAB:     build_summary(etf_results),
         },
         "markets": {
             "nikkei225": nk_results, "dow30": dj_results,
             "nasdaq100": nq_results, "sp500": sp_results,
-            "fx":        fx_results,
+            "fx":        fx_results, ETF_TAB: etf_results,
             "rates":      rates_results, "volatility": vol_results,
             "imm":        imm_results,   "crypto":     crypto_results,
             "valuation":  valuation_results,

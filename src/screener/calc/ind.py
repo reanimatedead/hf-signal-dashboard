@@ -147,7 +147,10 @@ def summary(h, l, c, p=P):
         return None
     x = compute(h, l, c, p)
     j = judge(x, p)
+    rc = cci200_recent(x)
     return {
+        "cci200_signal": rc["code"] if rc and rc["bars_ago"] == 0 else None,
+        "cci200_recent": rc,
         "chart_signal": j["label"],
         "chart_signal_code": j["signal"],
         "long_oversold": j["long_oversold"],
@@ -184,6 +187,10 @@ def chart_series(h, l, c, p=P, tail=None, nd=4):
         {"i": i - a, "type": ("buy" if s[i] > 0 else "sell"), "code": int(s[i])} for i in range(a, n) if s[i] != 0
     ]
     out["marks"] += [{"i": i - a, "type": "long_oversold", "code": 1} for i in range(a, n) if lo[i] and s[i] == 0]
+    for code, arr in cci200_days(x).items():  # ◆ 買い（CCI −200）/ ◆ 売り目安（CCI +200）
+        out["marks"] += [
+            {"i": i - a, "type": code, "code": 1 if code == CCI200_BUY else -1} for i in range(a, n) if arr[i]
+        ]
     out["index_map"] = np.flatnonzero(x["ok"]).tolist()[a:]
     return out
 
@@ -232,6 +239,50 @@ def cci_events(x, level=CCI_ALERT_LEVEL):
         "cci48_up": _crossed(su, su),
         "cci288_up": _crossed(lu, lu),
     }
+
+
+# ── CCI ±200 の売買判定（2026-11 追加。既存の買い・売りの規則 signals / day_labels は変えない）──────────
+# buy_cci200:  CCI48 と CCI288 の両方が −200 以下に「そろった」最初の日（cci_events の both_down と同じ日）
+# sell_cci200: CCI48 と CCI288 の両方が +200 以上に「そろった」最初の日（cci_events の both_up と同じ日）
+#              売り目安 = 利益確定・新しく買わない（空売りの根拠ではない）
+CCI200_BUY = "buy_cci200"
+CCI200_SELL = "sell_cci200"
+CCI200_LABELS = (CCI200_BUY, CCI200_SELL)
+CCI200_RECENT_BARS = 10  # 一覧・判断カードに「n 日前」として出す範囲（営業日）
+
+
+def cci200_days(x, level=CCI_ALERT_LEVEL):
+    """{buy_cci200: bool配列, sell_cci200: bool配列}（画面・通知・検証が同じこれを使う）。"""
+    ev = cci_events(x, level)
+    return {CCI200_BUY: ev["both_down"], CCI200_SELL: ev["both_up"]}
+
+
+def cci200_recent(x, within=CCI200_RECENT_BARS):
+    """直近 within 本の中で最後に出た CCI ±200 の判定 {"code", "bars_ago"}（0 = 最新日）。無ければ None。"""
+    d = cci200_days(x)
+    n = len(x["c"])
+    best = None
+    for code, arr in d.items():
+        idx = np.flatnonzero(arr[max(0, n - within - 1) :])
+        if len(idx):
+            i = max(0, n - within - 1) + int(idx[-1])
+            if best is None or i > best[1]:
+                best = (code, i)
+    return None if best is None else {"code": best[0], "bars_ago": n - 1 - best[1]}
+
+
+def daily_event_counts(xs, key="both_down"):
+    """{銘柄: (x, 日付)} → (日付, その抜けの件数, その日に日足がある銘柄の数)。0 件の日も含む。"""
+    import collections
+
+    cnt = collections.Counter()
+    active = collections.Counter()
+    for x, ds in xs.values():
+        active.update(ds)
+        for i in np.flatnonzero(cci_events(x)[key]):
+            cnt[ds[i]] += 1
+    dates = sorted(active)
+    return dates, [cnt.get(d, 0) for d in dates], [active[d] for d in dates]
 
 
 def spike_threshold(past_counts, q=SPIKE_Q, min_days=SPIKE_MIN_DAYS):

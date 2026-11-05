@@ -143,6 +143,7 @@ def screen(asof: str, px_d: str, p1y_d: str, p1m_d: str, master_path: str, cfg: 
                 "PBR": round(pbr, 2),
                 "fair_pbr": _r(tpbr, 2) if tpbr else None,
                 "per_fwd": round(mcap / fnp, 1) if fnp and fnp > 0 else None,
+                "per_act": round(mcap / np_, 1) if np_ and np_ > 0 else None,  # 実績PER（直近の通期の純利益）
                 "roe_act_pct": _r(100 * roe_act, 1) if roe_act is not None else None,
                 "roe_fwd_pct": _r(100 * roe_fwd, 1) if roe_fwd is not None else None,
                 "earnings_yield_pct": round(100 * op / mcap, 1) if op and mcap else None,
@@ -251,6 +252,44 @@ def monthly_valuation(cfg: Config) -> dict[str, dict[str, Any]]:
         tmp.write_text(json.dumps(out[d]))
         os.replace(tmp, cp)
     return out
+
+
+SCORE_INPUTS_CACHE = "score_inputs_v1"  # 定義を変えたら名前を変える
+
+
+def monthly_score_inputs(cfg: Config) -> dict[str, dict[str, list[Any]]]:
+    """months.json の各月初の {code: [上値余地, PBR, 実績PER, 一時利益の目印]}（売買スコアの検証用。
+    画面と同じ screen の列。<data_dir>/japan/derived/ に控える・J-Quants 由来・ローカルだけ）。"""
+    mp = cfg.jp("months.json")
+    if not mp.exists():
+        return {}
+    out: dict[str, dict[str, list[Any]]] = {}
+    cdir = cfg.jp("derived", SCORE_INPUTS_CACHE)
+    for d in _load(mp):
+        cp = cdir / f"{d}.json"
+        if cp.exists():
+            out[d] = _load(cp)
+            continue
+        master = cfg.jp(f"master_{d}.json")
+        if not master.exists() or not cfg.jp(f"bars_{d}.json").exists():
+            continue
+        rows = screen(d, d, d, d, str(master), cfg=cfg)
+        out[d] = {r["code"]: [r["upside_pct"], r["PBR"], r["per_act"], bool(r["one_off_flag"])] for r in rows}
+        cdir.mkdir(parents=True, exist_ok=True)
+        tmp = cp.with_name(cp.name + ".tmp")
+        tmp.write_text(json.dumps(out[d]))
+        os.replace(tmp, cp)
+    return out
+
+
+def disclosure_dates(cfg: Config) -> dict[str, list[str]]:
+    """{code4: [決算短信の開示日]}（DocType に FinancialStatements を含むものだけ）。次の決算の推定（calc.score）用。"""
+    out: dict[str, set[str]] = collections.defaultdict(set)
+    for p in sorted(cfg.jp("fins").glob("*.json")):
+        for r in _load(p):
+            if "FinancialStatements" in str(r.get("DocType", "")) and r.get("DiscDate"):
+                out[str(r["Code"])[:4]].add(str(r["DiscDate"])[:10])
+    return {k: sorted(v) for k, v in out.items()}
 
 
 def monthly_quintiles(cfg: Config) -> dict[str, dict[str, str]]:

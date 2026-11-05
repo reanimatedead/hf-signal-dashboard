@@ -20,6 +20,8 @@ def test_writes_only_under_out(cfg):
         "japan_list.html",
         "us_list.csv",
         "us_list.html",
+        "etf_list.csv",
+        "etf_list.html",
         "verify_local.json",
         "counts.json",
         "cci_alerts.html",

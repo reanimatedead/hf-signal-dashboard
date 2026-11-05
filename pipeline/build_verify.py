@@ -31,14 +31,14 @@ ROOT = pathlib.Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from marketcalc import events, fund_us, ind  # noqa: E402
+from marketcalc import events, fund_us, ind, score  # noqa: E402
 
 SCHEMA = "verify/1"
 RECENT_MONTHS = 6
 COMPOSITE_LABELS = ("strong_buy", "buy", "hold", "watch", "avoid")
 COMPOSITE_BUY = ("strong_buy", "buy")
 # nikkei225=日経225 / us_union=米国（Dow30・Nasdaq100・S&P500 の和集合）
-MARKET_LABEL = {"nikkei225": "nikkei225", "us": "us_union"}
+MARKET_LABEL = {"nikkei225": "nikkei225", "us": "us_union", "etf": "etf"}
 METHOD = {
     "horizon_days": events.H, "gap_days": events.GAP, "warmup_bars": events.WARMUP,
     "recent_months": RECENT_MONTHS,
@@ -122,6 +122,123 @@ def build(markets, generated_at=None):
     out["weakened"] = bool(weak_items)
     out["weakened_items"] = weak_items
     return out
+
+
+# ── 売買スコア（screener.calc.score）の 5 段階の検証・ETF ごとの成績（2026-11 追加。既存の markets は変えない）──
+SCORE_MARKET = {"nikkei225": "jp", "us": "us", "etf": "etf"}   # marketcalc.score.CCI200 の市場名
+SPIKE_MARKETS = ("nikkei225", "us")                             # 「一斉に割れ」を判定する市場（ETF はしない）
+
+
+def spike_info(xs):
+    """[(sym, x, ds, e)] → (一斉に割れの日の集合, 最新日が一斉に割れか)。式は marketcalc.ind（Mac mini と同じ）。"""
+    d = {sym: (x, ds) for sym, x, ds, _e in xs}
+    dates, counts, active = ind.daily_event_counts(d)
+    if not dates:
+        return set(), False
+    days = ind.spike_days(dates, counts, active)
+    return days, dates[-1] in days
+
+
+def _xs(entries):
+    """entries: [{"sym","dates","h","l","c","v"(出来高 or None)}] → [(sym, x, ds, entry)]（Close が有限な行だけ・300 本以上）。"""
+    out = []
+    for e in entries:
+        c = np.asarray(e["c"], dtype=float)
+        if np.sum(np.isfinite(c)) < ind.MIN_BARS:
+            continue
+        x = ind.compute(e["h"], e["l"], c)
+        ds = [d for d, o in zip(e["dates"], x["ok"]) if o]
+        out.append((e["sym"], x, ds, e))
+    return out
+
+
+def turnover_series(xs):
+    """{銘柄: (日付, 売買代金の20日平均)}（出来高のある銘柄だけ）。"""
+    out = {}
+    for sym, x, ds, e in xs:
+        v = e.get("v")
+        if v is None:
+            continue
+        vv = np.asarray(v, dtype=float)[np.asarray(x["ok"], dtype=bool)]
+        out[sym] = (ds, score.rolling_mean(score.turnover_values(x["c"], vv)))
+    return out
+
+
+def us_monthly_inputs(xs, fund):
+    """us_fundamentals.json の hist（月初の決算）× その月初の終値 → ({月初: {銘柄: (余地, PBR, PER)}}, {月初: {銘柄: one_off}})。"""
+    vin, oo = {}, {}
+    for sym, x, ds, _e in xs:
+        h = ((fund or {}).get(sym) or {}).get("hist") or {}
+        for m, rec in h.items():
+            i = int(np.searchsorted(np.array(ds), m, side="right")) - 1
+            if i < 0:
+                continue
+            ni, eq, sh, roe = rec[:4]
+            vin.setdefault(m, {})[sym] = fund_us.value_inputs(ni, eq, sh, roe, float(x["c"][i]))
+            if len(rec) > 4:
+                oo.setdefault(m, {})[sym] = bool(rec[4])
+    return vin, oo
+
+
+def score_market(entries, parts, gate, since, fund=None, market="us", spikes=None):
+    """1 つの市場の段階別成績（score.verify_tiers）。parts は score.score_rows と同じ。"""
+    xs = _xs(entries)
+    low = score.low_turnover_by_symbol(turnover_series(xs)) if "penalty" in parts else {}
+    vbm, obm = us_monthly_inputs(xs, fund) if ("value" in parts and fund) else ({}, {})
+    vpm = score.value_points_by_month(vbm) if vbm else None
+    items = []
+    for sym, x, ds, _e in xs:
+        earn = ((fund or {}).get(sym) or {}).get("filed") or []
+        tot = score.total_days(x, ds, sym, gate, parts, vpm, obm or None, earn, low.get(sym), market, spikes)
+        items.append((x["c"], tot, ds))
+    return score.verify_tiers(items, since, parts)
+
+
+def build_scores(obj, entries_by_market, fund=None, etf_kinds=None):
+    """obj（build の戻り値）に score_gate・score_tiers・etf を足す。最上位の段階が直近で基準を下回れば
+    weakened_items に "<市場>:score:tier5" を足す（「根拠が弱まっています」と同じ扱い）。gate を返す。"""
+    etf_kinds = etf_kinds or {}
+    gates, tiers, cci = {}, {}, {}
+    for key, entries in entries_by_market.items():
+        if key == "etf":
+            entries = [e for e in entries if etf_kinds.get(e["sym"]) not in score.NOT_SCORED_KINDS] or []
+            xs = _xs(entries)
+            mk = verify_market([(e["dates"], e["h"], e["l"], e["c"], None) for e in entries])
+        else:
+            xs = _xs(entries)
+            mk = obj["markets"].get(key) or verify_market([(e["dates"], e["h"], e["l"], e["c"], None) for e in entries])
+        since = (mk.get("recent6m") or {}).get("since")
+        spikes, spike_today = spike_info(xs) if key in SPIKE_MARKETS else (set(), False)
+        c2 = score.cci200_verify([(x, ds) for _s, x, ds, _e in xs], spikes, since)
+        c2.update({"market": SCORE_MARKET[key], "verified": True, "spike_today": spike_today,
+                   "spike_rule": key in SPIKE_MARKETS, "points": dict(score.CCI200[SCORE_MARKET[key]])})
+        cci[key] = c2
+        gate = score.gate_from_verify((mk.get("recent6m") or {}).get("chart"), (mk.get("recent6m") or {}).get("base"), c2)
+        gates[key] = gate
+        gates.setdefault("_spike_today", {})[key] = spike_today
+        parts = score.CHART_ONLY if key == "nikkei225" else (("chart", "penalty") if key == "etf"
+                                                              else ("value", "chart", "penalty"))
+        t = score_market(entries, parts, gate, since, fund if key == "us" else None, SCORE_MARKET[key], spikes)
+        t["gate"] = gate
+        tiers[key] = t
+        if key == "etf":
+            obj["etf"] = {"market": {"full": mk["full"], "recent6m": mk["recent6m"], "symbols": mk["symbols"]},
+                          "symbols": {}}
+        if t.get("weakened") is True:
+            obj.setdefault("weakened_items", []).append(f"{MARKET_LABEL.get(key, key)}:score:{score.TOP_TIER}")
+            obj["weakened"] = True
+    for e in entries_by_market.get("etf", []):     # ETF ごと（inverse も成績は出す・スコアの対象外と印を付ける）
+        xs = _xs([e])
+        kind = etf_kinds.get(e["sym"], "unknown")
+        rec = {"kind": kind, "scored": kind not in score.NOT_SCORED_KINDS}
+        if xs:
+            st = score.per_symbol_labels(xs[0][1])
+            rec.update({"base": st.pop("base", None), "chart": st, "last_date": xs[0][2][-1]})
+        obj.setdefault("etf", {"market": None, "symbols": {}})["symbols"][e["sym"]] = rec
+    obj["score_tiers"] = tiers
+    obj["cci200"] = cci
+    obj["score_rules"] = score.rules()
+    return gates
 
 
 def write(obj, path):

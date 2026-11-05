@@ -15,6 +15,7 @@ from . import screen as S
 KEYS = [
     "ticker", "name", "idx", "sector", "fin_tag", "fy", "price", "mcap_bn", "PER", "PBR", "roe_pct",
     "earnings_yield_pct", "roc_pct", "magic_rank", "F", "f_max", "ret_1y_pct", "ri_upside_pct",
+    "equity_ratio_pct", "div_yield_pct", "fair_price", "one_off_flag",
 ]  # fmt: skip
 
 
@@ -34,7 +35,7 @@ def build(cfg: Config, today: dt.date) -> list[S.Row]:
     for r in rows:
         r["fin_tag"] = tag(r)
     rows.sort(key=lambda r: r.get("magic_rank") or 9999)
-    return [{k: r.get(k) for k in KEYS} | {"fin": r.get("fin")} for r in rows]
+    return [{k: r.get(k) for k in KEYS} | {"fin": r.get("fin"), "filed": r.get("filed") or []} for r in rows]
 
 
 def write(cfg: Config, rows: list[S.Row]) -> None:

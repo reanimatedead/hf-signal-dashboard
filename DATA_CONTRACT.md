@@ -1694,3 +1694,25 @@ Stats = {n, mean, median, up_pct}
 - 失敗時の Issue 自動起票はしない。通知は各 workflow の ntfy ステップだけ（Secret `NTFY_TOPIC`、本文はジョブ名・日付・失敗のみ）。`NTFY_TOPIC` が未設定なら、ジョブのログに `::warning::` を出す。
 - `assert_gen_health` / `verify_live` / `health_gate` の判定は**変更なし**。
 - 依存は `uv.lock` の 1 か所だけで固定（全 workflow が Python 3.11 で `uv sync --locked`、Mac mini も uv）。自動では上げない。
+
+## 22. v8.1 — 売買スコア・ETF・CCI ±200 の判定（2026-11-06）
+
+規則と配分は **`src/screener/calc/score.py`（W・CCI200・TIERS）と `src/screener/calc/ind.py`（cci200_days）の1か所**。
+画面（公開 fetch_signals.py / Mac mini の一覧）・Mac の通知・検証（verify.json / verify_local.json）・About（about.json の
+`rules.score` / `rules.cci200`）は同じ関数を呼ぶ。既存の買い・売り（`ind.signals` / `day_labels`）と既存の検証の値は変えない。
+
+- **ETF**: 公開は `calc/assets.ETFS`（Yahoo・`markets.etf`・タブ「ETF」）。種類 `etf_kind` = index / leveraged / inverse / unknown
+  （`assets.etf_kind` が名前から判定）。Mac mini は J-Quants の銘柄一覧の「市場：その他」かつ ProdCat 014/023（013=REIT は除く）→
+  `out/etf_list.csv/html`。inverse はスコアを付けない（`score_note = not_scored_inverse`）。ETF ごとの判定別成績は `verify.etf.symbols`。
+- **行の列（コード）**: `score` `score_tier`(1〜5) `score_value` `score_chart` `score_penalty` `score_penalties`(one_off|earnings_soon|low_turnover)
+  `score_quality`（未検証・合計に入れない）`score_sell`（利益確定・新しく買わない目安。合計に入れない）`score_note`、
+  `cci200_signal`（最新日の buy_cci200 / sell_cci200）`cci200_recent`（{code, bars_ago}・10 営業日以内）`cci200_spike`。
+  米国株（公開）: `PER` `PBR` `roe_pct` `div_yield_pct` `equity_ratio_pct` `fair_price` `upside_pct` `turnover_20d` `next_earnings`（推定）`earnings_soon` `one_off_flag`。
+- **規約（ADR-002）**: 公開の日本株（nikkei225）は `score_value` / `score_quality` / `score_penalty` と PER・PBR・理論株価・売買代金を持たない。
+  スコアはチャートの点だけ（`tests/test_score_public.py`）。
+- **検証**: `verify.json` の `score_tiers.<nikkei225|us|etf>`（段階ごとの20営業日後・全期間/直近6か月/件数）と
+  `cci200.<市場>`（全期間・一斉に割れの日を除く・直近6か月）。最上位の段階が直近6か月で基準を下回ると
+  `weakened_items` に `<市場>:score:tier5`（「根拠が弱まっています」と同じ扱い）。Mac mini は `verify_local.json` に同じ形（fx・crypto は未検証）。
+- **点の自動 0**: 直近6か月で基準を下回った判定（売り目安は上回った判定）は 0 点（`score.gate_from_verify`）。
+- **米国の決算**: `data/us_fundamentals.json`（週次 universe.yml）に `hist`（過去24か月の各月初の決算）と `filed`（10-K/10-Q の提出日）。
+  SEC は連絡先つき User-Agent を求めるので、リポジトリ変数 `SEC_USER_AGENT` が必要（未設定だと週次の更新は 403 で止まり前回のファイルのまま）。

@@ -11,9 +11,9 @@ _SRC = str(pathlib.Path(__file__).resolve().parents[1] / "src")
 if _SRC not in sys.path:
     sys.path.insert(0, _SRC)
 
-from screener.calc import assets, composite, contracts, events, fund_us, ind, schedule, value  # noqa: E402
+from screener.calc import assets, composite, contracts, events, fund_us, ind, schedule, score, value  # noqa: E402
 
-for _m in (assets, composite, contracts, events, fund_us, ind, schedule, value):
+for _m in (assets, composite, contracts, events, fund_us, ind, schedule, score, value):
     sys.modules[f"{__name__}.{_m.__name__.rsplit('.', 1)[-1]}"] = _m
 
-__all__ = ["assets", "composite", "contracts", "events", "fund_us", "ind", "schedule", "value"]
+__all__ = ["assets", "composite", "contracts", "events", "fund_us", "ind", "schedule", "score", "value"]

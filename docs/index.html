@@ -625,6 +625,7 @@ tbody tr.mrow-normal:hover{opacity:1}
     <button class="tab" data-tab="dow30"     onclick="sw('dow30',this)" data-i18n="tab.dow30"></button>
     <button class="tab" data-tab="nasdaq100" onclick="sw('nasdaq100',this)" data-i18n="tab.nasdaq100"></button>
     <button class="tab" data-tab="sp500"     onclick="sw('sp500',this)" data-i18n="tab.sp500"></button>
+    <button class="tab" data-tab="etf"       onclick="sw('etf',this)" data-i18n="tab.etf"></button>
     <button class="tab" data-tab="fx"        onclick="sw('fx',this)" data-i18n="tab.fx"></button>
     <button class="tab" data-tab="rates_vol" onclick="sw('rates_vol',this)" data-i18n="tab.rates_vol"></button>
     <button class="tab" data-tab="pos_val"   onclick="sw('pos_val',this)" data-i18n="tab.pos_val"></button>
@@ -1105,7 +1106,7 @@ function sw(key,btn){
 // ══ Filters ════════════════════════════════════════
 function renderFBtns(){
   const fg=document.getElementById("fgrp");
-  const EQ=["nikkei225","dow30","nasdaq100","sp500"];
+  const EQ=["nikkei225","dow30","nasdaq100","sp500","etf"];
   const sigs=tab==="fx"?S_FX:(EQ.includes(tab)?S_STK:[]);
   fg.innerHTML=`<button class="fbtn${fsig===null?" active":""}" onclick="setF(null,this)">${T("tb.all")}</button>`;
   sigs.forEach(s=>{
@@ -1518,7 +1519,7 @@ function detailHTML(r){
   const tab = (tf,active)=> `<span class="dt-tab${active?" dt-tab-on":""}" onclick="showTF('${sym}','${tf}',this)">${T("tf.short_"+tf)}</span>`;
   return `<div class="dt-wrap">
     <div class="dt-hd"><b>${esc(r.symbol||"—")}</b> &nbsp;${esc(companyName(r.name))}&nbsp;&middot;&nbsp;${sigLabel(r.signal)}&nbsp;&middot;&nbsp;${T("dt.score",{v:f(score,0)})}&nbsp;&middot;&nbsp;${r.error?`<span style="color:var(--red)">${T("dt.data_error")}</span>`:T("dt.ok")}</div>
-    ${judgeLine(r, score)}
+    ${(window.SIG&&SIG.decisionCard)?SIG.decisionCard(r, score):judgeLine(r, score)}
     <div class="dt-tabs">${tab("4h",false)}${tab("1d",true)}${tab("1w",false)}</div>
     <div class="dt-grid">
       <span><b>RSI(14)</b> ${f(r.rsi,1)}</span>

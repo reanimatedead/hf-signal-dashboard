@@ -44,6 +44,9 @@ def build(out, hours_ago=50.0):
     # 2026-11 UI 検証: 日経225 の 7735.T（コードだけ本物・価格は架空 BBB×50）と FX 1 本（架空 AAA を 150 円台へ）
     frames["7735.T"] = _scaled(frames["BBB"], 50.0)
     frames["USDJPY=X"] = _scaled(frames["AAA"], 150.0 / float(frames["AAA"]["Close"].iloc[-1]))
+    # 2026-11 ETF タブ: コードだけ本物（指数 1306.T・インバース 1357.T）、価格は架空 AAA / BBB
+    frames["1306.T"] = _scaled(frames["AAA"], 20.0)
+    frames["1357.T"] = _scaled(frames["BBB"], 3.0)
     fs._batched_2y_ohlc = lambda syms, **k: {s: frames.get(s) for s in syms}   # 通信しない
 
     def rows(syms, label, names=None):
@@ -56,19 +59,25 @@ def build(out, hours_ago=50.0):
     spx = {"AAA": "FAKE Alpha Inc.", "BBB": "FAKE Beta plc", "CCC": "FAKE Gamma Holdings Inc.",
            "DDD": "FAKE Dual Inc. (Class A)", "EEE": "FAKE Dual Inc. (Class C)"}
     markets_eq = {"nikkei225": rows(list(jp) + ["7735.T"], "JP"), "dow30": rows(TICKERS[:2], "US"),
-                  "nasdaq100": rows(TICKERS, "US", ndx), "sp500": rows(TICKERS, "US", spx)}
+                  "nasdaq100": rows(TICKERS, "US", ndx), "sp500": rows(TICKERS, "US", spx),
+                  "etf": rows(["1306.T", "1357.T"], "ETF")}
+    for r in markets_eq["etf"]:
+        r["etf_kind"] = fs.assets.ETFS[r["symbol"]][1]
     collect = {}
     fs.attach_equity_charts(markets_eq, collect=collect)
-    vrec = fs.build_and_write_verify(collect, out / "verify.json")
     fd = {t: {**fund_us.fundamentals(facts(t)["facts"], "2025-12-31"), "fin": t == "EEE"} for t in TICKERS}
     fpath = out / "_us_fundamentals_fake.json"
     fpath.write_text(json.dumps({"as_of": "2025-12-31", "rows": fd}))
     urec = fs.attach_us_fundamentals((markets_eq["dow30"], markets_eq["nasdaq100"], markets_eq["sp500"]), fpath)
+    gates = {}
+    vrec = fs.build_and_write_verify(collect, out / "verify.json", us_fund=fs.load_us_fund_rows(fpath), gates_out=gates)
     fpath.unlink()
+    fs.attach_scores(markets_eq["nikkei225"], (markets_eq["dow30"], markets_eq["nasdaq100"], markets_eq["sp500"]),
+                     markets_eq["etf"], gates)
     now = datetime.now(fs.JST) - timedelta(hours=hours_ago)
     uni = {tab: {"count": len([r for r in rs if not r["symbol"].startswith("^")]), "target": fs.EQUITY_TARGETS[tab],
                  "capture_pct": 0, "defined": len(rs), "source_mode": "curated_subset",
-                 "universe_source": "preview", "fetch_failures": []} for tab, rs in markets_eq.items()}
+                 "universe_source": "preview", "fetch_failures": []} for tab, rs in markets_eq.items() if tab != "etf"}
     payload = {
         "meta": {"updated_at": now.isoformat(), "updated_at_str": now.strftime("%Y-%m-%d %H:%M JST"),
                  "next_update_str": "—", "preview": "preview_fake_data",   # 架空データ（本物の銘柄・価格ではない）

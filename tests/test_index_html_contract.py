@@ -21,16 +21,16 @@ def test_index_exists():
     assert INDEX.exists(), "docs/index.html must exist"
 
 
-def test_exactly_twelve_main_tabs():
+def test_exactly_thirteen_main_tabs():
     html = _read()
     tabs = re.findall(r'<button[^>]*class="tab(?:\s+active)?"[^>]*data-tab="([^"]+)"', html)
     # 検証タブを追加（2026-11, DATA_CONTRACT §21）: 10 → 11。仕組み（About）を右端に追加: 11 → 12。
-    # 抜け道のクラス名は使わない。
-    assert len(tabs) == 12, f"expected 12 main tabs (incl. survival, relations, verify, about), found {len(tabs)}: {tabs}"
+    # 抜け道のクラス名は使わない。ETF タブを追加（2026-11 売買スコア）: 12 → 13。
+    assert len(tabs) == 13, f"expected 13 main tabs (incl. survival, etf, relations, verify, about), found {len(tabs)}: {tabs}"
     assert tabs[-1] == "about", f"about must be the rightmost tab: {tabs}"
     expected = {
         "survival",
-        "nikkei225", "dow30", "nasdaq100", "sp500",
+        "nikkei225", "dow30", "nasdaq100", "sp500", "etf",
         "fx", "rates_vol", "pos_val", "relations", "moneyflow",
         "verify", "about",
     }
