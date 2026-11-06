@@ -104,3 +104,62 @@ def price_glitch_mask(close, factor=GLITCH_FACTOR, w=GLITCH_WINDOW):
         m = float(np.median(nb))
         out[i] = c[i] > m * factor or c[i] < m / factor
     return out
+
+
+# ── 最後の足の単位の誤り（全銘柄。直近20本の中央値と比べる）────────────────────────────────
+LAST_GLITCH_WINDOW = 20  # 最後の足の前の 20 本
+LAST_GLITCH_LO = 0.2  # 中央値の 0.2 倍未満
+LAST_GLITCH_HI = 5.0  # 中央値の 5 倍超
+
+
+def last_bar_glitch(close, w=LAST_GLITCH_WINDOW, lo=LAST_GLITCH_LO, hi=LAST_GLITCH_HI):
+    """終値の配列 → 最後の足が単位の誤りか（その前の w 本の中央値の lo 倍未満か hi 倍超）。"""
+    import numpy as np
+
+    c = np.asarray(close, dtype=float)
+    if not len(c) or not np.isfinite(c[-1]) or c[-1] <= 0:
+        return False
+    prev = c[:-1][-w:]
+    prev = prev[np.isfinite(prev) & (prev > 0)]
+    if len(prev) < 5:
+        return False
+    m = float(np.median(prev))
+    return bool(c[-1] < m * lo or c[-1] > m * hi)
+
+
+# ── 取引時間中の未確定の足（その市場の取引時間中に走らせたとき、当日の足は判定・検証に使わない）──
+# 東証は 9:00〜15:30 JST（昼休みも含めて未確定）、米国は現地時間 9:30〜16:00（夏時間は zoneinfo が扱う）。
+SESSIONS = {
+    "jp": ("Asia/Tokyo", (9, 0), (15, 30)),
+    "us": ("America/New_York", (9, 30), (16, 0)),
+}
+
+
+def market_of(symbol):
+    """銘柄コード → "jp" | "us" | None（FX・暗号資産など取引時間の決まりがないもの）。"""
+    s = str(symbol or "")
+    if s.endswith(".T") or s in ("^N225", "^TOPX"):
+        return "jp"
+    if "=" in s or s.endswith("-USD"):
+        return None
+    return "us"
+
+
+def session_today(market, now=None):
+    """その市場がいま取引時間中なら、現地の今日の日付（datetime.date）。時間外・週末・市場なしは None。"""
+    import datetime as dt
+    from zoneinfo import ZoneInfo
+
+    if market not in SESSIONS:
+        return None
+    tz, (oh, om), (ch, cm) = SESSIONS[market]
+    t = (now or dt.datetime.now(dt.UTC)).astimezone(ZoneInfo(tz))
+    if t.weekday() >= 5 or not (dt.time(oh, om) <= t.time() < dt.time(ch, cm)):
+        return None
+    return t.date()
+
+
+def unfinished_last_bar(market, last_date, now=None):
+    """最後の足の日付が、取引時間中の市場の「今日」なら True（未確定の足）。休場日は今日の足が無いので False。"""
+    d = session_today(market, now)
+    return d is not None and last_date is not None and last_date == d

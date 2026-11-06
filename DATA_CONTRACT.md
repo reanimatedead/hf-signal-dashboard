@@ -1721,3 +1721,14 @@ Stats = {n, mean, median, up_pct}
   「旧スコア」に畳む（data.json・verify.json の値と検証は従来どおり出す）。並び替えの既定は `score`（値の無い行は常に最後）。
   インバース ETF は判定・スコアのどの欄も「対象外」。Mac mini は daily の最後に `out/today.html`（段階5/4 の上位・CCI ±200・
   決算7日以内・段階の検証。J-Quants の数値を含むのでローカルだけ）を作る（`screener.today`）。
+
+## 23. v8.2 — 未確定の足・最後の足の単位の誤り・米国株の株数（2026-11-06）
+
+- **未確定の足**: その市場の取引時間中（東証 9:00〜15:30 JST・米国 現地 9:30〜16:00）に走らせたとき、当日の足を判定・検証・一覧の株価から外す。
+  規則は `calc.contracts.session_today / unfinished_last_bar`。公開側は `fetch_signals.clean_bars`（指数・構成銘柄・ETF の全部）、
+  Mac mini の米国株は `us.screen.trim_last`。外した足は `meta.unfinished_bars`（銘柄 → 日付）。日本株の Mac mini 側は J-Quants の確定値なので対象外。
+- **最後の足の単位の誤り**: 全銘柄の最後の足を、その前の 20 本の中央値と比べ、0.2 倍未満か 5 倍超なら外す（`calc.contracts.last_bar_glitch`）。
+  `meta.price_glitches` は銘柄 → 除いた本数（同じ日を2回数えない）。ETF は従来どおり途中の足も見る（`price_glitch_mask`）。
+- **米国株の株数**: 表紙の株数（dei:EntityCommonStockSharesOutstanding）が asof より 400 日超古い、または直近の希薄化後の加重平均株数と
+  1.5 倍超ずれるときは、希薄化後の加重平均株数（10-K / 10-Q の最新期末）を使う（`calc.fund_us.pick_shares`）。
+  複数クラス株の会社（MA・CME・NKE・AOS・FOX など）で表紙の株数が古い・1クラス分だけだったため。

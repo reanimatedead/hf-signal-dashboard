@@ -7,10 +7,11 @@
 
 from __future__ import annotations
 
+import datetime as dt
 import json
 from typing import Any
 
-from ..calc import fund_us
+from ..calc import contracts, fund_us
 from ..config import Config
 
 Row = dict[str, Any]
@@ -40,10 +41,22 @@ def load_px(t: str, cfg: Config) -> Any:
     if key not in _px_cache:
         try:
             with open(cfg.us("px", f"{t}.json")) as fh:
-                _px_cache[key] = fund_us.parse_yahoo_chart(json.load(fh))
+                _px_cache[key] = trim_last(fund_us.parse_yahoo_chart(json.load(fh)), t)
         except (OSError, ValueError, KeyError, IndexError, TypeError):
             _px_cache[key] = None
     return _px_cache[key]
+
+
+def trim_last(p: dict[str, Any], t: str, now: Any = None) -> dict[str, Any]:
+    """米国の取引時間中の当日の未確定の足と、最後の足の単位の誤り（直近20本の中央値の 0.2 倍未満・5 倍超）を外す。
+    規則は calc.contracts の 1 か所（公開側の fetch_signals.clean_bars と同じ）。"""
+    if not p or not p.get("d"):
+        return p
+    last = dt.date.fromisoformat(p["d"][-1])
+    c = [x if x is not None else float("nan") for x in p["c"]]
+    if contracts.unfinished_last_bar("us", last, now) or contracts.last_bar_glitch(c):
+        p = {k: (v[:-1] if isinstance(v, list) and k != "splits" else v) for k, v in p.items()}
+    return p
 
 
 def clear_cache() -> None:
