@@ -3,6 +3,7 @@
 
 import bisect
 import datetime as dt
+import math
 
 from .value import RI, FScore, magic_rank, one_off_flag, ri_ratio
 
@@ -37,6 +38,12 @@ FILED_KEEP = 12  # 次の決算の推定（calc.score.next_earnings）に使う�
 CORE_TAGS = ("NetIncomeLoss", "StockholdersEquity", "Assets")  # 契約テストで「取れること」を確かめるタグ
 FIN_SECTORS = ("Financial", "Real Estate", "Utilities")
 STALE_DAYS = 550  # 決算が18か月超古いものは除外
+# 株数（表紙の dei:EntityCommonStockSharesOutstanding）の確かめ。複数クラス株の会社は表紙の株数が
+# 何年も更新されない・1クラス分だけになることがある（MA は 2010 年、FOX は 1 株）。
+# そのときは希薄化後の加重平均株数を使う。
+SHARES_STALE_DAYS = 400  # 表紙の株数が asof より 400 日超古い
+SHARES_MIN = 100_000  # これより少ない株数は誤り（FOX の表紙は 1 株）
+SHARES_MAX_RATIO = 1.5  # 表紙の株数と直近の希薄化後株数（分割調整後）が 1.5 倍超ずれる
 
 
 def annual(F, tags, asof, unit="USD"):
@@ -100,6 +107,54 @@ def shares(F, asof):
     return None, None
 
 
+def latest_dsh(F, asof):
+    """直近の希薄化後の加重平均株数（10-K / 10-Q のうち期末が最も新しいもの）→ (株数, 期末日)。"""
+    g = F.get("us-gaap", {}).get("WeightedAverageNumberOfDilutedSharesOutstanding", {})
+    x = g.get("units", {}).get("shares", [])
+    x = [v for v in x if v.get("filed", "9999") < asof and v.get("form") in FILED_FORMS and v.get("val")]
+    if not x:
+        return None, None
+    v = max(x, key=lambda v: (v["end"], v["filed"]))
+    return v["val"], v["end"]
+
+
+def implied_shares(F, asof, splits=()):
+    """純利益 ÷ 希薄化後 EPS（直近の通期）→ 株数の目安（今の分割基準）。単位の違う値に左右されない物差し。"""
+    ni, _n0, fy = annual(F, TAGS["ni"][:1], asof)
+    eps, _e0, efy = annual(F, ["EarningsPerShareDiluted", "EarningsPerShareBasic"], asof, "USD/shares")
+    if not ni or not eps or fy is None or efy != fy or abs(eps) < 0.01:
+        return None
+    v = ni / eps
+    return split_adjust(v, fy, splits) if v > 0 else None
+
+
+def pick_shares(F, asof, splits=()):
+    """使う株数（今の分割基準）→ (株数, 出どころ "dei"|"dsh"|None)。
+    候補は表紙の株数（dei）と直近の希薄化後の加重平均株数（dsh）。どちらかが単位違い・古い・1クラス分だけのことがある
+    （MA は表紙が 2010 年のまま、FOX は表紙が 1 株、MCD・WAT は dsh が百万単位や 1000 倍）。
+    1) 純利益 ÷ 希薄化後 EPS（implied_shares）があれば、それに近い方
+    2) 無ければ表紙の株数。ただし表紙が 400 日超古い・10 万株未満なら dsh。
+       dsh と 100 倍超ずれるなら dsh の単位違いとみなし表紙、1.5 倍超ずれるなら dsh"""
+    sh, shd = shares(F, asof)
+    dv, dend = latest_dsh(F, asof)
+    a = split_adjust(sh, shd, splits) if sh and shd else None
+    b = split_adjust(dv, dend, splits) if dv and dend else None
+    if not (a and b):
+        return (a, "dei") if a else (b, "dsh") if b else (None, None)
+    c = implied_shares(F, asof, splits)
+    if c:
+        return (a, "dei") if abs(math.log(a / c)) <= abs(math.log(b / c)) else (b, "dsh")
+    stale = (dt.date.fromisoformat(asof) - dt.date.fromisoformat(shd)).days > SHARES_STALE_DAYS
+    if (stale or a < SHARES_MIN) and b >= SHARES_MIN:
+        return b, "dsh"
+    r = a / b
+    if not (1 / 100 <= r <= 100):  # dsh の単位違い（百万単位・1000 倍）
+        return a, "dei"
+    if not (1 / SHARES_MAX_RATIO <= r <= SHARES_MAX_RATIO):
+        return b, "dsh"
+    return a, "dei"
+
+
 def split_adjust(sh, shd, splits):
     """株数を今の分割基準にそろえる（株価は Yahoo の分割調整後なので）。"""
     for sd, rr in splits:
@@ -125,11 +180,9 @@ def fundamentals(F, asof, splits=()):
     g = {k: annual(F, v, asof, "shares" if k == "dsh" else "USD") for k, v in TAGS.items()}
     ni, ni0, fy = g["ni"]
     eq, eq0, _ = g["eq"]
-    sh, shd = shares(F, asof)
-    if not sh:
-        sh, shd = g["dsh"][0], g["dsh"][2]
-    if sh and shd:
-        sh = split_adjust(sh, shd, splits)
+    sh, _src = pick_shares(F, asof, splits)
+    if not sh and g["dsh"][0] and g["dsh"][2]:
+        sh = split_adjust(g["dsh"][0], g["dsh"][2], splits)
     if ni is None or not eq or not sh or fy is None:
         return None
     if (dt.date.fromisoformat(asof) - dt.date.fromisoformat(fy)).days > STALE_DAYS:
