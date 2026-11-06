@@ -1451,7 +1451,7 @@ function renderBody(rows){
     const click = detailable
       ? `onclick="toggleDetail(event,'${r.symbol}')" style="cursor:pointer"`
       : "";
-    return `<tr class="${cls}" data-sym="${r.symbol||''}" ${click}>${colset.map(c=>cell(c,r)).join("")}</tr>`;
+    return `<tr class="${cls}" data-sym="${r.symbol||''}" ${click}>${window.SIG?SIG.rowCells(colset,r,tab,cell):colset.map(c=>cell(c,r)).join("")}</tr>`;
   }).join("");
   // (4) モバイルカード化は rates_vol のときだけ有効化（他タブは従来表示のまま）
   const wrap = document.querySelector(".tbl-wrap");

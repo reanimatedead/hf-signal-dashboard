@@ -176,3 +176,32 @@ def test_pipeline_writes_today_html_only_under_out(cfg):
     ):
         assert s in t, s
     assert "<script" not in t and "buy_cci200" not in t  # 言葉は描画時に付ける（コードを出さない）
+
+
+def test_today_earnings_only_watched_rows():
+    """決算7日以内は段階5・段階4・本日の◆に入った銘柄だけ。見出しに「全体 N 件中 M 件」。"""
+    from screener import today as tp
+
+    def r(c, **k):
+        return {"code": c, "company_name": c, "next_earnings": "2026-11-05", **k}
+
+    doc = {
+        "asof": "2026-11-02",
+        "jp": [
+            r("T5", score=45, score_tier=5),
+            r("T4", score=30, score_tier=4),
+            r("T3", score=20, score_tier=3),
+            r("BUY", score=1, score_tier=1, cci200_signal="buy_cci200"),
+            r("SELL", score=1, score_tier=1, cci200_signal="sell_cci200"),
+            r("FAR", score=45, score_tier=5, next_earnings="2026-12-30"),
+            r("X1"),
+            r("X2"),
+        ],
+    }
+    t = tp.render(doc)
+    sec = t.split("日以内（推定）", 1)[1].split("段階ごとの検証", 1)[0]
+    assert "全体 7 件中 4 件" in sec
+    for c in ("T5", "T4", "BUY", "SELL"):
+        assert f"<td>{c}</td>" in sec, c
+    for c in ("T3", "X1", "X2", "FAR"):
+        assert f"<td>{c}</td>" not in sec, c
