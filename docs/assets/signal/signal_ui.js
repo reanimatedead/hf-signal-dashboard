@@ -267,6 +267,19 @@
     }
     return null;
   }
+  // インバース型 ETF の行：スコア〜売りの続いた欄を「物差しの対象外（インバース）」1つのセル（colspan）にまとめる
+  const INV_SPAN = new Set(["score", "chart_signal_code", "score_value", "score_chart", "score_penalty", "score_quality", "score_sell"]);
+  function rowCells(colset, r, tab, cellFn) {
+    if (tab !== "etf" || !isInv(r)) return colset.map((c) => cellFn(c, r)).join("");
+    let out = "";
+    for (let i = 0; i < colset.length;) {
+      if (!INV_SPAN.has(colset[i].k)) { out += cellFn(colset[i], r); i++; continue; }
+      let j = i; while (j < colset.length && INV_SPAN.has(colset[j].k)) j++;
+      out += `<td class="inv-span" colspan="${j - i}" style="text-align:center" data-label="${esc(T("col.score_total"))}">${NA()}</td>`;
+      i = j;
+    }
+    return out;
+  }
   function n1(v) { return num(v) == null ? DASH : I18.fmtNum(v, 1); }
   function compact(v) {   // 百万単位（日本円・米ドルとも同じ表し方）
     return Math.abs(v) >= 1e6 ? T("num.mn", { v: I18.fmtNum(v / 1e6, Math.abs(v) >= 1e8 ? 0 : 1) }) : I18.fmtNum(v, 0);
@@ -653,5 +666,5 @@
   }
 
   window.SIG = { loadVerify, cols, cell, judgeCell, renderUsBuyList, renderMacOnlyNote, renderStaleBanner, renderWeakBanner,
-    showVerify, hideVerify, drawPriceCciChart, weakItem, decisionCard, scoreHead, tierPills, EQ_TABS, BUY, SELL, state: S };
+    showVerify, hideVerify, drawPriceCciChart, weakItem, decisionCard, scoreHead, tierPills, rowCells, EQ_TABS, BUY, SELL, state: S };
 })();

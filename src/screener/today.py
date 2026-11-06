@@ -3,7 +3,8 @@
 daily.py の最後（一覧と通知のあと）に作る。中身は日本株・米国株・ETF それぞれの
   - 売買スコアの段階5・段階4 の上位（スコアの高い順）
   - 本日の CCI ±200 の判定: 買い（CCI48・CCI288 がそろって −200 割れ）／売り目安（そろって +200 超え）
-  - 決算が 7 日以内の注意（次の決算の推定日 calc.score.next_earnings）
+  - 決算が 7 日以内の注意（次の決算の推定日 calc.score.next_earnings）。全銘柄ではなく、その市場の段階5・段階4・
+    本日の◆（買い・売り目安）に入った銘柄だけに絞り、見出しに「全体 N 件中 M 件」と出す
   - 段階ごとの検証（20 営業日後の中央値・全期間と直近6か月・件数。verify_local.json の score_tiers）
 J-Quants 由来の数値（日本株の PER・PBR・理論株価など）を含むので、Mac mini の中だけに置く（ADR-002）。
 規則は持たない（行の値・検証の値は signals.run が calc.score / calc.ind で作ったものをそのまま使う）。
@@ -94,10 +95,9 @@ def render(doc: dict[str, Any]) -> str:
         t4 = [r for r in ranked if r.get("score_tier") == 4][:TOP_N]
         buy = [r for r in rows if r.get("cci200_signal") == ind.CCI200_BUY]
         sell = [r for r in doc.get(m) or [] if r.get("cci200_signal") == ind.CCI200_SELL]
-        earn = sorted(
-            (r for r in rows if (d := _days(asof, r.get("next_earnings"))) is not None and 0 <= d <= EARNINGS_DAYS),
-            key=lambda r: str(r.get("next_earnings")),
-        )
+        soon = [r for r in rows if (d := _days(asof, r.get("next_earnings"))) is not None and 0 <= d <= EARNINGS_DAYS]
+        watch = {id(r) for r in ranked if r.get("score_tier") in (5, 4)} | {id(r) for r in buy + sell}
+        earn = sorted((r for r in soon if id(r) in watch), key=lambda r: str(r.get("next_earnings")))
         cols = COLS[m]
         parts.append(
             f"<h2>{title}</h2>"
@@ -109,8 +109,9 @@ def render(doc: dict[str, Any]) -> str:
             f"<p class=note>利益確定・新しく買わない目安。空売りの根拠ではありません。</p>"
             f"{_table(sell, key, name, cols)}"
             + (
-                f"<h3>決算が {EARNINGS_DAYS} 日以内（推定）{len(earn)} 件"
+                f"<h3>決算が {EARNINGS_DAYS} 日以内（推定）全体 {len(soon):,} 件中 {len(earn):,} 件"
                 " — 決算の前後は値動きが大きくなりやすいので注意</h3>"
+                "<p class=note>段階5・段階4・本日の◆（買い・売り目安）に入った銘柄だけを載せています。</p>"
                 f"{_table(earn, key, name, cols)}"
                 if m != "etf"
                 else ""
