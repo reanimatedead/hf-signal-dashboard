@@ -89,3 +89,12 @@ def test_us_trim_last():
     q = us_screen.trim_last(p, "AAPL", now=_at(2026, 11, 6, 11, 0, "America/New_York"))
     assert q["d"] == ["2026-11-04", "2026-11-05"] and q["c"] == [10.0, 11.0] and q["splits"] == p["splits"]
     assert us_screen.trim_last(p, "AAPL", now=_at(2026, 11, 6, 17, 0, "America/New_York")) == p
+
+
+def test_clean_bars_drops_trailing_nan_close():  # 取引前の当日の空の行（株価が NaN → null で出ていた）
+    days = pd.bdate_range(end="2026-11-06", periods=30)
+    df = _df(days, [344.0] * 29 + [float("nan")])
+    out = fs.clean_bars(df, "AAPL", now=_at(2026, 11, 6, 11, 0, "Asia/Tokyo"))
+    assert len(out) == 29 and float(out["Close"].iloc[-1]) == 344.0
+    r = fs.process_ticker(out, "AAPL", "Apple")
+    assert r.get("price") == 344.0

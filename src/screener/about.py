@@ -22,7 +22,7 @@ from pathlib import Path
 from typing import Any
 
 from . import alerts
-from .calc import assets, composite, ind, schedule, score, value
+from .calc import assets, composite, fund_us, ind, schedule, score, value
 from .japan import screen
 
 SCHEMA = "about/1"
@@ -260,6 +260,13 @@ def build(
                 "sell_note": ind.SELL_NOTE,
             },
             "etf": {"symbols": {s: k for s, (_n, k) in assets.ETFS.items()}, "kinds": list(assets.ETF_KINDS)},
+            # 米国株の理論株価: 業種（SEC の SIC 上2桁）の黒字企業の PER の中央値 × EPS（calc.fund_us.relative_value）
+            "us_fair_price": {
+                "model": "sector_median_per",
+                "group_min": fund_us.PER_BENCH["group_min"],
+                "levels": list(fund_us.PER_LEVELS),
+                "industry_code": "sec_sic",
+            },
         },
         "schedule": schedule_summary(now, deploy_yml),
         "verify": verify_summary(verify),

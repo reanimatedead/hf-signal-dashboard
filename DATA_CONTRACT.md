@@ -1732,3 +1732,14 @@ Stats = {n, mean, median, up_pct}
 - **米国株の株数**: 表紙の株数（dei:EntityCommonStockSharesOutstanding）が asof より 400 日超古い、または直近の希薄化後の加重平均株数と
   1.5 倍超ずれるときは、希薄化後の加重平均株数（10-K / 10-Q の最新期末）を使う（`calc.fund_us.pick_shares`）。
   複数クラス株の会社（MA・CME・NKE・AOS・FOX など）で表紙の株数が古い・1クラス分だけだったため。
+- **終値が空の末尾の行**: Yahoo が取引前の当日の行を終値なし（NaN）で返すことがあり、株価が NaN → data.json で null になっていた
+  （2026-11-06 11:17 の full で米国株のほぼ全部）。`clean_bars` が最初に外す。`meta.nan_report.price_null` は NaN も空に数える。
+
+## 24. v8.3 — 米国株の理論株価を業種別 PER の中央値に（2026-11-06）
+
+- それまで米国株にも日本株の残余利益モデル（`calc.value.ri_ratio`: 割引率 8%・ROE 上限 40%・10 年で収束・1株純資産が起点）を当てていた。
+  自社株買いで純資産が小さい米国の大型株はほぼ全部が大きく割高に出た（上値余地の中央値 −66.9%、AAPL 理論株価 20）。
+- 米国株は **理論株価 = EPS × 同じ業種の黒字企業の PER の中央値**、**上値余地 = 業種の PER の中央値 ÷ PER − 1**（`calc.fund_us.relative_value`）。
+  業種は SEC の SIC コード（`data/us_fundamentals.json` の `sic`）の上2桁。黒字企業が 8 社未満なら SIC の大分類、それも足りなければ全体。赤字は理論株価なし。
+- 売買スコアの検証（月初ごと）も同じ基準（`fund_us.rerate_month`。その月初の業種別 PER の中央値）。Mac mini 版の米国株も同じ関数（`us.screen.apply_relative` 経由）。
+- 日本株（Mac mini 版）は残余利益モデルのまま。about.json の `rules.us_fair_price` に式の名前と段（sic2 / division / all）・最低社数。

@@ -168,6 +168,7 @@
       + table([{ t: T("ab.th_part") }, { t: T("ab.th_points") }, { t: T("ab.sc_th_max"), r: 1 }], rows)
       + `<p>${T("ab.sc_rules", { pct: nn(num(r.low_turnover_q) == null ? null : r.low_turnover_q * 100), days: n0(r.turnover_days), bd: n0(r.earnings_soon_bdays) })}</p>`
       + `<p>${T("ab.sc_tiers", { items: tiers })}</p><p>${T("ab.sc_gate")}</p><p>${T("ab.sc_public_jp")}</p>`
+      + (((a.rules || {}).us_fair_price || {}).model ? `<p>${T("ab.us_fair", { n: n0(a.rules.us_fair_price.group_min) })}</p>` : "")
       + `<p>${T("code.sell_note.sell_note")}</p>` + (res ? `<p>${T("ab.sc_results")}</p><ul>${res}</ul>` : ""));
   }
   function indicators(a) {

@@ -11,6 +11,7 @@ def rows(fx):
         r = fund_us.screen_one(t, info, fx["facts"][t], fx["px"][t], ASOF, "2025-06-30", "2026-05-29")
         if r:
             out.append(r)
+    fund_us.apply_relative(out, {})  # 業種が無いときは全体の PER の中央値
     return fund_us.rank(out)
 
 
@@ -19,7 +20,8 @@ def test_rows_and_f_score(fx):
     assert len(rs) == 5
     for r in rs:
         assert r["f_max"] == 7 and r["F"] == 7  # サンプルは全項目が改善するように作ってある
-        assert r["ri_upside_pct"] is not None and r["PBR"] > 0
+        assert r["PBR"] > 0
+        assert (r["ri_upside_pct"] is not None) == bool(r["PER"] and r["PER"] > 0)
 
 
 def test_magic_rank_excludes_financials(fx):
