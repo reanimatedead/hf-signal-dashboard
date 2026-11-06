@@ -726,6 +726,15 @@ def clean_bars(df, symbol, etf=False, now=None):
     3) ETF は途中の足の単位の誤りも外す（drop_price_glitches）"""
     if df is None or "Close" not in df.columns or not len(df):
         return df
+    # 0) 終値が空（NaN）の末尾の行は外す（Yahoo が取引前の当日の行を空で返すことがある → 株価が NaN になり null で出ていた）
+    c0 = pd.to_numeric(df["Close"].squeeze(), errors="coerce")
+    k = len(c0)
+    while k and pd.isna(c0.iloc[k - 1]):
+        k -= 1
+    if k < len(df):
+        df = df.iloc[:k]
+        if not len(df):
+            return df
     d = _last_day(df)
     if contracts.unfinished_last_bar(contracts.market_of(symbol), d, now):
         _UNFINISHED[symbol] = str(d)
@@ -2402,10 +2411,15 @@ def attach_us_fundamentals(tabs, path=None):
                     m = fund_us.metrics(fd, float(px))
                 except Exception:  # noqa: BLE001
                     continue
-                calc[sym] = {**m, "fin": bool(fd.get("fin")), "f_score": fd.get("f_score"), "f_max": fd.get("f_max"),
+                calc[sym] = {**m, "symbol": sym, "price": float(px), "fin": bool(fd.get("fin")),
+                             "f_score": fd.get("f_score"), "f_max": fd.get("f_max"),
                              "upside_pct": m.get("ri_upside_pct"), "one_off_flag": bool(fd.get("one_off")),
                              "next_earnings": score.next_earnings(fd.get("filed") or [], today),
                              "earnings_soon": score.earnings_soon(fd.get("filed") or [], today)}
+        # 米国株の理論株価・上値余地は業種（SIC 上2桁）の PER の中央値が基準（fund_us.apply_relative）
+        fund_us.apply_relative(list(calc.values()), {t: (fdmap.get(t) or {}).get("sic") for t in calc}, key="symbol")
+        for v in calc.values():
+            v["upside_pct"] = v.get("ri_upside_pct")
         fund_us.rank(list(calc.values()))
     for rows in tabs:
         for r in rows:
@@ -3292,7 +3306,8 @@ def main():
                and not str(r.get("symbol", "")).startswith("^")]
         return {
             "constituents": len(con),
-            "price_null": sum(1 for r in con if r.get("price") is None),
+            "price_null": sum(1 for r in con if r.get("price") is None
+                              or (isinstance(r.get("price"), float) and math.isnan(r["price"]))),   # NaN も空に数える
             "chart_unavailable": sum(1 for r in con if r.get("chart_status") == "unavailable"),
         }
 

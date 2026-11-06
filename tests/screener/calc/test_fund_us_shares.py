@@ -82,3 +82,33 @@ def test_implied_shares_decides():  # 純利益 ÷ 希薄化後 EPS に近い方
         }
     }
     assert fund_us.pick_shares(F, "2026-11-06") == (450_000_000, "dei")
+
+
+# ── 米国株の理論株価: 業種別 PER の中央値（fund_us.per_benchmarks / relative_value / rerate_month）──
+
+
+def test_per_benchmarks_levels():
+    pers = {f"S{i}": 10.0 + i for i in range(8)}  # SIC 35 に 8 社（中央値 13.5）
+    pers.update({"T1": 40.0, "T2": 50.0})  # SIC 73 に 2 社 → 大分類 I にも足りない → 全体
+    pers["L"] = -5.0  # 赤字は中央値に入れない
+    sics = {**{f"S{i}": "3571" for i in range(8)}, "T1": "7372", "T2": "7370", "L": "3571"}
+    bm = fund_us.per_benchmarks(pers, sics)
+    assert bm["S0"] == (13.5, "sic2") and bm["L"] == (13.5, "sic2")
+    assert bm["T1"][1] == "all" and bm["T1"][0] == 14.5  # 黒字 10 社の中央値
+
+
+def test_relative_value_fair_and_upside():
+    per_px = {f"S{i}": (20.0, 100.0) for i in range(8)}
+    per_px["X"] = (10.0, 50.0)
+    per_px["L"] = (None, 30.0)
+    rv = fund_us.relative_value(per_px, {k: "2834" for k in per_px})
+    assert rv["X"]["upside_pct"] == 100.0 and rv["X"]["fair_price"] == 100.0  # EPS 5 × 業種 PER 20
+    assert rv["S0"]["upside_pct"] == 0.0
+    assert rv["L"]["upside_pct"] is None and rv["L"]["fair_price"] is None
+
+
+def test_rerate_month_keeps_pbr_per():
+    vin = {f"S{i}": [-90.0, 3.0, 20.0, False] for i in range(8)}
+    vin["X"] = [-95.0, 9.0, 40.0, True]
+    out = fund_us.rerate_month(vin, {})
+    assert out["X"] == [-50.0, 9.0, 40.0, True] and out["S0"][0] == 0.0

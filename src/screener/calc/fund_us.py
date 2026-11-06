@@ -223,7 +223,8 @@ def fundamentals(F, asof, splits=()):
 
 
 def value_inputs(ni, eq, sh, roe, px):
-    """(上値余地%, PBR, PER)（丸めなし）。metrics と 売買スコアの検証（月初ごと）の両方がこれを使う。"""
+    """(残余利益モデルの上値余地%, PBR, PER)（丸めなし）。米国株の上値余地は業種別 PER の中央値で置き換える
+    （公開は apply_relative、月初の検証は rerate_month）。残余利益の余地はここでだけ計算し、表示・点数には使わない。"""
     mcap = px * sh
     pbr = mcap / eq if eq and eq > 0 else None
     tpbr = ri_ratio(roe, RI) if roe is not None else None
@@ -232,26 +233,121 @@ def value_inputs(ni, eq, sh, roe, px):
     return up, pbr, per
 
 
+# ── 米国株の理論株価（2026-11-06 から）─────────────────────────────────────────────
+# 日本株の残余利益モデル（calc.value.ri_ratio: 割引率 8%・ROE 上限 40%・10 年で資本コストへ収束・純資産が起点）を
+# そのまま米国株に当てると、自社株買いで純資産が小さく ROE が高い米国の大型株はほぼ全部が大きく割高に出る
+# （2026-11-06 の公開データで上値余地の中央値 −66.9%、AAPL 理論株価 20）。
+# 米国株は「同じ業種の黒字企業の PER の中央値」を基準にする: 理論株価 = EPS × 基準 PER、上値余地 = 基準 PER ÷ PER − 1。
+# 業種は SEC の SIC コード（data/us_fundamentals.json の sic）の上 2 桁。黒字企業が group_min 社未満なら SIC の大分類、
+# それも足りなければ全体の中央値。赤字（PER なし）は理論株価なし。
+PER_LEVELS = ("sic2", "division", "all")
+PER_BENCH = {"group_min": 8, "levels": PER_LEVELS}
+SIC_DIVISIONS = (
+    (1, 9, "A"), (10, 14, "B"), (15, 17, "C"), (20, 39, "D"), (40, 49, "E"),
+    (50, 51, "F"), (52, 59, "G"), (60, 67, "H"), (70, 89, "I"), (90, 99, "J"),
+)  # fmt: skip
+
+
+def sic_keys(sic):
+    """SIC コード → {"sic2": 上2桁, "division": 大分類, "all": "all"}。"""
+    try:
+        two = int(str(sic).strip()[:2])
+    except (TypeError, ValueError):
+        return {"sic2": None, "division": None, "all": "all"}
+    div = next((d for lo, hi, d in SIC_DIVISIONS if lo <= two <= hi), None)
+    return {"sic2": f"{two:02d}", "division": div, "all": "all"}
+
+
+def per_benchmarks(pers, sics, p=PER_BENCH):
+    """{銘柄: PER（丸めなし）}・{銘柄: SIC} → {銘柄: (基準 PER, 使った段 "sic2"|"division"|"all")}。
+    黒字（PER>0）だけで中央値。"""
+    import statistics
+
+    keys = {t: sic_keys(sics.get(t)) for t in pers}
+    pools = {}
+    for t, v in pers.items():
+        if v is None or not v > 0:
+            continue
+        for lv in p["levels"]:
+            k = keys[t][lv]
+            if k is not None:
+                pools.setdefault((lv, k), []).append(v)
+    med = {k: statistics.median(v) for k, v in pools.items() if len(v) >= p["group_min"] or k[0] == "all"}
+    out = {}
+    for t in pers:
+        for lv in p["levels"]:
+            k = keys[t][lv]
+            if k is not None and (lv, k) in med:
+                out[t] = (med[(lv, k)], lv)
+                break
+    return out
+
+
+def per_upside(per, bench):
+    """上値余地%（基準 PER ÷ PER − 1）。赤字・PER なしは None。"""
+    return 100 * (bench / per - 1) if per and per > 0 and bench else None
+
+
+def relative_value(per_px, sics, p=PER_BENCH):
+    """{銘柄: (PER, 株価)} → {銘柄: {"upside_pct", "fair_price", "per_bench", "per_bench_level"}}。
+    公開側・Mac mini とも同じ関数。"""
+    bm = per_benchmarks({t: v[0] for t, v in per_px.items()}, sics, p)
+    out = {}
+    for t, (per, px) in per_px.items():
+        b = bm.get(t)
+        up = per_upside(per, b[0]) if b else None
+        out[t] = {
+            "upside_pct": round(up, 1) if up is not None else None,
+            "fair_price": round(px * b[0] / per, 2) if up is not None else None,
+            "per_bench": round(b[0], 1) if b else None,
+            "per_bench_level": b[1] if b else None,
+        }
+    return out
+
+
+def rerate_month(vin, sics, p=PER_BENCH):
+    """月初の {銘柄: (余地, PBR, PER, ...)} の余地を、その月初の業種別 PER の中央値で置き換える（検証用）。"""
+    bm = per_benchmarks({t: v[2] for t, v in vin.items()}, sics, p)
+    out = {}
+    for t, v in vin.items():
+        b = bm.get(t)
+        out[t] = type(v)((per_upside(v[2], b[0]) if b else None, *v[1:]))
+    return out
+
+
 def metrics(fd, px):
     """価格を入れて毎日計算する部分。"""
     mcap = px * fd["sh"]
     ev = mcap + fd["debt"] - fd["cash"]
     ni, eq, ebit, cap, roe = fd["ni"], fd["eq"], fd["ebit"], fd["cap"], fd["roe"]
-    tpbr = ri_ratio(roe, RI) if roe is not None else None
-    up, pbr, per = value_inputs(ni, eq, fd["sh"], roe, px)
+    _up_ri, pbr, per = value_inputs(ni, eq, fd["sh"], roe, px)
     return {
         "mcap_bn": round(mcap / 1e9, 1),
         "PER": round(per, 1) if per is not None else None,
         "PBR": round(pbr, 2) if pbr else None,
         "roe_pct": round(100 * roe, 1) if roe is not None else None,
-        "ri_upside_pct": round(up, 1) if up is not None else None,
+        # 上値余地・理論株価は業種別 PER の中央値で apply_relative が入れる（全銘柄がそろってから）
+        "ri_upside_pct": None,
         "earnings_yield_pct": round(100 * ebit / ev, 1) if ebit and ev > 0 else None,
         "roc_pct": round(100 * ebit / cap, 1) if ebit and cap > 0 else None,
         # 2026-11 追加（売買スコア・公開の米国株の列）。古い us_fundamentals.json に無い項目は None。
         "equity_ratio_pct": round(100 * eq / fd["ta"], 1) if fd.get("ta") and eq > 0 else None,
         "div_yield_pct": round(100 * abs(fd["div"]) / mcap, 2) if fd.get("div") and mcap > 0 else None,
-        "fair_price": round(px * tpbr / pbr, 2) if tpbr and pbr else None,
+        "fair_price": None,
+        "per_raw": per,
     }
+
+
+def apply_relative(rows, sics, key="ticker", p=PER_BENCH):
+    """metrics の行（price・per_raw を持つ）に、業種別 PER の中央値からの理論株価・上値余地を入れる。"""
+    per_px = {r[key]: (r.get("per_raw"), r.get("price")) for r in rows if r.get(key) and r.get("price")}
+    rv = relative_value(per_px, sics, p)
+    for r in rows:
+        v = rv.get(r.get(key))
+        if v:
+            r["ri_upside_pct"], r["fair_price"] = v["upside_pct"], v["fair_price"]
+            r["per_bench"], r["per_bench_level"] = v["per_bench"], v["per_bench_level"]
+    return rows
 
 
 def is_fin(sector):

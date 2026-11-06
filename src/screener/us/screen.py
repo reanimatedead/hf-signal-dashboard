@@ -74,8 +74,18 @@ def screen(
         del facts
         if r:
             rows.append(r)
+    fund_us.apply_relative(rows, load_sics(cfg))  # 理論株価・上値余地は業種別 PER の中央値から（公開側と同じ関数）
     fund_us.rank(rows)
     return rows
+
+
+def load_sics(cfg: Config) -> dict[str, Any]:
+    """{ticker: SIC}（リポジトリの data/us_fundamentals.json・SEC 由来）。無ければ空（全体の中央値になる）。"""
+    try:
+        with open(cfg.repo_dir / "data" / "us_fundamentals.json", encoding="utf-8") as fh:
+            return {t: (v or {}).get("sic") for t, v in (json.load(fh).get("rows") or {}).items()}
+    except (OSError, ValueError, AttributeError):
+        return {}
 
 
 SCORE_INPUTS_CACHE = "score_inputs_v1"
@@ -104,7 +114,7 @@ def monthly_score_inputs(
             todo.append(m)
             out[m] = {}
     if not todo:
-        return out
+        return rerate(out, cfg)
     for t in uni:
         facts = load_facts(t, cfg)  # 1社ずつ
         p = load_px(t, cfg)
@@ -128,7 +138,13 @@ def monthly_score_inputs(
         tmp = cdir / f"{m}.json.tmp"
         tmp.write_text(json.dumps(out[m]))
         os.replace(tmp, cdir / f"{m}.json")
-    return out
+    return rerate(out, cfg)
+
+
+def rerate(out: dict[str, dict[str, Any]], cfg: Config) -> dict[str, dict[str, Any]]:
+    """控えの余地（残余利益）を、月初ごとの業種別 PER の中央値からの余地に置き換える（fund_us.rerate_month）。"""
+    sics = load_sics(cfg)
+    return {m: fund_us.rerate_month(v, sics) for m, v in out.items()}
 
 
 def fwd(t: str, a: str, b: str, cfg: Config) -> float | None:

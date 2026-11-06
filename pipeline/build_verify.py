@@ -177,6 +177,8 @@ def us_monthly_inputs(xs, fund):
             vin.setdefault(m, {})[sym] = fund_us.value_inputs(ni, eq, sh, roe, float(x["c"][i]))
             if len(rec) > 4:
                 oo.setdefault(m, {})[sym] = bool(rec[4])
+    sics = {t: (v or {}).get("sic") for t, v in (fund or {}).items()}
+    vin = {m: fund_us.rerate_month(v, sics) for m, v in vin.items()}  # 余地は月初ごとの業種別 PER の中央値から
     return vin, oo
 
 
