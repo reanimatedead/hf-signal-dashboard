@@ -107,6 +107,7 @@ def pipeline(
             doc["cci_alerts"],
             local_report.alerts_html(cfg, doc),
             prefer=str(cfg.get("alerts.notifier", "osascript") or "osascript"),
+            sounds=alerts.sound_settings(cfg),
         )
     print("today.html →", today_page.write(cfg, doc), flush=True)  # 最後に「今日の要点」（ローカルだけ）
     return c
