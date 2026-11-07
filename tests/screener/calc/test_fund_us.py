@@ -20,7 +20,7 @@ def test_rows_and_f_score(fx):
     assert len(rs) == 5
     for r in rs:
         assert r["f_max"] == 7 and r["F"] == 7  # サンプルは全項目が改善するように作ってある
-        if r.get("value_check"):  # 「要確認」（株数が古い等）は PER・PBR・余地を出さない
+        if r.get("value_check") in fund_us.VALUE_HIDE:  # 「要確認」は PER・PBR・余地を出さない
             assert r["PBR"] is None and r["ri_upside_pct"] is None
             continue
         assert r["PBR"] > 0
@@ -68,3 +68,10 @@ def test_ri_ratio():
     assert abs(value.ri_ratio(0.08) - 1.0) < 1e-12  # ROE = 資本コスト → 理論PBR 1
     assert value.ri_ratio(0.20) > 1.0 > value.ri_ratio(0.02)
     assert value.ri_ratio(5.0) == value.ri_ratio(0.40)  # 上限で頭打ち
+
+
+def test_share_class_ticker_without_fix_is_mismatch(fx):
+    """SHARE_CLASSES の銘柄で本文が読めなかったら、株数を信用しない（要確認）。"""
+    F = fx["facts"]["AAA"]
+    assert fund_us.fundamentals(F, "2025-01-31", (), None, True)["sh_mismatch"] is True
+    assert fund_us.fundamentals(F, "2025-01-31", (), (100, "2025-01-01"), True)["sh"] == 100

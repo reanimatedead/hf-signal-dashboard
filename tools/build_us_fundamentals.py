@@ -111,27 +111,26 @@ def month_firsts(asof, n=HIST_MONTHS):
 
 def class_shares(sym, cik, sub, get_text):
     """株の種類を換算した株数（fund_us.SHARE_CLASSES の銘柄だけ）→ (株数, 提出日) | None。
-    直近の 10-Q / 10-K の表紙から読む。取れなければ None（株数が古いままなので「要確認」になる）。"""
+    直近の 10-Q / 10-K の本文から読む。取れなければ None（株数を信用できないので「要確認」になる）。"""
     if sym not in fund_us.SHARE_CLASSES:
         return None
     try:
         r = sub["filings"]["recent"]
         i = next(k for k, f in enumerate(r["form"]) if f in ("10-Q", "10-K"))
         acc = r["accessionNumber"][i].replace("-", "")
-        counts = fund_us.cover_class_shares(get_text(DOC_URL.format(cik=cik, acc=acc, doc=r["primaryDocument"][i])))
-        sh = fund_us.class_equiv_shares(sym, counts)
+        sh = fund_us.listed_class_shares(sym, get_text(DOC_URL.format(cik=cik, acc=acc, doc=r["primaryDocument"][i])))
         return (sh, r["filingDate"][i]) if sh else None
     except Exception:  # noqa: BLE001
         return None
 
 
-def history(F, asof, splits, sh_fix=None):
+def history(F, asof, splits, sh_fix=None, needs_fix=False):
     """{月初: [純利益, 自己資本, 株数, ROE, 一時利益の目印 0/1]}（その月初より前に提出された決算だけ。fund_us.fundamentals と同じ式）。
-    株数が古い月（要確認）は入れない。sh_fix は今の換算株数を過去の月にも使う（BRK-B・ERIE は株数の変化が小さい）。"""
+    株数が食い違う月（要確認）は入れない。sh_fix は今の換算株数を過去の月にも使う（BRK-B・ERIE・V は株数の変化が小さい）。"""
     out = {}
     for m in month_firsts(asof):
-        fd = fund_us.fundamentals(F, m, splits, sh_fix)
-        if fd and not fd.get("sh_stale"):
+        fd = fund_us.fundamentals(F, m, splits, sh_fix, needs_fix)
+        if fd and not fd.get("sh_mismatch"):
             out[m] = [fd["ni"], fd["eq"], fd["sh"], round(fd["roe"], 5) if fd.get("roe") is not None else None,
                       int(bool(fd.get("one_off")))]
     return out
@@ -145,14 +144,15 @@ def one(get_json, sym, cik, asof, get_text=http_text):
     except Exception:  # noqa: BLE001
         sub = {}
     fix = class_shares(sym, cik, sub, get_text)
-    fd = fund_us.fundamentals(F, asof, sp, fix)
-    hist = history(F, asof, sp, fix) if fd else {}
+    needs = sym in fund_us.SHARE_CLASSES
+    fd = fund_us.fundamentals(F, asof, sp, fix, needs)
+    hist = history(F, asof, sp, fix, needs) if fd else {}
     del F                                              # 1社分ずつ捨てる（全部をメモリに載せない）
     if not fd:
         return None
     sic = sub.get("sic")
     row = {k: fd[k] for k in ("fy", "ni", "eq", "ebit", "sh", "debt", "cash", "cap", "f_score", "f_max",
-                              "ta", "div", "one_off", "filed", "sh_end", "sh_stale")}
+                              "ta", "div", "one_off", "filed", "sh_end", "sh_mismatch")}
     if fix:
         row["sh_src"] = "cover"                        # 株の種類を換算した株数（Mac mini 版もこの値を使う）
     row["hist"] = hist

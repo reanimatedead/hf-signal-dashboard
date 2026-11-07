@@ -256,12 +256,13 @@
         : `<div class="sc-cell"><span>${I18.fmtNum(r.score_quality, 1)}</span><span class="sc-sub">${T("sc.unverified")}</span></div>`;
       case "score_sell": return !num(r.score_sell) ? DASH
         : `<div class="sc-cell"><span class="sc-sell">${I18.fmtNum(r.score_sell, 0)}</span><span class="sc-sub">${T("sc.sell_hint")}</span></div>`;
-      case "PER": case "PBR": if (r.value_check) return vcheck(r);
+      case "PER": case "PBR": if (vhide(r)) return vcheck(r);
         return num(r[c.k]) == null ? DASH : I18.fmtNum(r[c.k], c.k === "PBR" ? 2 : 1);
       case "roe_pct": case "div_yield_pct": case "equity_ratio_pct": return num(r[c.k]) == null ? DASH : I18.fmtNum(r[c.k], 1) + "%";
-      case "fair_price": if (r.value_check) return vcheck(r);
+      case "fair_price": if (vhide(r)) return vcheck(r);
         return num(r.fair_price) == null ? DASH : I18.fmtNum(r.fair_price, 2);
-      case "upside_pct": if (r.value_check) return vcheck(r);
+      case "upside_pct": if (vhide(r)) return vcheck(r);
+        if (r.value_check) return `<div class="sc-cell"><span>${pct(r.upside_pct)}</span>${vcheck(r, "sc.value_check_oneoff")}</div>`;
         return num(r.upside_pct) == null ? DASH : pct(r.upside_pct);
       case "turnover_20d": return num(r.turnover_20d) == null ? DASH : compact(r.turnover_20d);
       case "next_earnings": return !r.next_earnings ? DASH
@@ -283,10 +284,11 @@
     }
     return out;
   }
-  // 「要確認」（fund_us.value_check: PER 2 未満・上値余地 +500% 超。株の種類・株数の取り違えの疑い）
-  function vcheck(r) {
+  // 「要確認」（fund_us.value_check）。upside_gt_150 だけは値を出す（一時的な利益の可能性）。どれも割安の点は 0
+  function vhide(r) { return r.value_check && r.value_check !== "upside_gt_150"; }
+  function vcheck(r, key) {
     const why = esc(I18.code("value_check", r.value_check));
-    return `<span class="sc-sub" title="${why}" style="color:var(--yellow)">${T("sc.value_check")}</span>`;
+    return `<span class="sc-sub" title="${why}" style="color:var(--yellow)">${T(key || "sc.value_check")}</span>`;
   }
   function n1(v) { return num(v) == null ? DASH : I18.fmtNum(v, 1); }
   function compact(v) {   // 百万単位（日本円・米ドルとも同じ表し方）

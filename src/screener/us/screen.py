@@ -99,7 +99,7 @@ def load_share_fixes(cfg: Config) -> dict[str, tuple[float, str]]:
     return {t: (v["sh"], v["sh_end"]) for t, v in _fund_rows(cfg).items() if (v or {}).get("sh_src") == "cover"}
 
 
-SCORE_INPUTS_CACHE = "score_inputs_v2"  # 定義を変えたら名前を変える（v2: 株の種類の換算・株数が古い月を除く）
+SCORE_INPUTS_CACHE = "score_inputs_v3"  # 定義を変えたら名前を変える（v3: 株の種類の換算・株数が食い違う月を除く）
 
 
 def monthly_score_inputs(
@@ -133,11 +133,11 @@ def monthly_score_inputs(
         if not facts or not p:
             continue
         for m in todo:
-            fd = fund_us.fundamentals(facts, m, p["splits"], fixes.get(t))
+            fd = fund_us.fundamentals(facts, m, p["splits"], fixes.get(t), t in fund_us.SHARE_CLASSES)
             k = bisect.bisect_right(p["d"], m) - 1
             while k >= 0 and p["c"][k] is None:
                 k -= 1
-            if not fd or k < 0 or fd.get("sh_stale"):  # 株数が古い月（要確認）は使わない
+            if not fd or k < 0 or fd.get("sh_mismatch"):  # 株数が食い違う月（要確認）は使わない
                 continue
             up, pbr, per = fund_us.value_inputs(fd["ni"], fd["eq"], fd["sh"], fd["roe"], float(p["c"][k]))
             out[m][t] = [up, pbr, per, bool(fd.get("one_off"))]

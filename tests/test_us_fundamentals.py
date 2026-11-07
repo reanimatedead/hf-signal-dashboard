@@ -83,7 +83,7 @@ def test_class_shares_reads_latest_cover_page():
     assert bu.class_shares("AAPL", 1, SUB, text) is None and len(urls) == 1  # 対象外は取りに行かない
 
 
-def test_class_shares_failure_leaves_shares_stale():
+def test_class_shares_failure_returns_none():
     def boom(u):
         raise OSError("down")
 

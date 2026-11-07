@@ -120,7 +120,7 @@ def test_rerate_month_keeps_pbr_per():
 def test_value_check_rules():
     assert fund_us.value_check(0.008, 170299.0) == "per_lt_2"  # BRK-B: A 株の EPS × B 株の株価
     assert fund_us.value_check(3.1, 607.0) == "upside_gt_500"
-    assert fund_us.value_check(8.8, 353.6) is None
+    assert fund_us.value_check(8.8, 149.0) is None
     assert fund_us.value_check(None, None) is None
 
 
@@ -156,14 +156,66 @@ def test_score_rows_value_zero_for_flagged():
     assert rows[4]["score_value"] == 35.0  # 要確認は順位の母集団に入らない（最上位は満点）
 
 
-def test_shares_stale_flags():
-    assert fund_us.shares_stale("2010-01-27", "2026-11-06") and not fund_us.shares_stale("2026-09-30", "2026-11-06")
+def test_shares_mismatch_is_over_20_percent_only():
+    assert not fund_us.shares_mismatch(120, 100) and fund_us.shares_mismatch(121, 100)
+    assert fund_us.shares_mismatch(79, 100) and not fund_us.shares_mismatch(100, None)
     per_px = {f"S{i}": (20.0, 100.0) for i in range(8)}
-    per_px["V"] = (8.4, 422.0)
-    rv = fund_us.relative_value(per_px, {k: "7389" for k in per_px}, stale={"V": True})
-    assert rv["V"]["value_check"] == "shares_stale" and rv["V"]["fair_price"] is None
+    per_px["X"] = (8.4, 422.0)
+    rv = fund_us.relative_value(per_px, {k: "7389" for k in per_px}, mismatch={"X": True})
+    assert rv["X"]["value_check"] == "shares_mismatch" and rv["X"]["fair_price"] is None
+
+
+def test_old_share_count_alone_is_not_flagged():
+    """株数が 400 日より古くても、純利益 ÷ EPS と合っていれば要確認にしない（BLK・HSY）。"""
     F = _F([_v(469_280_842, "2010-01-27", "2010-02-01")], [])
+    assert fund_us.value_check(25.0, 10.0) is None
     assert fund_us.pick_shares_end(F, "2026-11-06")[2] == "2010-01-27"
+
+
+def test_upside_over_150_keeps_values_but_zero_points():
+    per_px = {f"S{i}": (20.0, 100.0) for i in range(8)}
+    per_px["ONE"] = (5.0, 50.0)  # 余地 +300%: 一時的な利益の可能性
+    per_px["OK"] = (10.0, 50.0)  # 余地 +100%
+    sics = {k: "6331" for k in per_px}
+    rv = fund_us.relative_value(per_px, sics)
+    assert rv["ONE"]["value_check"] == "upside_gt_150" and rv["ONE"]["upside_pct"] == 300.0
+    assert rv["ONE"]["fair_price"] == 200.0 and rv["OK"]["value_check"] is None
+    rows = [{"ticker": t, "price": px, "per_raw": per, "PER": per, "PBR": 1.0} for t, (per, px) in per_px.items()]
+    fund_us.apply_relative(rows, sics)
+    one = next(r for r in rows if r["ticker"] == "ONE")
+    assert one["PER"] == 5.0 and one["PBR"] == 1.0 and one["ri_upside_pct"] == 300.0  # 画面には出す
+    assert fund_us.value_check(5.0, 150.0) is None and fund_us.value_check(5.0, 150.1) == "upside_gt_150"
+
+
+def test_score_zero_for_upside_over_150_and_out_of_ranking():
+    from screener.calc import score
+
+    rows = [{"symbol": f"S{i}", "upside_pct": float(i), "PBR": 5.0 - i, "PER": 14.0 - i} for i in range(5)]
+    rows.append({"symbol": "X", "upside_pct": 300.0, "PBR": 1.0, "PER": 5.0, "value_check": "upside_gt_150"})
+    score.score_rows(rows, None, ("value",), market="us")
+    assert rows[-1]["score_value"] == 0.0 and rows[-1]["upside_pct"] == 300.0
+    assert rows[4]["score_value"] == 35.0  # 順位の母集団に入らない（最上位は満点）
+
+
+def test_rerate_month_blanks_upside_over_150():
+    vin = {f"S{i}": [0.0, 3.0, 20.0, False] for i in range(8)}
+    vin["ONE"] = [0.0, 1.0, 5.0, True]
+    out = fund_us.rerate_month(vin, {})
+    assert out["ONE"] == [None, None, None, True] and out["S0"][0] == 0.0
+
+
+V_DOC = """<xbrli:context id="t26"><xbrli:instant>2026-09-30</xbrli:instant></xbrli:context>
+<xbrli:context id="t25"><xbrli:instant>2025-09-30</xbrli:instant></xbrli:context>
+<xbrli:context id="a26"><xbrli:instant>2026-09-30</xbrli:instant>
+<xbrldi:explicitMember d="c">us-gaap:CommonClassAMember</xbrldi:explicitMember></xbrli:context>
+<ix:nonFraction contextRef="t25" name="v:SharesOutstandingAsConvertedBasis" scale="6">1,930</ix:nonFraction>
+<ix:nonFraction contextRef="a26" name="v:SharesOutstandingAsConvertedBasis" scale="6">1,728</ix:nonFraction>
+<ix:nonFraction contextRef="t26" name="v:SharesOutstandingAsConvertedBasis" scale="6">1,867</ix:nonFraction>"""
+
+
+def test_v_uses_latest_as_converted_total():
+    assert fund_us.listed_class_shares("V", V_DOC) == 1_867_000_000
+    assert fund_us.listed_class_shares("V", "<html></html>") is None
 
 
 # ── 株の種類の換算（fund_us.SHARE_CLASSES）: 表紙の種類別の株数を、上場している種類にそろえる ──
