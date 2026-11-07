@@ -119,7 +119,7 @@ def test_rerate_month_keeps_pbr_per():
 
 def test_value_check_rules():
     assert fund_us.value_check(0.008, 170299.0) == "per_lt_2"  # BRK-B: A 株の EPS × B 株の株価
-    assert fund_us.value_check(3.1, 607.0) == "upside_gt_500"
+    assert fund_us.value_check(3.1, 607.0) == "upside_gt_150"  # +500% 超も同じ扱い（値は出す）
     assert fund_us.value_check(8.8, 149.0) is None
     assert fund_us.value_check(None, None) is None
 
@@ -161,7 +161,7 @@ def test_shares_mismatch_is_over_20_percent_only():
     assert fund_us.shares_mismatch(79, 100) and not fund_us.shares_mismatch(100, None)
     per_px = {f"S{i}": (20.0, 100.0) for i in range(8)}
     per_px["X"] = (8.4, 422.0)
-    rv = fund_us.relative_value(per_px, {k: "7389" for k in per_px}, mismatch={"X": True})
+    rv = fund_us.relative_value(per_px, {k: "7389" for k in per_px}, sh_checks={"X": "shares_mismatch"})
     assert rv["X"]["value_check"] == "shares_mismatch" and rv["X"]["fair_price"] is None
 
 
@@ -258,3 +258,66 @@ def test_sh_fix_aligns_per_with_listed_class_price():
     m = fund_us.metrics(fd, 570.89)
     assert 18 < m["PER"] < 18.5 and 1.6 < m["PBR"] < 1.8
     assert fund_us.value_check(m["per_raw"], None) is None
+
+
+def test_unverified_shares_hide_values():
+    per_px = {f"S{i}": (20.0, 100.0) for i in range(8)}
+    per_px["ARES"] = (26.0, 150.0)
+    rows = [{"ticker": t, "price": px, "per_raw": per, "PER": per, "PBR": 3.0} for t, (per, px) in per_px.items()]
+    rows[-1]["sh_check"] = "shares_unverified"
+    fund_us.apply_relative(rows, {k: "6211" for k in per_px})
+    a = rows[-1]
+    assert a["value_check"] == "shares_unverified" and a["PER"] is None and a["PBR"] is None
+    assert a["fair_price"] is None and a["ri_upside_pct"] is None
+
+
+def test_upside_over_500_shows_values_like_over_150():
+    per_px = {f"S{i}": (20.0, 100.0) for i in range(8)}
+    per_px["CHTR"] = (2.9, 118.0)  # 余地 +590%
+    rows = [{"ticker": t, "price": px, "per_raw": per, "PER": per, "PBR": 0.9} for t, (per, px) in per_px.items()]
+    fund_us.apply_relative(rows, {k: "4841" for k in per_px})
+    c = rows[-1]
+    assert c["value_check"] == "upside_gt_150" and c["PER"] == 2.9 and c["ri_upside_pct"] > 500 and c["fair_price"]
+
+
+def test_share_check_uses_class_eps_from_filing():
+    fix = (1_867_000_000, "2026-11-05", {"2026-09-30": 12.32})
+    args = (23_504_000_000, "2026-09-30", {}, "2026-11-07", ())
+    assert fund_us.share_check(fix[0], *args, fix, True) is None  # 19.08 億と 2% 差
+    assert fund_us.share_check(3e9, *args, (3e9, "2026-11-05", fix[2]), True) == "shares_mismatch"
+    assert fund_us.share_check(fix[0], *args, (fix[0], fix[1], {}), True) == "shares_unverified"
+    assert fund_us.share_check(fix[0], *args, None, True) == "shares_mismatch"  # 換算できなかった
+
+
+def test_class_eps_keeps_decimals_and_picks_class():
+    doc = """<xbrli:context id="a"><xbrli:endDate>2026-09-30</xbrli:endDate>
+<x:explicitMember d="c">us-gaap:CommonClassAMember</x:explicitMember></xbrli:context>
+<xbrli:context id="b"><xbrli:endDate>2026-09-30</xbrli:endDate>
+<x:explicitMember d="c">us-gaap:CommonClassCMember</x:explicitMember></xbrli:context>
+<ix:nonFraction contextRef="a" name="us-gaap:EarningsPerShareDiluted">12.32</ix:nonFraction>
+<ix:nonFraction contextRef="b" name="us-gaap:EarningsPerShareDiluted">49.30</ix:nonFraction>"""
+    assert fund_us.class_eps("V", doc) == {"2026-09-30": 12.32}
+
+
+def test_fix_at_only_after_the_filing():
+    fix = (100, "2026-08-10", {})
+    assert fund_us.fix_at(fix, "2026-09-01") == fix
+    assert fund_us.fix_at(fix, "2026-08-01") is None and fund_us.fix_at(fix, "2026-08-10") is None
+    assert fund_us.fix_at(None, "2026-09-01") is None
+
+
+def _strip_after(F, m):
+    return {
+        ns: {
+            tg: {**b, "units": {u: [v for v in vs if v["filed"] < m] for u, vs in b["units"].items()}}
+            for tg, b in tags.items()
+        }
+        for ns, tags in F.items()
+    }
+
+
+def test_fundamentals_at_a_month_ignores_later_filings(fx):
+    """先読みしない: その月より後の提出を消しても、その月の値は同じ。"""
+    for t, F in fx["facts"].items():
+        for m in ("2023-06-01", "2024-03-01", "2025-01-31"):
+            assert fund_us.fundamentals(F, m) == fund_us.fundamentals(_strip_after(F, m), m), (t, m)

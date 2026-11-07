@@ -73,5 +73,5 @@ def test_ri_ratio():
 def test_share_class_ticker_without_fix_is_mismatch(fx):
     """SHARE_CLASSES の銘柄で本文が読めなかったら、株数を信用しない（要確認）。"""
     F = fx["facts"]["AAA"]
-    assert fund_us.fundamentals(F, "2025-01-31", (), None, True)["sh_mismatch"] is True
-    assert fund_us.fundamentals(F, "2025-01-31", (), (100, "2025-01-01"), True)["sh"] == 100
+    assert fund_us.fundamentals(F, "2025-01-31", (), None, True)["sh_check"] == "shares_mismatch"
+    assert fund_us.fundamentals(F, "2025-01-31", (), (100, "2025-01-01", {}), True)["sh"] == 100

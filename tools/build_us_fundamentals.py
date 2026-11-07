@@ -110,27 +110,37 @@ def month_firsts(asof, n=HIST_MONTHS):
 
 
 def class_shares(sym, cik, sub, get_text):
-    """株の種類を換算した株数（fund_us.SHARE_CLASSES の銘柄だけ）→ (株数, 提出日) | None。
-    直近の 10-Q / 10-K の本文から読む。取れなければ None（株数を信用できないので「要確認」になる）。"""
+    """株の種類を換算した株数（fund_us.SHARE_CLASSES の銘柄だけ）→ (株数, 提出日, {決算期末: EPS}) | None。
+    株数は直近の 10-Q / 10-K、EPS は直近の 10-K の本文から読む。株数が取れなければ None（「要確認」になる）。"""
     if sym not in fund_us.SHARE_CLASSES:
         return None
     try:
         r = sub["filings"]["recent"]
-        i = next(k for k, f in enumerate(r["form"]) if f in ("10-Q", "10-K"))
-        acc = r["accessionNumber"][i].replace("-", "")
-        sh = fund_us.listed_class_shares(sym, get_text(DOC_URL.format(cik=cik, acc=acc, doc=r["primaryDocument"][i])))
-        return (sh, r["filingDate"][i]) if sh else None
+
+        def doc(forms):
+            i = next(k for k, f in enumerate(r["form"]) if f in forms)
+            url = DOC_URL.format(cik=cik, acc=r["accessionNumber"][i].replace("-", ""), doc=r["primaryDocument"][i])
+            return get_text(url), r["filingDate"][i]
+
+        text, filed = doc(("10-Q", "10-K"))
+        sh = fund_us.listed_class_shares(sym, text)
+        if not sh:
+            return None
+        try:
+            return sh, filed, fund_us.class_eps(sym, doc(("10-K",))[0])
+        except Exception:  # noqa: BLE001
+            return sh, filed, {}                       # EPS が読めなければ照合できない（要確認）
     except Exception:  # noqa: BLE001
         return None
 
 
 def history(F, asof, splits, sh_fix=None, needs_fix=False):
     """{月初: [純利益, 自己資本, 株数, ROE, 一時利益の目印 0/1]}（その月初より前に提出された決算だけ。fund_us.fundamentals と同じ式）。
-    株数が食い違う月（要確認）は入れない。sh_fix は今の換算株数を過去の月にも使う（BRK-B・ERIE・V は株数の変化が小さい）。"""
+    株数の照合ができない・食い違う月（要確認）は入れない。換算株数はその提出より後の月にだけ使う（fund_us.fix_at）。"""
     out = {}
     for m in month_firsts(asof):
-        fd = fund_us.fundamentals(F, m, splits, sh_fix, needs_fix)
-        if fd and not fd.get("sh_mismatch"):
+        fd = fund_us.fundamentals(F, m, splits, fund_us.fix_at(sh_fix, m), needs_fix)
+        if fd and not fd.get("sh_check"):
             out[m] = [fd["ni"], fd["eq"], fd["sh"], round(fd["roe"], 5) if fd.get("roe") is not None else None,
                       int(bool(fd.get("one_off")))]
     return out
@@ -152,9 +162,10 @@ def one(get_json, sym, cik, asof, get_text=http_text):
         return None
     sic = sub.get("sic")
     row = {k: fd[k] for k in ("fy", "ni", "eq", "ebit", "sh", "debt", "cash", "cap", "f_score", "f_max",
-                              "ta", "div", "one_off", "filed", "sh_end", "sh_mismatch")}
+                              "ta", "div", "one_off", "filed", "sh_end", "sh_check")}
     if fix:
         row["sh_src"] = "cover"                        # 株の種類を換算した株数（Mac mini 版もこの値を使う）
+        row["sh_eps"] = fix[2]
     row["hist"] = hist
     row["roe"] = round(fd["roe"], 5) if fd.get("roe") is not None else None
     row["sic"] = sic

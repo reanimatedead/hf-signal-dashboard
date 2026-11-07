@@ -168,6 +168,17 @@ def shares_mismatch(sh, implied, limit=None):
     return bool(sh and implied) and abs(sh / implied - 1) > limit
 
 
+def share_check(sh, ni, fy, F, asof, splits, sh_fix, needs_fix):
+    """株数の照合 → None（合っている）| "shares_mismatch"（20% 超ずれる）| "shares_unverified"（物差しが無い）。"""
+    if needs_fix and not sh_fix:
+        return "shares_mismatch"
+    eps = ((sh_fix[2] if len(sh_fix) > 2 else None) or {}).get(fy) if sh_fix else None
+    implied = ni / eps if eps else implied_shares(F, asof, splits)
+    if not implied or implied <= 0:
+        return "shares_unverified"
+    return "shares_mismatch" if shares_mismatch(sh, implied) else None
+
+
 def split_adjust(sh, shd, splits):
     """株数を今の分割基準にそろえる（株価は Yahoo の分割調整後なので）。"""
     for sd, rr in splits:
@@ -186,6 +197,13 @@ SHARE_CLASSES = {
     "ERIE": {"us-gaap:CommonClassAMember": 1, "us-gaap:CommonClassBMember": 2400},
     "V": {"as_converted": "v:SharesOutstandingAsConvertedBasis"},
 }
+# 照合に使う EPS（上場している種類の通期の値。companyfacts に無いので 10-K の本文から読む）。
+# BRK は希薄化がなく基本 EPS だけ。
+CLASS_EPS = {
+    "BRK-B": ("us-gaap:EarningsPerShareBasic", "EquivalentClassBMember"),
+    "ERIE": ("us-gaap:EarningsPerShareDiluted", "CommonClassAMember"),
+    "V": ("us-gaap:EarningsPerShareDiluted", "CommonClassAMember"),
+}
 _IX_NUM = re.compile(r"<ix:nonFraction\b([^>]*)>(.*?)</ix:nonFraction>", re.S)
 
 
@@ -198,15 +216,16 @@ def _ix_facts(html, name):
             continue
         ctx_id = re.search(r'contextRef="([^"]+)"', attrs)
         scale = re.search(r'scale="(-?\d+)"', attrs)
-        digits = re.sub(r"[^0-9]", "", re.sub(r"<[^>]+>", "", m.group(2)))
+        num = re.sub(r"[^0-9.]", "", re.sub(r"<[^>]+>", "", m.group(2)))
         pat = rf'<xbrli:context id="{re.escape(ctx_id.group(1))}">(.*?)</xbrli:context>' if ctx_id else None
         ctx = pat and re.search(pat, html, re.S)
-        if not ctx or not digits:
+        if not ctx or not re.search(r"\d", num):
             continue
         body = ctx.group(1)
         dates = re.findall(r"<xbrli:(?:instant|endDate)>([^<]+)<", body)
         members = [x.strip() for x in re.findall(r"explicitMember[^>]*>([^<]+)<", body)]
-        out.append((int(digits) * 10 ** int(scale.group(1) if scale else 0), members, max(dates, default="")))
+        v = float(num) * 10 ** int(scale.group(1) if scale else 0)
+        out.append((int(v) if v.is_integer() else v, members, max(dates, default="")))
     return out
 
 
@@ -232,6 +251,19 @@ def listed_class_shares(ticker, html):
     return class_equiv_shares(ticker, cover_class_shares(html))
 
 
+def class_eps(ticker, html):
+    """10-K の本文（iXBRL）→ {決算期末: 上場している種類の EPS}。"""
+    spec = CLASS_EPS.get(ticker)
+    if not spec:
+        return {}
+    return {d: v for v, ms, d in _ix_facts(html, spec[0]) if ms and ms[0].endswith(spec[1]) and v}
+
+
+def fix_at(sh_fix, m):
+    """過去の月 m に使える換算株数。提出が m より後なら None（今の株数を過去に当てると先読みになる）。"""
+    return sh_fix if sh_fix and sh_fix[1] < m else None
+
+
 def filed_dates(F, asof):
     """10-K / 10-Q の提出日（asof より前・新しい順に FILED_KEEP 件・昇順で返す）。次の決算の推定に使う。"""
     ds = set()
@@ -246,7 +278,8 @@ def filed_dates(F, asof):
 
 def fundamentals(F, asof, splits=(), sh_fix=None, needs_fix=False):
     """価格を使わない部分（週1回計算して保存できる）。足りなければ None。
-    sh_fix = (株数, 日付): 株の種類を換算した株数（SHARE_CLASSES）。あれば SEC の companyfacts の株数の代わりに使う。
+    sh_fix = (株数, 日付, {決算期末: EPS}): 株の種類を換算した株数（SHARE_CLASSES）。
+    あれば companyfacts の株数の代わりに使う。
     needs_fix: SHARE_CLASSES の銘柄。換算できなかった（sh_fix なし）ら株数を信用しない。"""
     g = {k: annual(F, v, asof, "shares" if k == "dsh" else "USD") for k, v in TAGS.items()}
     ni, ni0, fy = g["ni"]
@@ -255,7 +288,7 @@ def fundamentals(F, asof, splits=(), sh_fix=None, needs_fix=False):
     if not sh and g["dsh"][0] and g["dsh"][2]:
         sh, sh_end = split_adjust(g["dsh"][0], g["dsh"][2], splits), g["dsh"][2]
     if sh_fix:
-        sh, sh_end = sh_fix
+        sh, sh_end = sh_fix[:2]
     if ni is None or not eq or not sh or fy is None:
         return None
     if (dt.date.fromisoformat(asof) - dt.date.fromisoformat(fy)).days > STALE_DAYS:
@@ -293,7 +326,7 @@ def fundamentals(F, asof, splits=(), sh_fix=None, needs_fix=False):
         "one_off": one_off_flag(net_income=ni, op_income=g["ebit"][0])["flag"],
         "filed": filed_dates(F, asof),
         "sh_end": sh_end,
-        "sh_mismatch": (needs_fix and not sh_fix) or shares_mismatch(sh, implied_shares(F, asof, splits)),
+        "sh_check": share_check(sh, ni, fy, F, asof, splits, sh_fix, needs_fix),
     }
 
 
@@ -360,24 +393,22 @@ def per_benchmarks(pers, sics, p=PER_BENCH):
 
 # 値の確かめ。
 # 理論株価・上値余地・PER・PBR を出さない（VALUE_HIDE）:
-#   shares_mismatch  使う株数が「純利益 ÷ 希薄化後 EPS」と sh_mismatch（20%）を超えて食い違う
-#   per_lt_2         PER が per_min 未満
-#   upside_gt_500    上値余地が upside_max% 超
+#   shares_mismatch    使う株数が「純利益 ÷ 希薄化後 EPS」と sh_mismatch（20%）を超えて食い違う
+#   shares_unverified  その照合ができない（EPS が無い・決算期が合わない）
+#   per_lt_2           PER が per_min 未満
 # 値は出す（一時的な利益で PER が低く見えている可能性）:
-#   upside_gt_150    上値余地が upside_soft% 超
+#   upside_gt_150      上値余地が upside_soft% 超
 # どれも売買スコアの割安の点は 0、順位の母集団からも外す。
-VALUE_CHECK = {"per_min": 2.0, "upside_max": 500.0, "upside_soft": 150.0, "sh_mismatch": 0.2}
-VALUE_HIDE = ("shares_mismatch", "per_lt_2", "upside_gt_500")
+VALUE_CHECK = {"per_min": 2.0, "upside_soft": 150.0, "sh_mismatch": 0.2}
+VALUE_HIDE = ("shares_mismatch", "shares_unverified", "per_lt_2")
 
 
-def value_check(per, up, p=VALUE_CHECK, mismatch=False):
-    """→ None（問題なし）| "shares_mismatch" | "per_lt_2" | "upside_gt_500" | "upside_gt_150"。"""
-    if mismatch:
-        return "shares_mismatch"
+def value_check(per, up, p=VALUE_CHECK, sh_check=None):
+    """→ None（問題なし）| "shares_mismatch" | "shares_unverified" | "per_lt_2" | "upside_gt_150"。"""
+    if sh_check:
+        return sh_check
     if per is not None and per < p["per_min"]:  # PER は黒字のときだけある（赤字は None）
         return "per_lt_2"
-    if up is not None and up > p["upside_max"]:
-        return "upside_gt_500"
     if up is not None and up > p["upside_soft"]:
         return "upside_gt_150"
     return None
@@ -388,15 +419,15 @@ def per_upside(per, bench):
     return 100 * (bench / per - 1) if per and per > 0 and bench else None
 
 
-def relative_value(per_px, sics, p=PER_BENCH, mismatch=None):
+def relative_value(per_px, sics, p=PER_BENCH, sh_checks=None):
     """{銘柄: (PER, 株価)} → {銘柄: {"upside_pct", "fair_price", "per_bench", "per_bench_level"}}。
     公開側・Mac mini とも同じ関数。"""
-    bm = per_benchmarks({t: (None if (mismatch or {}).get(t) else v[0]) for t, v in per_px.items()}, sics, p)
+    bm = per_benchmarks({t: (None if (sh_checks or {}).get(t) else v[0]) for t, v in per_px.items()}, sics, p)
     out = {}
     for t, (per, px) in per_px.items():
         b = bm.get(t)
         up = per_upside(per, b[0]) if b else None
-        chk = value_check(per, up, mismatch=bool((mismatch or {}).get(t)))
+        chk = value_check(per, up, sh_check=(sh_checks or {}).get(t))
         if chk in VALUE_HIDE:
             up = None
         out[t] = {
@@ -443,15 +474,15 @@ def metrics(fd, px):
         "div_yield_pct": round(100 * abs(fd["div"]) / mcap, 2) if fd.get("div") and mcap > 0 else None,
         "fair_price": None,
         "per_raw": per,
-        "sh_mismatch": bool(fd.get("sh_mismatch")),  # 株数の食い違い → apply_relative が「要確認」
+        "sh_check": fd.get("sh_check"),  # 株数の照合の結果 → apply_relative が「要確認」
     }
 
 
 def apply_relative(rows, sics, key="ticker", p=PER_BENCH):
     """metrics の行（price・per_raw を持つ）に、業種別 PER の中央値からの理論株価・上値余地を入れる。"""
     per_px = {r[key]: (r.get("per_raw"), r.get("price")) for r in rows if r.get(key) and r.get("price")}
-    mismatch = {r[key]: bool(r.get("sh_mismatch")) for r in rows if r.get(key)}
-    rv = relative_value(per_px, sics, p, mismatch)
+    sh_checks = {r[key]: r.get("sh_check") for r in rows if r.get(key)}
+    rv = relative_value(per_px, sics, p, sh_checks)
     for r in rows:
         v = rv.get(r.get(key))
         if v:

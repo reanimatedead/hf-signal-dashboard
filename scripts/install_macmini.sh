@@ -4,7 +4,8 @@
 #   1. 毎日の実行専用の作業ツリー ~/hf-signal-dashboard-run（git worktree・origin/main）を作って uv sync
 #      開発用のクローン ~/hf-signal-dashboard はどのブランチでもよい（毎日の実行は触らない）
 #   2. J-Quants のキーを macOS キーチェーンに登録（read -rs。画面にもファイルにも出さない）
-#   3. ntfy のトピック（ランダム）を作り ~/.config/screener/config.toml に保存（1回だけ表示）
+#   3. ntfy のトピック（ランダム）を作り ~/.config/screener/config.toml に保存（1回だけ表示）。
+#      ファイルがあれば作り直さず、足りない項目だけ足す
 #   4. launchd: 毎日 19:00 に `uv run python -m screener.daily`（ログは <data_dir>/logs）
 #   5. sudo pmset repeat wakeorpoweron MTWRFSU 18:55:00（19:00 の前に起こす）
 #   6. ntfy の試し送信（本文は「screener 日付 OK」だけ）
@@ -64,22 +65,10 @@ if [ -z "$TOPIC" ]; then
   TOPIC="screener-$(openssl rand -hex 16)"
   NEW_TOPIC=1
 fi
+# すでにあれば作り直さず、足りない項目だけ足す（[alerts]・[edgar] などの既存の値は変えない）
 umask 077
-cat >"$CONF" <<EOF_CONF
-# screener の設定（install_macmini.sh が作成）。キーはここに書かない（キーチェーン）。
-[paths]
-data_dir = "$DATA_DIR"
-repo_dir = "$RUN_DIR"
-
-[jquants]
-keychain_service = "$SERVICE"
-rate_per_min = 50
-history_years = 5
-
-[ntfy]
-server = "https://ntfy.sh"
-topic = "$TOPIC"
-EOF_CONF
+(cd "$RUN_DIR" && "$UV" run python -m screener.config ensure "$CONF" \
+  --data-dir "$DATA_DIR" --repo-dir "$RUN_DIR" --service "$SERVICE" --topic "$TOPIC")
 umask 022
 if [ "$NEW_TOPIC" = 1 ]; then
   printf '\nntfy のトピック（スマホの ntfy アプリでこの名前を購読してください。表示はこの1回だけ）:\n  %s\n\n' "$TOPIC"

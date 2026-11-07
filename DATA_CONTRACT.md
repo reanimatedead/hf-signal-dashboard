@@ -1749,9 +1749,9 @@ Stats = {n, mean, median, up_pct}
 ### 米国株の「要確認」（`calc.fund_us.value_check`）
 - どれも売買スコアの割安の点は 0、順位の母集団から外す。月初の検証も同じ（`rerate_month`。株数が食い違う月は入力に入れない）。
 - 値を出さない（`VALUE_HIDE`。理論株価・上値余地・PER・PBR なし、業種別 PER の中央値からも外す）:
-  使う株数が「純利益 ÷ 希薄化後 EPS」と 20% 超ずれる（`shares_mismatch`）、PER が 2 未満、上値余地が +500% 超。
+  使う株数が「純利益 ÷ 希薄化後 EPS」と 20% 超ずれる（`shares_mismatch`）、その照合ができない（`shares_unverified`）、PER が 2 未満。
 - 値は出す: 上値余地が +150% 超（`upside_gt_150`。「要確認（一時的な利益の可能性）」と表示）。
-- 株数の古さだけでは要確認にしない。SEC に希薄化後 EPS が無い銘柄はこの検査ができない（要確認にならない）。
+- 株数の古さだけでは要確認にしない。
 - 外した銘柄は `meta.us_fundamentals.value_check`（銘柄 → 理由・外す前の PER）と `value_check_rule`。
 - 原因: ERIE は SEC の株数が B 株 2,542 株（2021 年）のまま、BRK-B は株数が 2011 年の A 株の数で、A 株規模の EPS を B 株の株価に当てていた。
   SEC の companyfacts は株の種類ごとの最新の株数を持たない。
@@ -1760,6 +1760,11 @@ Stats = {n, mean, median, up_pct}
 - 週次の `tools/build_us_fundamentals.py` が直近の 10-Q / 10-K の本文（iXBRL）を読み、上場している種類の株数に換算して使う。
   BRK-B: A 株 × 1,500 + B 株、ERIE: A 株 + B 株 × 2,400（表紙の株数 × 提出書類で確かめた定款の固定値）。
   V: B・C 株と優先株の転換比率が変わるので、会社が出す A 株換算の合計（`v:SharesOutstandingAsConvertedBasis`）を読む。
-- 読めなければ `shares_mismatch` で「要確認」になる。過去の月（`hist`）にも今の換算株数を使う。Mac mini 版も同じ値（`sh_src: "cover"` の行）を使う。
-- `data/us_fundamentals.json` の各行に `sh_end`（使った株数の期末日。本文なら提出日）と `sh_mismatch`。
+- 読めなければ `shares_mismatch` で「要確認」になる。照合の EPS は直近の 10-K の本文から読む（`CLASS_EPS`。`sh_eps`）。Mac mini 版も同じ値（`sh_src: "cover"` の行）を使う。
+- `data/us_fundamentals.json` の各行に `sh_end`（使った株数の期末日。本文なら提出日）と `sh_check`。
+
+### 検証の財務データ（先読みしない）
+- `hist` の月初の値は、その月初より前に提出された 10-K / 10-Q だけから計算する（`fund_us.fundamentals(F, 月初)`。`filed` で切る）。テストで、後の提出を消しても値が変わらないことを確かめている。
+- 換算株数は提出より後の月にだけ使う（`fix_at`）。それより前の月は V・ERIE・BRK-B の割安の点なし。株数を照合できない月も入れない。
+- 残る偏り: 銘柄は今の構成銘柄（生き残りの偏り）。チャートの点の gate は今の判定を過去にも当てる。当てない場合の成績は verify.json の `score_tiers.us.without_gate`。
 

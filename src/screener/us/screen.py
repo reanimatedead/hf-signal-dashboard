@@ -94,12 +94,15 @@ def load_sics(cfg: Config) -> dict[str, Any]:
     return {t: (v or {}).get("sic") for t, v in _fund_rows(cfg).items()}
 
 
-def load_share_fixes(cfg: Config) -> dict[str, tuple[float, str]]:
-    """{ticker: (株数, 日付)}: 株の種類を換算した株数（週次の build_us_fundamentals.py が表紙から読んだ値）。"""
-    return {t: (v["sh"], v["sh_end"]) for t, v in _fund_rows(cfg).items() if (v or {}).get("sh_src") == "cover"}
+def load_share_fixes(cfg: Config) -> dict[str, tuple[float, str, dict[str, float]]]:
+    """{ticker: (株数, 日付, {決算期末: EPS})}: 株の種類を換算した株数。"""
+    rows = _fund_rows(cfg).items()
+    return {t: (v["sh"], v["sh_end"], v.get("sh_eps") or {}) for t, v in rows if (v or {}).get("sh_src") == "cover"}
 
 
-SCORE_INPUTS_CACHE = "score_inputs_v3"  # 定義を変えたら名前を変える（v3: 株の種類の換算・株数が食い違う月を除く）
+SCORE_INPUTS_CACHE = (
+    "score_inputs_v4"  # 定義を変えたら名前を変える（v4: 株数を照合できない月も除く・換算株数は提出後の月だけ）
+)
 
 
 def monthly_score_inputs(
@@ -133,11 +136,12 @@ def monthly_score_inputs(
         if not facts or not p:
             continue
         for m in todo:
-            fd = fund_us.fundamentals(facts, m, p["splits"], fixes.get(t), t in fund_us.SHARE_CLASSES)
+            fix = fund_us.fix_at(fixes.get(t), m)
+            fd = fund_us.fundamentals(facts, m, p["splits"], fix, t in fund_us.SHARE_CLASSES)
             k = bisect.bisect_right(p["d"], m) - 1
             while k >= 0 and p["c"][k] is None:
                 k -= 1
-            if not fd or k < 0 or fd.get("sh_mismatch"):  # 株数が食い違う月（要確認）は使わない
+            if not fd or k < 0 or fd.get("sh_check"):  # 株数を照合できない・食い違う月（要確認）は使わない
                 continue
             up, pbr, per = fund_us.value_inputs(fd["ni"], fd["eq"], fd["sh"], fd["roe"], float(p["c"][k]))
             out[m][t] = [up, pbr, per, bool(fd.get("one_off"))]
