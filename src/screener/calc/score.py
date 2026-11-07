@@ -19,6 +19,7 @@
 
 from __future__ import annotations
 
+import calendar
 import datetime as dt
 from collections.abc import Iterable, Mapping, Sequence
 from typing import Any
@@ -168,6 +169,79 @@ def gate_from_verify(
     out[ind.CCI200_BUY + "_spike"] = events.weakened(buy.get("spike_recent6m"), cb) is not True
     out[ind.CCI200_SELL] = events.weakened(cb, sell.get("recent6m") or {}) is not True  # 売り目安後が基準より上 = 外れ
     return out
+
+
+GATE_MONTHS = 6  # gate が見る期間
+
+
+def _months_before(d: str, months: int) -> str:
+    x = dt.date.fromisoformat(d[:10])
+    y, m = x.year, x.month - months
+    while m < 1:
+        m += 12
+        y -= 1
+    return dt.date(y, m, min(x.day, calendar.monthrange(y, m)[1])).isoformat()
+
+
+def gate_days(
+    xs: Iterable[tuple[dict[str, Any], Sequence[str]]],
+    spike_days: set[str] | None = None,
+    months: int = GATE_MONTHS,
+) -> dict[str, dict[str, bool]]:
+    """{日付: gate}。各日の gate は、その日までに 20 営業日後の結果が確定したシグナルだけで決める（先読みしない）。
+    見る範囲: シグナルの日がその日の months か月前以降、かつ結果の確定日がその日以前。規則は gate_from_verify。
+    最新日の gate が画面のスコアに使うもの。"""
+    acc: dict[str, list[tuple[str, str, float]]] = {}
+    days: set[str] = set()
+    for x, ds in xs:
+        ds = list(ds)
+        days.update(ds)
+        conds = {**ind.label_conditions(x), **ind.cci200_days(x)}
+        events.merge(acc, events.event_returns_dated(x["c"], conds, ds, exits=True))
+    sp = spike_days or set()
+    if ind.CCI200_BUY in acc:
+        acc["_spike"] = [e for e in acc[ind.CCI200_BUY] if e[0] in sp]
+
+    def arrays(v: list[tuple[str, str, float]]) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+        v = sorted(v)
+        return (
+            np.array([e[0] for e in v], dtype="datetime64[D]"),
+            np.array([e[1] for e in v], dtype="datetime64[D]"),
+            np.array([e[2] for e in v], dtype=float),
+        )
+
+    ev = {k: arrays(v) for k, v in acc.items()}
+
+    def window(k: str, lo: np.datetime64, d: np.datetime64) -> dict[str, Any]:
+        if k not in ev:
+            return {"n": 0, "median": None}
+        sig, ex, ret = ev[k]
+        a, b = np.searchsorted(sig, lo), np.searchsorted(sig, d, side="right")
+        r = ret[a:b][ex[a:b] <= d]
+        return {"n": int(len(r)), "median": round(float(np.median(r)), 2) if len(r) else None}
+
+    out = {}
+    for day in sorted(days):
+        d, lo = np.datetime64(day[:10], "D"), np.datetime64(_months_before(day, months), "D")
+        base = window("base", lo, d)
+        c200 = {
+            "base": {"recent6m": base},
+            ind.CCI200_BUY: {"recent6m": window(ind.CCI200_BUY, lo, d), "spike_recent6m": window("_spike", lo, d)},
+            ind.CCI200_SELL: {"recent6m": window(ind.CCI200_SELL, lo, d)},
+        }
+        out[day] = gate_from_verify({k: window(k, lo, d) for k in W["chart"]}, base, c200)
+    return out
+
+
+def evidence_weak(full: Mapping[str, Any], recent: Mapping[str, Any], min_n: int = 5) -> bool:
+    """段階5 の中央値が全期間と直近6か月の両方で相場全体（base）を上回らない → 根拠不十分。
+    件数が少なければ上回らない扱い。"""
+
+    def beats(st: Mapping[str, Any]) -> bool:
+        t, b = st.get(TOP_TIER) or {}, st.get("base") or {}
+        return t.get("n", 0) >= min_n and None not in (t.get("median"), b.get("median")) and t["median"] > b["median"]
+
+    return not beats(full) and not beats(recent)
 
 
 def chart_points(
@@ -380,15 +454,18 @@ def chart_points_days(
     market: str = "us",
     ds: Sequence[str] | None = None,
     spike_days: set[str] | None = None,
+    gate_by_day: Mapping[str, Mapping[str, bool]] | None = None,
 ) -> np.ndarray:
-    """日ごとのチャートの点（画面と同じ chart_points を日ごとに）。spike_days は「一斉に割れ」の日付。"""
+    """日ごとのチャートの点（画面と同じ chart_points を日ごとに）。spike_days は「一斉に割れ」の日付。
+    gate_by_day（gate_days）があれば、その日の gate を使う。"""
     lab = ind.day_labels(x)
     cd = ind.cci200_days(x)
     sp = spike_days or set()
     out = np.zeros(len(lab))
     for i in range(len(lab)):
         code = ind.CCI200_BUY if cd[ind.CCI200_BUY][i] else ind.CCI200_SELL if cd[ind.CCI200_SELL][i] else None
-        out[i] = chart_points(str(lab[i]), code, gate, market, bool(ds is not None and ds[i] in sp))
+        g = gate_by_day.get(ds[i], gate) if gate_by_day is not None and ds is not None else gate
+        out[i] = chart_points(str(lab[i]), code, g, market, bool(ds is not None and ds[i] in sp))
     return out
 
 
@@ -435,11 +512,12 @@ def total_days(
     low_turnover: np.ndarray | None = None,
     market: str = "us",
     spike_days: set[str] | None = None,
+    gate_by_day: Mapping[str, Mapping[str, bool]] | None = None,
 ) -> np.ndarray:
     """日ごとの合計点（score_rows と同じ部品: chart_points・割安の点（その月初の順位）・penalty）。
     割安の点の無い日は 0 点（score_rows と同じ扱い）。x と ds は同じ長さ（Close が有限な日だけ）。"""
     use = set(parts)
-    tot = chart_points_days(x, gate, market, ds, spike_days) if "chart" in use else np.zeros(len(ds))
+    tot = chart_points_days(x, gate, market, ds, spike_days, gate_by_day) if "chart" in use else np.zeros(len(ds))
     if "value" in use and value_by_month:
         tot = tot + np.array(by_month_days(code, ds, value_by_month, 0.0), dtype=float)
     if "penalty" in use:
@@ -504,6 +582,7 @@ def verify_tiers(
         "recent6m": rs,
         "top_tier": TOP_TIER,
         "weakened": wk,
+        "evidence_weak": evidence_weak(fs, rs),
         "top_below_base_full": events.weakened(fs[TOP_TIER], fs["base"]),
     }
 

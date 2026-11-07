@@ -42,8 +42,9 @@ def event_returns(close, conds, h=H, gap=GAP, start=WARMUP, dates=None, since=No
     return out
 
 
-def event_returns_dated(close, conds, dates, h=H, gap=GAP, start=WARMUP):
-    """event_returns と同じ数え方で、(日付, h日後騰落%) の組を返す（年ごと・特定の日を除く集計用）。"""
+def event_returns_dated(close, conds, dates, h=H, gap=GAP, start=WARMUP, exits=False):
+    """event_returns と同じ数え方で、(日付, h日後騰落%) の組を返す（年ごと・特定の日を除く集計用）。
+    exits=True なら (日付, 結果が確定した h日後の日付, 騰落%)。"""
     C = np.asarray(close, dtype=float)
     out = {"base": []}
     last = {}
@@ -54,11 +55,12 @@ def event_returns_dated(close, conds, dates, h=H, gap=GAP, start=WARMUP):
         if not (np.isfinite(C[i]) and np.isfinite(C[i + h]) and C[i] > 0):
             continue
         f = (C[i + h] / C[i] - 1) * 100
-        out["base"].append((dates[i], f))
+        rec = (dates[i], dates[i + h], f) if exits else (dates[i], f)
+        out["base"].append(rec)
         for k, cond in conds.items():
             if cond[i] and i - last[k] >= gap:
                 last[k] = i
-                out[k].append((dates[i], f))
+                out[k].append(rec)
     return out
 
 

@@ -177,3 +177,68 @@ def test_etf_kind_from_name():
     # 公開の ETF 一覧の種類は名前の規則と一致（1か所の定義どうしがずれない）
     assert {s: k for s, (_n, k) in assets.ETFS.items()} == {s: assets.etf_kind(n) for s, (n, _k) in assets.ETFS.items()}
     assert {"1306.T", "1321.T", "1570.T", "1360.T", "1357.T", "1458.T", "1459.T"} <= set(assets.ETFS)
+
+
+# ── gate を各日付の時点で決める（score.gate_days）: 未来の結果を見ない ──
+
+
+def _series(n=1000, seed=3):
+    rng = np.random.default_rng(seed)
+    c = 100 * np.exp(np.cumsum(rng.normal(0.0002, 0.02, n)))
+    h, lo = c * 1.01, c * 0.99
+    ds = [str(d) for d in np.datetime64("2022-01-03") + np.arange(n)]
+    return ind.compute(h, lo, c), ds
+
+
+def test_gate_days_ignores_the_future():
+    """ある日の gate は、その日より後の値動きを変えても変わらない。"""
+    xs = [_series(seed=s) for s in range(6)]
+    cut = 800
+    day = xs[0][1][cut]
+    a = score.gate_days(xs)
+    chopped = []
+    for x, ds in xs:
+        y = {k: (v[: cut + 1] if isinstance(v, np.ndarray) and len(v) == len(ds) else v) for k, v in x.items()}
+        chopped.append((y, ds[: cut + 1]))
+    b = score.gate_days(chopped)
+    assert a[day] == b[day]
+
+
+def test_gate_days_only_uses_results_known_by_that_day(monkeypatch):
+    """シグナルの 20 営業日後の結果が確定するまでは gate に効かない。"""
+    n = 600
+    x, ds = _series(n)
+    i = 400
+    buys = np.zeros(n, dtype=bool)
+    buys[i::30] = True
+    monkeypatch.setattr(ind, "label_conditions", lambda _x: {"buy": buys})
+    monkeypatch.setattr(ind, "cci200_days", lambda _x: {})
+    c = np.full(n, 100.0)
+    c[i + 20 :: 30] = 50.0  # どの buy も 20 営業日後に半値（それ以外の日は動かない）
+    g = score.gate_days([({**x, "c": c}, ds)])
+    assert g[ds[i + 19]]["buy"] is True  # まだ1件も確定していない
+    assert g[ds[i + 30 * 3 + 20]]["buy"] is True  # 確定は 4 件だけ（5 件未満は判定しない）
+    assert g[ds[i + 30 * 4 + 19]]["buy"] is True  # 5 件目の結果は翌日に確定する
+    assert g[ds[i + 30 * 4 + 20]]["buy"] is False  # 確定した日に初めて 0 点
+
+
+def test_total_days_uses_each_days_gate():
+    x, ds = _series(600)
+    on = {d: {} for d in ds}
+    off = {d: {k: False for k in score.W["chart"]} for d in ds}
+    a = score.total_days(x, ds, "X", None, ("chart",), gate_by_day=on)
+    b = score.total_days(x, ds, "X", None, ("chart",), gate_by_day=off)
+    assert np.array_equal(a, score.total_days(x, ds, "X", None, ("chart",)))
+    assert (b <= a).all()
+
+
+def _tiers(t5, base, n=10):
+    return {"tier5": {"n": n, "median": t5}, "base": {"n": 100, "median": base}}
+
+
+def test_evidence_weak_when_top_tier_never_beats_market():
+    assert score.evidence_weak(_tiers(0.3, 0.5), _tiers(0.5, 0.5)) is True
+    assert score.evidence_weak(_tiers(0.6, 0.5), _tiers(0.1, 0.5)) is False  # 片方でも上回れば出さない
+    assert score.evidence_weak(_tiers(0.1, 0.5), _tiers(0.6, 0.5)) is False
+    assert score.evidence_weak(_tiers(9.0, 0.5, n=2), _tiers(9.0, 0.5, n=4)) is True  # 件数が少なすぎる
+    assert score.evidence_weak(_tiers(None, 0.5, n=0), _tiers(None, 0.5, n=0)) is True  # 段階5 が無い

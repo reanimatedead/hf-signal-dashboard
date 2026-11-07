@@ -300,7 +300,8 @@
     }
     const t = num(r.score_tier);
     return `<div class="sc-cell"><span class="sc-tot">${I18.fmtNum(r.score, 1)}</span>`
-      + (t == null ? "" : `<span class="sc-tier sc-t${t}">${T("sc.tier_n", { n: I18.fmtNum(t, 0) })}</span>`) + `</div>`;
+      + (t == null ? "" : `<span class="sc-tier sc-t${t}">${T("sc.tier_n", { n: I18.fmtNum(t, 0) })}</span>`)
+      + (r.score_evidence_weak ? `<span class="sc-sub" style="color:var(--yellow)">${T("sc.evidence_weak")}</span>` : "") + `</div>`;
   }
 
   // ── 米国の買い判定一覧（Nasdaq 100 タブの上） ──
@@ -442,11 +443,12 @@
   function scoreTiers(v) {
     const st = v.score_tiers || {};
     if (!Object.keys(st).length) return "";
-    let h = `<h2 style="margin-top:18px">${T("vf.score_title")}</h2><div class="vf-meta">${T("vf.score_meta")}</div>`;
+    let h = `<h2 style="margin-top:18px">${T("vf.score_title")}</h2><div class="vf-meta">${T("vf.score_meta")}</div><div class="vf-meta">${T("vf.survivorship")}</div>`;
     Object.entries(st).forEach(([k, t]) => {
       const label = I18.code("verify_market", I18.norm("verify_market", k === "us" ? "us_union" : k));
       const parts = (t.parts || []).map((x) => T("sc.part_" + x)).join(T("common.sep_list"));
       h += `<h3>${T("vf.score_h", { label: esc(label), n: I18.fmtNum(t.symbols, 0), parts: esc(parts) })}</h3>`;
+      if (t.evidence_weak === true) h += `<div class="vf-meta vf-weak">${T("sc.evidence_weak")}</div>`;
       const head = "<tr>" + ["vf.th_tier", "vf.th_n", "vf.th_median", "vf.th_up", "vf.th_diff", "vf.th_n6", "vf.th_median6", "vf.th_diff6"].map((x) => `<th>${T(x)}</th>`).join("") + "</tr>";
       const row = (name, a, b, fa, fb, mark) => {
         const d = (s, base) => (s && base && num(s.median) != null && num(base.median) != null ? T("vf.pt", { v: I18.fmtSigned(s.median - base.median, 2) }) : "—");
@@ -457,7 +459,8 @@
       const F = t.full || {}, R = t.recent6m || {};
       const body = row(T("vf.base_row"), F.base, R.base, F.base, R.base)
         + TIERS.map((x) => row(T("sc.tier_n", { n: x.slice(4) }), F[x], R[x], F.base, R.base,
-          x === "tier5" && t.weakened === true ? ` <span class="vf-weak">${T("vf.weak_mark")}</span>` : "")).join("");
+          x === "tier5" && t.weakened === true ? ` <span class="vf-weak">${T("vf.weak_mark")}</span>` : "")).join("")
+        + (t.without_gate ? row(T("vf.no_gate_row"), (t.without_gate.full || {}).tier5, (t.without_gate.recent6m || {}).tier5, F.base, R.base) : "");
       h += `<table><thead>${head}</thead><tbody>${body}</tbody></table>`;
     });
     return h;

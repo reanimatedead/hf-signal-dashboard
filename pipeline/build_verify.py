@@ -182,8 +182,9 @@ def us_monthly_inputs(xs, fund):
     return vin, oo
 
 
-def score_market(entries, parts, gate, since, fund=None, market="us", spikes=None):
-    """1 つの市場の段階別成績（score.verify_tiers）。parts は score.score_rows と同じ。"""
+def score_market(entries, parts, gate_by_day, since, fund=None, market="us", spikes=None):
+    """1 つの市場の段階別成績（score.verify_tiers）。parts は score.score_rows と同じ。
+    gate_by_day は score.gate_days（各日の時点の gate）。None なら gate を当てない。"""
     xs = _xs(entries)
     low = score.low_turnover_by_symbol(turnover_series(xs)) if "penalty" in parts else {}
     vbm, obm = us_monthly_inputs(xs, fund) if ("value" in parts and fund) else ({}, {})
@@ -191,7 +192,8 @@ def score_market(entries, parts, gate, since, fund=None, market="us", spikes=Non
     items = []
     for sym, x, ds, _e in xs:
         earn = ((fund or {}).get(sym) or {}).get("filed") or []
-        tot = score.total_days(x, ds, sym, gate, parts, vpm, obm or None, earn, low.get(sym), market, spikes)
+        tot = score.total_days(x, ds, sym, None, parts, vpm, obm or None, earn, low.get(sym), market, spikes,
+                               gate_by_day)
         items.append((x["c"], tot, ds))
     return score.verify_tiers(items, since, parts)
 
@@ -215,17 +217,19 @@ def build_scores(obj, entries_by_market, fund=None, etf_kinds=None):
         c2.update({"market": SCORE_MARKET[key], "verified": True, "spike_today": spike_today,
                    "spike_rule": key in SPIKE_MARKETS, "points": dict(score.CCI200[SCORE_MARKET[key]])})
         cci[key] = c2
-        gate = score.gate_from_verify((mk.get("recent6m") or {}).get("chart"), (mk.get("recent6m") or {}).get("base"), c2)
+        gd = score.gate_days([(x, ds) for _s, x, ds, _e in xs], spikes)     # 各日の時点の gate（先読みしない）
+        gate = gd[max(gd)] if gd else {}                                    # 最新日の gate = 画面のスコアに使う
         gates[key] = gate
         gates.setdefault("_spike_today", {})[key] = spike_today
         parts = score.CHART_ONLY if key == "nikkei225" else (("chart", "penalty") if key == "etf"
                                                               else ("value", "chart", "penalty"))
-        t = score_market(entries, parts, gate, since, fund if key == "us" else None, SCORE_MARKET[key], spikes)
+        kfund = fund if key == "us" else None
+        t = score_market(entries, parts, gd, since, kfund, SCORE_MARKET[key], spikes)
         t["gate"] = gate
-        if key == "us":   # gate は今の判定を過去にも当てるので、当てない場合の成績も残す（先読みの大きさの確認用）
-            ng = score_market(entries, parts, None, since, fund, SCORE_MARKET[key], spikes)
-            t["without_gate"] = {"full": ng["full"], "recent6m": ng["recent6m"]}
+        ng = score_market(entries, parts, None, since, kfund, SCORE_MARKET[key], spikes)
+        t["without_gate"] = {"full": ng["full"], "recent6m": ng["recent6m"]}
         tiers[key] = t
+        gates.setdefault("_evidence_weak", {})[key] = bool(t.get("evidence_weak"))
         if key == "etf":
             obj["etf"] = {"market": {"full": mk["full"], "recent6m": mk["recent6m"], "symbols": mk["symbols"]},
                           "symbols": {}}

@@ -2529,6 +2529,13 @@ def attach_scores(nk, us_tabs, etf, gates):
                 for k in score.OUT_KEYS:
                     r[k] = src.get(k)
     score.score_rows(con(etf), gates.get(ETF_TAB), ("chart", "penalty"), market="etf")
+    # 検証で段階5 が相場全体を上回らない市場（score.evidence_weak）: スコア欄に「根拠不十分」
+    weak = gates.get("_evidence_weak") or {}
+    for key, rows in (("nikkei225", nk), ("us", [r for t in us_tabs for r in t]), (ETF_TAB, etf)):
+        if weak.get(key):
+            for r in con(rows):
+                if r.get("score") is not None:
+                    r["score_evidence_weak"] = True
     for rows in (nk, etf, *us_tabs):          # 初回ロードを軽くする: 新しい列の空（None）はキーごと省く（画面は無い=—）
         for r in rows:
             for k in PRUNE_NONE:

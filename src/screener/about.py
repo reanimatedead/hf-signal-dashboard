@@ -115,6 +115,7 @@ def verify_summary(v: dict[str, Any] | None) -> dict[str, Any]:
                 "recent6m": t.get("recent6m"),
                 "since": t.get("since"),
                 "weakened": t.get("weakened"),
+                "evidence_weak": t.get("evidence_weak"),
                 "gate": t.get("gate"),
             }
     return {
