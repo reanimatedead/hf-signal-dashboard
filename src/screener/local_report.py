@@ -41,8 +41,8 @@ HTML_COLS = [
 US_HTML_COLS = [
     "grade", "ticker", "name", "idx", "sector", "chart_signal", "cci200_signal", *SCORE_COLS, "trend", "price",
     "fair_price",
-    "upside_pct", "PER", "PBR", "roe_pct", "div_yield_pct", "equity_ratio_pct", "turnover_20d", "next_earnings",
-    "fin_tag", "magic_rank", "F", "f_max",
+    "upside_pct", "value_check", "PER", "PBR", "roe_pct", "div_yield_pct", "equity_ratio_pct", "turnover_20d",
+    "next_earnings", "fin_tag", "magic_rank", "F", "f_max",
 ]  # fmt: skip
 ETF_HTML_COLS = [
     "code", "name", "etf_kind", "chart_signal", "cci200_signal", "score", "score_tier", "score_chart", "score_penalty",
