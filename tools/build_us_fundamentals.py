@@ -35,6 +35,7 @@ OUT = ROOT / "data" / "us_fundamentals.json"
 TICKERS_URL = "https://www.sec.gov/files/company_tickers.json"
 FACTS_URL = "https://data.sec.gov/api/xbrl/companyfacts/CIK{cik:010d}.json"
 SUBMIT_URL = "https://data.sec.gov/submissions/CIK{cik:010d}.json"
+DOC_URL = "https://www.sec.gov/Archives/edgar/data/{cik}/{acc}/{doc}"
 SPLIT_URL = "https://query1.finance.yahoo.com/v8/finance/chart/{sym}?range=10y&interval=1mo&events=split"
 SEC_PAUSE = 0.12
 MIN_COVERAGE = 0.5
@@ -48,6 +49,13 @@ def http_json(url):
     headers = {"User-Agent": ua if host else "Mozilla/5.0", "Accept": "application/json"}
     with urllib.request.urlopen(urllib.request.Request(url, headers=headers), timeout=30) as r:
         return json.load(r)
+
+
+def http_text(url):
+    import urllib.request
+    ua = os.environ.get("SEC_USER_AGENT") or "hf-signal-dashboard https://github.com/reanimatedead/hf-signal-dashboard"
+    with urllib.request.urlopen(urllib.request.Request(url, headers={"User-Agent": ua}), timeout=60) as r:
+        return r.read().decode("utf-8", "ignore")
 
 
 def sic_is_fin(sic):
@@ -101,31 +109,52 @@ def month_firsts(asof, n=HIST_MONTHS):
     return sorted(out)
 
 
-def history(F, asof, splits):
-    """{月初: [純利益, 自己資本, 株数, ROE, 一時利益の目印 0/1]}（その月初より前に提出された決算だけ。fund_us.fundamentals と同じ式）。"""
+def class_shares(sym, cik, sub, get_text):
+    """株の種類を換算した株数（fund_us.SHARE_CLASSES の銘柄だけ）→ (株数, 提出日) | None。
+    直近の 10-Q / 10-K の表紙から読む。取れなければ None（株数が古いままなので「要確認」になる）。"""
+    if sym not in fund_us.SHARE_CLASSES:
+        return None
+    try:
+        r = sub["filings"]["recent"]
+        i = next(k for k, f in enumerate(r["form"]) if f in ("10-Q", "10-K"))
+        acc = r["accessionNumber"][i].replace("-", "")
+        counts = fund_us.cover_class_shares(get_text(DOC_URL.format(cik=cik, acc=acc, doc=r["primaryDocument"][i])))
+        sh = fund_us.class_equiv_shares(sym, counts)
+        return (sh, r["filingDate"][i]) if sh else None
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def history(F, asof, splits, sh_fix=None):
+    """{月初: [純利益, 自己資本, 株数, ROE, 一時利益の目印 0/1]}（その月初より前に提出された決算だけ。fund_us.fundamentals と同じ式）。
+    株数が古い月（要確認）は入れない。sh_fix は今の換算株数を過去の月にも使う（BRK-B・ERIE は株数の変化が小さい）。"""
     out = {}
     for m in month_firsts(asof):
-        fd = fund_us.fundamentals(F, m, splits)
-        if fd:
+        fd = fund_us.fundamentals(F, m, splits, sh_fix)
+        if fd and not fd.get("sh_stale"):
             out[m] = [fd["ni"], fd["eq"], fd["sh"], round(fd["roe"], 5) if fd.get("roe") is not None else None,
                       int(bool(fd.get("one_off")))]
     return out
 
 
-def one(get_json, sym, cik, asof):
+def one(get_json, sym, cik, asof, get_text=http_text):
     F = get_json(FACTS_URL.format(cik=cik))["facts"]
     sp = splits_of(get_json, sym)
-    fd = fund_us.fundamentals(F, asof, sp)
-    hist = history(F, asof, sp) if fd else {}
+    try:
+        sub = get_json(SUBMIT_URL.format(cik=cik))
+    except Exception:  # noqa: BLE001
+        sub = {}
+    fix = class_shares(sym, cik, sub, get_text)
+    fd = fund_us.fundamentals(F, asof, sp, fix)
+    hist = history(F, asof, sp, fix) if fd else {}
     del F                                              # 1社分ずつ捨てる（全部をメモリに載せない）
     if not fd:
         return None
-    try:
-        sic = get_json(SUBMIT_URL.format(cik=cik)).get("sic")
-    except Exception:  # noqa: BLE001
-        sic = None
+    sic = sub.get("sic")
     row = {k: fd[k] for k in ("fy", "ni", "eq", "ebit", "sh", "debt", "cash", "cap", "f_score", "f_max",
-                              "ta", "div", "one_off", "filed")}
+                              "ta", "div", "one_off", "filed", "sh_end", "sh_stale")}
+    if fix:
+        row["sh_src"] = "cover"                        # 株の種類を換算した株数（Mac mini 版もこの値を使う）
     row["hist"] = hist
     row["roe"] = round(fd["roe"], 5) if fd.get("roe") is not None else None
     row["sic"] = sic
@@ -143,7 +172,7 @@ def us_universe():
     return sorted(syms)
 
 
-def build(tickers, get_json=http_json, asof=None, pause=SEC_PAUSE, check_contract=True):
+def build(tickers, get_json=http_json, asof=None, pause=SEC_PAUSE, check_contract=True, get_text=http_text):
     """→ (exit_code, obj|None, log_lines)。"""
     asof = asof or dt.date.today().isoformat()
     log = []
@@ -159,7 +188,7 @@ def build(tickers, get_json=http_json, asof=None, pause=SEC_PAUSE, check_contrac
         if not cik:
             miss.append(t); continue
         try:
-            r = one(get_json, t, cik, asof)
+            r = one(get_json, t, cik, asof, get_text)
         except Exception:  # noqa: BLE001
             r = None
         if r:

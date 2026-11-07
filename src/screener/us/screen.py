@@ -67,10 +67,11 @@ def screen(
     asof: str, p1y: str | None, p1m: str | None, cfg: Config, uni: dict[str, dict[str, Any]] | None = None
 ) -> list[Row]:
     uni = uni if uni is not None else universe(cfg)
+    fixes = load_share_fixes(cfg)
     rows: list[Row] = []
     for t, info in uni.items():
         facts = load_facts(t, cfg)  # 1社ずつ
-        r = fund_us.screen_one(t, info, facts, load_px(t, cfg), asof, p1y, p1m)
+        r = fund_us.screen_one(t, info, facts, load_px(t, cfg), asof, p1y, p1m, fixes.get(t))
         del facts
         if r:
             rows.append(r)
@@ -79,16 +80,26 @@ def screen(
     return rows
 
 
-def load_sics(cfg: Config) -> dict[str, Any]:
-    """{ticker: SIC}（リポジトリの data/us_fundamentals.json・SEC 由来）。無ければ空（全体の中央値になる）。"""
+def _fund_rows(cfg: Config) -> dict[str, Any]:
+    """リポジトリの data/us_fundamentals.json の rows（SEC 由来）。無ければ空。"""
     try:
         with open(cfg.repo_dir / "data" / "us_fundamentals.json", encoding="utf-8") as fh:
-            return {t: (v or {}).get("sic") for t, v in (json.load(fh).get("rows") or {}).items()}
+            return json.load(fh).get("rows") or {}
     except (OSError, ValueError, AttributeError):
         return {}
 
 
-SCORE_INPUTS_CACHE = "score_inputs_v1"
+def load_sics(cfg: Config) -> dict[str, Any]:
+    """{ticker: SIC}。無ければ空（全体の中央値になる）。"""
+    return {t: (v or {}).get("sic") for t, v in _fund_rows(cfg).items()}
+
+
+def load_share_fixes(cfg: Config) -> dict[str, tuple[float, str]]:
+    """{ticker: (株数, 日付)}: 株の種類を換算した株数（週次の build_us_fundamentals.py が表紙から読んだ値）。"""
+    return {t: (v["sh"], v["sh_end"]) for t, v in _fund_rows(cfg).items() if (v or {}).get("sh_src") == "cover"}
+
+
+SCORE_INPUTS_CACHE = "score_inputs_v2"  # 定義を変えたら名前を変える（v2: 株の種類の換算・株数が古い月を除く）
 
 
 def monthly_score_inputs(
@@ -115,17 +126,18 @@ def monthly_score_inputs(
             out[m] = {}
     if not todo:
         return rerate(out, cfg)
+    fixes = load_share_fixes(cfg)
     for t in uni:
         facts = load_facts(t, cfg)  # 1社ずつ
         p = load_px(t, cfg)
         if not facts or not p:
             continue
         for m in todo:
-            fd = fund_us.fundamentals(facts, m, p["splits"])
+            fd = fund_us.fundamentals(facts, m, p["splits"], fixes.get(t))
             k = bisect.bisect_right(p["d"], m) - 1
             while k >= 0 and p["c"][k] is None:
                 k -= 1
-            if not fd or k < 0:
+            if not fd or k < 0 or fd.get("sh_stale"):  # 株数が古い月（要確認）は使わない
                 continue
             up, pbr, per = fund_us.value_inputs(fd["ni"], fd["eq"], fd["sh"], fd["roe"], float(p["c"][k]))
             out[m][t] = [up, pbr, per, bool(fd.get("one_off"))]

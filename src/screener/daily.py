@@ -1,8 +1,11 @@
 """毎日 19:00（launchd）に動く本体: python -m screener.daily
 
-1. リポジトリ（config の repo_dir、既定 ~/hf-signal-dashboard）で git pull --ff-only。
+1. 専用の作業ツリー（config の repo_dir、既定 ~/hf-signal-dashboard-run）を origin/main にそろえる
+   （git fetch origin main → git checkout --detach origin/main）。開発用のクローンは読みも書きもしないので、
+   そちらがどのブランチ・どんな途中の状態でも止まらない。main は開発用のクローンが使うことがあり、同じブランチを
+   2か所では開けないので、detached HEAD で origin/main を指す。
    そのあと自分自身を起動し直す（os.execv で `uv run python -m screener.daily --pulled`）。
-   こうしないと pull の前に読み込んだ古いコードのまま走り、pull した修正が次の日まで効かない。
+   こうしないと更新の前に読み込んだ古いコードのまま走り、取り込んだ修正が次の日まで効かない。
    uv run で起動し直すので、uv.lock が変わっていれば依存もそろえ直される。
 2. J-Quants 契約テスト（V2・日足 ≥3500 件・決算短信の列）
 3. 差分を取得（日本株 J-Quants は直近3営業日を取り直す・米国株と FX・仮想通貨は Yahoo の日足）
@@ -37,14 +40,18 @@ Runner = Callable[..., Any]
 Exec = Callable[[str, list[str]], Any]
 
 
-def git_pull(cfg: Config, runner: Runner = subprocess.run) -> None:
-    r = runner(["git", "-C", str(cfg.repo_dir), "pull", "--ff-only"], capture_output=True, text=True, timeout=300)
-    if r.returncode != 0:
-        raise RuntimeError(f"git pull --ff-only が失敗（{cfg.repo_dir}）: {str(r.stderr).strip()[:300]}")
+def update_worktree(cfg: Config, runner: Runner = subprocess.run) -> None:
+    """専用の作業ツリーを origin/main にそろえる。開発用のクローンを指していたら触らずに止める。"""
+    if not (cfg.repo_dir / ".git").is_file():  # git worktree の .git はファイル、通常のクローンはディレクトリ
+        raise RuntimeError(f"repo_dir が専用の作業ツリーではありません（{cfg.repo_dir}）: install_macmini.sh を実行")
+    for args in (["fetch", "origin", "main"], ["checkout", "--detach", "origin/main"]):
+        r = runner(["git", "-C", str(cfg.repo_dir), *args], capture_output=True, text=True, timeout=300)
+        if r.returncode != 0:
+            raise RuntimeError(f"git {args[0]} が失敗（{cfg.repo_dir}）: {str(r.stderr).strip()[:300]}")
 
 
 def reexec_argv(cfg: Config, args: list[str]) -> tuple[str, list[str]]:
-    """pull したあとの起動し直し方。uv があれば uv run（依存もそろう）、無ければ同じ python。"""
+    """更新したあとの起動し直し方。uv があれば uv run（依存もそろう）、無ければ同じ python。"""
     rest = ["-m", "screener.daily", "--pulled", *args]
     uv = shutil.which("uv")
     if uv:
@@ -82,7 +89,7 @@ def pipeline(
     get: Getter | None = None,
     us_update: Callable[[Config, dt.date], None] = update_us,
 ) -> dict[str, Any]:
-    """git pull と起動し直しは main が先に済ませている（ここは新しいコードで走る）。"""
+    """作業ツリーの更新と起動し直しは main が先に済ませている（ここは新しいコードで走る）。"""
     from .japan import fetch as jp_fetch
     from .japan import signals
 
@@ -116,7 +123,7 @@ def main(
 ) -> int:
     ap = argparse.ArgumentParser(description=(__doc__ or "").splitlines()[0])
     ap.add_argument("--today", help="基準日（既定: 今日 JST）")
-    ap.add_argument("--pulled", action="store_true", help="git pull 済み（起動し直したあと。手で付けない）")
+    ap.add_argument("--pulled", action="store_true", help="作業ツリーの更新済み（起動し直したあと。手で付けない）")
     args = sys.argv[1:] if argv is None else list(argv)
     a = ap.parse_args(args)
     today = today or (dt.date.fromisoformat(a.today) if a.today else config_mod.today_jst())
@@ -124,8 +131,8 @@ def main(
     try:
         cfg = cfg or config_mod.load()
         if not a.pulled:
-            git_pull(cfg, runner)
-            print("git pull --ff-only: OK → 新しいコードで起動し直す", flush=True)
+            update_worktree(cfg, runner)
+            print("作業ツリーを origin/main にそろえた → 新しいコードで起動し直す", flush=True)
             sys.stdout.flush()
             sys.stderr.flush()
             prog, new_argv = reexec_argv(cfg, [x for x in args if x != "--pulled"])

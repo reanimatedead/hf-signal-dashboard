@@ -20,6 +20,9 @@ def test_rows_and_f_score(fx):
     assert len(rs) == 5
     for r in rs:
         assert r["f_max"] == 7 and r["F"] == 7  # サンプルは全項目が改善するように作ってある
+        if r.get("value_check"):  # 「要確認」（株数が古い等）は PER・PBR・余地を出さない
+            assert r["PBR"] is None and r["ri_upside_pct"] is None
+            continue
         assert r["PBR"] > 0
         assert (r["ri_upside_pct"] is not None) == bool(r["PER"] and r["PER"] > 0)
 

@@ -256,10 +256,13 @@
         : `<div class="sc-cell"><span>${I18.fmtNum(r.score_quality, 1)}</span><span class="sc-sub">${T("sc.unverified")}</span></div>`;
       case "score_sell": return !num(r.score_sell) ? DASH
         : `<div class="sc-cell"><span class="sc-sell">${I18.fmtNum(r.score_sell, 0)}</span><span class="sc-sub">${T("sc.sell_hint")}</span></div>`;
-      case "PER": case "PBR": return num(r[c.k]) == null ? DASH : I18.fmtNum(r[c.k], c.k === "PBR" ? 2 : 1);
+      case "PER": case "PBR": if (r.value_check) return vcheck(r);
+        return num(r[c.k]) == null ? DASH : I18.fmtNum(r[c.k], c.k === "PBR" ? 2 : 1);
       case "roe_pct": case "div_yield_pct": case "equity_ratio_pct": return num(r[c.k]) == null ? DASH : I18.fmtNum(r[c.k], 1) + "%";
-      case "fair_price": return num(r.fair_price) == null ? DASH : I18.fmtNum(r.fair_price, 2);
-      case "upside_pct": return num(r.upside_pct) == null ? DASH : pct(r.upside_pct);
+      case "fair_price": if (r.value_check) return vcheck(r);
+        return num(r.fair_price) == null ? DASH : I18.fmtNum(r.fair_price, 2);
+      case "upside_pct": if (r.value_check) return vcheck(r);
+        return num(r.upside_pct) == null ? DASH : pct(r.upside_pct);
       case "turnover_20d": return num(r.turnover_20d) == null ? DASH : compact(r.turnover_20d);
       case "next_earnings": return !r.next_earnings ? DASH
         : `<div class="sc-cell"><span>${esc(I18.fmtDate(r.next_earnings, "ymd"))}</span><span class="sc-sub">${T(r.earnings_soon ? "sc.earn_soon" : "sc.earn_est")}</span></div>`;
@@ -279,6 +282,11 @@
       i = j;
     }
     return out;
+  }
+  // 「要確認」（fund_us.value_check: PER 2 未満・上値余地 +500% 超。株の種類・株数の取り違えの疑い）
+  function vcheck(r) {
+    const why = esc(I18.code("value_check", r.value_check));
+    return `<span class="sc-sub" title="${why}" style="color:var(--yellow)">${T("sc.value_check")}</span>`;
   }
   function n1(v) { return num(v) == null ? DASH : I18.fmtNum(v, 1); }
   function compact(v) {   // 百万単位（日本円・米ドルとも同じ表し方）

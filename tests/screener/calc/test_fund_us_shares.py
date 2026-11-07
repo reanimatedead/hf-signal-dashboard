@@ -112,3 +112,97 @@ def test_rerate_month_keeps_pbr_per():
     vin["X"] = [-95.0, 9.0, 40.0, True]
     out = fund_us.rerate_month(vin, {})
     assert out["X"] == [-50.0, 9.0, 40.0, True] and out["S0"][0] == 0.0
+
+
+# ── 「要確認」（fund_us.value_check）: PER 2 未満・上値余地 +500% 超 ──
+
+
+def test_value_check_rules():
+    assert fund_us.value_check(0.008, 170299.0) == "per_lt_2"  # BRK-B: A 株の EPS × B 株の株価
+    assert fund_us.value_check(3.1, 607.0) == "upside_gt_500"
+    assert fund_us.value_check(8.8, 353.6) is None
+    assert fund_us.value_check(None, None) is None
+
+
+def test_relative_value_flags_and_excludes_from_median():
+    per_px = {f"S{i}": (20.0, 100.0) for i in range(8)}
+    per_px["BRKB"] = (0.008, 572.0)
+    rv = fund_us.relative_value(per_px, {k: "6331" for k in per_px})
+    assert rv["BRKB"]["value_check"] == "per_lt_2" and rv["BRKB"]["fair_price"] is None
+    assert rv["BRKB"]["upside_pct"] is None and rv["S0"]["per_bench"] == 20.0  # 中央値に入れない
+    rows = [
+        {"ticker": t, "price": px, "per_raw": per, "PER": round(per, 1), "PBR": 1.0} for t, (per, px) in per_px.items()
+    ]
+    fund_us.apply_relative(rows, {k: "6331" for k in per_px})
+    b = next(r for r in rows if r["ticker"] == "BRKB")
+    assert b["PER"] is None and b["PBR"] is None and b["value_check_per"] == 0.0
+
+
+def test_rerate_month_blanks_flagged():
+    vin = {f"S{i}": [0.0, 3.0, 20.0, False] for i in range(8)}
+    vin["ERIE"] = [0.0, 0.1, 0.001, False]
+    out = fund_us.rerate_month(vin, {})
+    assert out["ERIE"] == [None, None, None, False]
+
+
+def test_score_rows_value_zero_for_flagged():
+    from screener.calc import score
+
+    rows = [{"symbol": f"S{i}", "upside_pct": float(i), "PBR": 5.0 - i, "PER": 14.0 - i} for i in range(5)]
+    rows.append({"symbol": "X", "upside_pct": None, "PBR": None, "PER": None, "value_check": "per_lt_2"})
+    score.score_rows(rows, None, ("value",), market="us")
+    x = rows[-1]
+    assert x["score_value"] == 0.0 and x["score"] == 0.0
+    assert rows[4]["score_value"] == 35.0  # 要確認は順位の母集団に入らない（最上位は満点）
+
+
+def test_shares_stale_flags():
+    assert fund_us.shares_stale("2010-01-27", "2026-11-06") and not fund_us.shares_stale("2026-09-30", "2026-11-06")
+    per_px = {f"S{i}": (20.0, 100.0) for i in range(8)}
+    per_px["V"] = (8.4, 422.0)
+    rv = fund_us.relative_value(per_px, {k: "7389" for k in per_px}, stale={"V": True})
+    assert rv["V"]["value_check"] == "shares_stale" and rv["V"]["fair_price"] is None
+    F = _F([_v(469_280_842, "2010-01-27", "2010-02-01")], [])
+    assert fund_us.pick_shares_end(F, "2026-11-06")[2] == "2010-01-27"
+
+
+# ── 株の種類の換算（fund_us.SHARE_CLASSES）: 表紙の種類別の株数を、上場している種類にそろえる ──
+
+_AX = 'dimension="us-gaap:StatementClassOfStockAxis"'
+COVER = f"""<xbrli:context id="cA"><xbrli:entity>
+<xbrldi:explicitMember {_AX}>us-gaap:CommonClassAMember</xbrldi:explicitMember></xbrli:entity></xbrli:context>
+<xbrli:context id="cB"><xbrli:entity>
+<xbrldi:explicitMember {_AX}>us-gaap:CommonClassBMember</xbrldi:explicitMember></xbrli:entity></xbrli:context>
+<ix:nonFraction contextRef="cA" name="dei:EntityCommonStockSharesOutstanding" scale="0">{{a}}</ix:nonFraction>
+<ix:nonFraction name="dei:EntityCommonStockSharesOutstanding" contextRef="cB"><span>{{b}}</span></ix:nonFraction>
+<ix:nonFraction contextRef="cA" name="us-gaap:Other">9</ix:nonFraction>"""
+
+
+def test_cover_shares_to_listed_class_brk_and_erie():
+    brk = fund_us.cover_class_shares(COVER.format(a="488,450", b="1,408,035,161"))
+    assert brk == {"us-gaap:CommonClassAMember": 488_450, "us-gaap:CommonClassBMember": 1_408_035_161}
+    assert fund_us.class_equiv_shares("BRK-B", brk) == 488_450 * 1500 + 1_408_035_161
+    erie = fund_us.cover_class_shares(COVER.format(a="46,189,068", b="2,542"))
+    assert fund_us.class_equiv_shares("ERIE", erie) == 46_189_068 + 2_542 * 2400
+
+
+def test_class_equiv_needs_every_class_and_a_listed_ticker():
+    assert fund_us.class_equiv_shares("BRK-B", {"us-gaap:CommonClassBMember": 5}) is None  # A 株が読めない
+    assert fund_us.class_equiv_shares("AAPL", {"us-gaap:CommonClassAMember": 5}) is None
+
+
+def test_sh_fix_aligns_per_with_listed_class_price():
+    """BRK-B: 純利益 670 億ドル ÷ 換算株数 21.4 億。B 株の株価 571 ドルで PER 18 前後（修正前は 0.0）。"""
+    fd = {
+        "sh": 2_140_710_161,
+        "ni": 66_968_000_000,
+        "eq": 717_419_000_000,
+        "ebit": 1,
+        "debt": 0,
+        "cash": 0,
+        "cap": 1,
+        "roe": 0.09,
+    }
+    m = fund_us.metrics(fd, 570.89)
+    assert 18 < m["PER"] < 18.5 and 1.6 < m["PBR"] < 1.8
+    assert fund_us.value_check(m["per_raw"], None) is None

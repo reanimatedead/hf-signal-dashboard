@@ -13,7 +13,7 @@ def test_default_data_dir_is_home_not_repo(tmp_path, monkeypatch):
     monkeypatch.delenv("SCREENER_CONFIG", raising=False)
     c = config.load()
     assert c.data_dir == tmp_path / "screener-data"
-    assert c.repo_dir == tmp_path / "hf-signal-dashboard"
+    assert c.repo_dir == tmp_path / "hf-signal-dashboard-run"
     assert c.out_dir == tmp_path / "screener-data" / "out"
     assert not str(c.data_dir).startswith(str(config.PACKAGE_REPO))
     assert config.default_config_path() == tmp_path / ".config" / "screener" / "config.toml"
