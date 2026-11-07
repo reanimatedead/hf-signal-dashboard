@@ -3,13 +3,14 @@
 - 設定ファイル: 環境変数 SCREENER_CONFIG → ~/.config/screener/config.toml（無ければ既定値だけ）。
 - データ置き場: 既定 ~/screener-data。リポジトリの中は既定にしない（J-Quants 由来のデータを
   誤ってコミットしないため。ADR-002）。設定でリポジトリの中を指したら止める。
-- リポジトリ: 既定 ~/hf-signal-dashboard（Mac mini の clone。daily.py はここで git pull --ff-only する）。
+- リポジトリ: 既定 ~/hf-signal-dashboard-run（毎日の実行専用の git worktree。daily.py が origin/main にそろえる。
+  開発用のクローン ~/hf-signal-dashboard とは別。install_macmini.sh が作る）。
 
 config.toml の例（install_macmini.sh が作る）::
 
     [paths]
     data_dir = "~/screener-data"
-    repo_dir = "~/hf-signal-dashboard"
+    repo_dir = "~/hf-signal-dashboard-run"
     [ntfy]
     topic = "screener-<ランダム32桁>"
     [alerts]
@@ -30,7 +31,7 @@ JST = dt.timezone(dt.timedelta(hours=9), "JST")
 PACKAGE_REPO = Path(__file__).resolve().parents[2]  # このファイルがあるリポジトリ（src/screener/config.py の2つ上）
 
 DEFAULTS: dict[str, dict[str, Any]] = {
-    "paths": {"data_dir": "~/screener-data", "repo_dir": "~/hf-signal-dashboard"},
+    "paths": {"data_dir": "~/screener-data", "repo_dir": "~/hf-signal-dashboard-run"},
     "jquants": {"keychain_service": "screener-jquants", "rate_per_min": 50, "history_years": 5},
     "ntfy": {"server": "https://ntfy.sh", "topic": ""},
     "edgar": {"user_agent": "screener research (local)"},
@@ -144,7 +145,7 @@ def fallback(path: str | Path | None = None) -> Config:
     raw = {k: dict(v) for k, v in DEFAULTS.items()}
     raw["ntfy"]["topic"] = topic
     home = Path.home()
-    return Config(data_dir=home / "screener-data", repo_dir=home / "hf-signal-dashboard", raw=raw, path=None)
+    return Config(data_dir=home / "screener-data", repo_dir=home / "hf-signal-dashboard-run", raw=raw, path=None)
 
 
 def today_jst() -> dt.date:

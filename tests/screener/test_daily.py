@@ -1,4 +1,4 @@
-"""screener.daily: git pull --ff-only → 契約テスト → 差分 → 一覧 → local_report。
+"""screener.daily: 専用の作業ツリーの更新 → 契約テスト → 差分 → 一覧 → local_report。
 失敗時だけ「失敗」、月曜は「週次 OK」。"""
 
 import datetime as dt
@@ -102,15 +102,22 @@ class Exec:
         self.calls.append((prog, argv))
 
 
-def test_pull_then_restart_with_new_code(cfg):
-    """git pull --ff-only のあと、本処理の前に自分自身を起動し直す（古いコードのまま走らない）。"""
+def _as_worktree(cfg):
+    cfg.repo_dir.mkdir(parents=True, exist_ok=True)
+    (cfg.repo_dir / ".git").write_text("gitdir: /x/.git/worktrees/run\n")
+
+
+def test_update_then_restart_with_new_code(cfg):
+    """作業ツリーを origin/main にそろえたあと、本処理の前に自分自身を起動し直す（古いコードのまま走らない）。"""
+    _as_worktree(cfg)
     git, ex, ran = Git(), Exec(), []
     rc = daily.main(["--today", "2026-11-03"], cfg=cfg, run=lambda c, d: ran.append(d), runner=git, execv=ex)
     assert rc == 0 and ran == []  # 古いプロセスでは本処理をしない
-    assert git.calls == [["git", "-C", str(cfg.repo_dir), "pull", "--ff-only"]]
+    base = ["git", "-C", str(cfg.repo_dir)]
+    assert git.calls == [[*base, "fetch", "origin", "main"], [*base, "checkout", "--detach", "origin/main"]]
     ((prog, argv),) = ex.calls
     assert argv[0] == prog and argv[-5:] == ["-m", "screener.daily", "--pulled", "--today", "2026-11-03"]
-    # 起動し直したあと（--pulled）は pull しない・本処理をする
+    # 起動し直したあと（--pulled）は更新しない・本処理をする
     git2 = Git()
     assert daily.main(argv[argv.index("--pulled") :], cfg=cfg, run=lambda c, d: ran.append(d), runner=git2) == 0
     assert git2.calls == [] and ran == [dt.date(2026, 11, 3)]
@@ -125,7 +132,8 @@ def test_reexec_uses_uv_run_when_available(cfg, monkeypatch):
     assert prog == daily.sys.executable and argv[1:] == ["-m", "screener.daily", "--pulled"]
 
 
-def test_git_pull_failure_stops_and_sends_fail(cfg):
+def test_git_failure_stops_and_sends_fail(cfg):
+    _as_worktree(cfg)
     sent, ex = [], Exec()
     rc = daily.main([], cfg=cfg, today=TUE, runner=Git(rc=1), execv=ex, poster=lambda u, b: sent.append(b.decode()))
     assert rc == 1 and sent == ["screener 2026-11-03 失敗"] and ex.calls == []

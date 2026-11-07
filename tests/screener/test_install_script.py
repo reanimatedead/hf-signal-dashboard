@@ -1,5 +1,5 @@
 """scripts/install_macmini.sh: キーをファイル・ログ・画面に出す行が無い・
-リポジトリは ~/hf-signal-dashboard（main）・bash -n・shellcheck。"""
+毎日の実行は専用の作業ツリー ~/hf-signal-dashboard-run・bash -n・shellcheck。"""
 
 import re
 import shutil
@@ -39,12 +39,15 @@ def test_no_tee_anywhere():
     assert not any(re.search(r"\btee\b", ln) for ln in _lines())
 
 
-def test_repo_dir_is_home_hf_signal_dashboard_on_main():
+def test_daily_runs_in_dedicated_worktree():
     text = SCRIPT.read_text()
-    assert 'REPO_DIR="$HOME/hf-signal-dashboard"' in text
-    assert "<key>WorkingDirectory</key><string>$REPO_DIR</string>" in text
-    assert "<string>$REPO_DIR</string>" in text and "screener.daily" in text
-    assert '[ "$branch" = "main" ]' in text and 'git -C "$REPO_DIR" status --porcelain' in text
+    assert 'REPO_DIR="$HOME/hf-signal-dashboard"' in text and 'RUN_DIR="$HOME/hf-signal-dashboard-run"' in text
+    assert 'worktree add --detach "$RUN_DIR" origin/main' in text
+    assert "<key>WorkingDirectory</key><string>$RUN_DIR</string>" in text
+    assert "<string>--project</string>\n    <string>$RUN_DIR</string>" in text and "screener.daily" in text
+    assert 'repo_dir = "$RUN_DIR"' in text
+    assert "<string>$REPO_DIR</string>" not in text  # launchd は開発用のクローンを見ない
+    assert '[ "$branch" = "main" ]' not in text  # 開発用のクローンのブランチでは止めない
 
 
 def test_schedule_and_wake():
