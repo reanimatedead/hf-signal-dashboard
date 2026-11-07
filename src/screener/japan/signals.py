@@ -484,4 +484,5 @@ def run(cfg: Config, asof: str | None = None, now: dt.datetime | None = None) ->
         "etf": etf,
         "verify": v,
         "cci_alerts": alerts.build(markets, list(cfg.get("alerts.watchlist", []) or [])),
+        "_xs": {"jp": jx, "us": ux, "etf": ctx.get("etf_xs", {})},  # 記録帳の答え合わせ用（daily が取り出す）
     }

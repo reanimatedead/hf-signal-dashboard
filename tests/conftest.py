@@ -29,3 +29,18 @@ def pytest_runtest_setup(item):
     m = item.get_closest_marker("needs_data_json")
     if m is not None:
         gate.gate(gate.missing_files(list(m.kwargs.get("files") or ["data.json"])))
+
+
+@pytest.fixture(autouse=True)
+def _no_real_history(monkeypatch):
+    """どのテストも本物の ~/screener-data/history に書かない（書こうとしたら失敗にする）。"""
+    from screener import history
+
+    real = pathlib.Path.home() / "screener-data"
+    orig = history.hist_dir
+
+    def guarded(cfg):
+        assert pathlib.Path(cfg.data_dir).resolve() != real.resolve(), "本物の data_dir に書こうとした"
+        return orig(cfg)
+
+    monkeypatch.setattr(history, "hist_dir", guarded)
