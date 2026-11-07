@@ -5,9 +5,10 @@ import json
 from pathlib import Path
 
 import numpy as np
+import pytest
 
-from screener import alerts, daily, fxcrypto, local_report
-from screener.calc import assets
+from screener import alerts, config, daily, fxcrypto, local_report
+from screener.calc import assets, ind
 from screener.japan import signals
 
 DAYS = [f"2026-{1 + i // 28:02d}-{1 + i % 28:02d}" for i in range(140)]
@@ -219,4 +220,95 @@ def test_daily_run_writes_list_verify_per_market_and_notifies_once(cfg, monkeypa
     from .test_daily import fake_get
 
     daily.pipeline(cfg, dt.date(2026, 10, 30), get=fake_get(cfg=cfg), us_update=lambda c, d: None)
-    assert len(sent) == 1 and sent[0][1].name.startswith("cci_alerts_") and sent[0][2] == {"prefer": "osascript"}
+    assert (
+        len(sent) == 1
+        and sent[0][1].name.startswith("cci_alerts_")
+        and sent[0][2]
+        == {
+            "prefer": "osascript",
+            "sounds": {"enabled": True, "spike": "Sosumi", "signal": "Glass"},
+        }
+    )
+
+
+# ── 通知の音（alerts.sound_for）: 一斉に割れ = Sosumi、買い・売り目安 = Glass、それ以外は鳴らさない ──
+
+SOUNDS = {"enabled": True, "spike": "Sosumi", "signal": "Glass"}
+
+
+def _alert(spike=False, both_down=(), sell=(), watch=()):
+    m = {
+        "label": "日本株", "spike": spike, "spike_line": 10.0, "verified": True,
+        "both_down": list(both_down), ind.CCI200_SELL: list(sell),
+    }  # fmt: skip
+    return {"asof": "2026-11-06", "markets": {"jp": m}, "watch_hits": list(watch)}
+
+
+@pytest.fixture
+def sound_dir(tmp_path):
+    d = tmp_path / "Sounds"
+    d.mkdir()
+    (d / "Sosumi.aiff").touch()
+    (d / "Glass.aiff").touch()
+    return d
+
+
+def _script(a, sounds, sound_dir, tmp_path):
+    calls = []
+    how = alerts.notify(
+        a,
+        tmp_path / "x.html",
+        runner=lambda args, **kw: calls.append(args) or R(),
+        platform="darwin",
+        home=tmp_path,
+        sounds=sounds,
+        sound_dir=sound_dir,
+    )
+    assert how == "osascript"
+    return calls[-1][2]
+
+
+ROW = {"code": "1001", "name": "A"}
+
+
+@pytest.mark.parametrize(
+    ("kw", "sound"),
+    [
+        ({"spike": True, "both_down": [ROW]}, "Sosumi"),
+        ({"spike": True, "both_down": [ROW], "sell": [ROW]}, "Sosumi"),  # 両方あれば大事な方
+        ({"both_down": [ROW]}, "Glass"),
+        ({"sell": [ROW]}, "Glass"),
+    ],
+)
+def test_sound_by_importance(kw, sound, sound_dir, tmp_path):
+    assert _script(_alert(**kw), SOUNDS, sound_dir, tmp_path).endswith(f' sound name "{sound}"')
+
+
+def test_no_sound_for_other_notices(sound_dir, tmp_path):
+    """ウォッチリストの片方だけの割れは、買い・売り目安ではないので鳴らさない。"""
+    assert "sound name" not in _script(_alert(watch=[ROW]), SOUNDS, sound_dir, tmp_path)
+
+
+def test_no_sound_when_disabled_or_not_given(sound_dir, tmp_path):
+    a = _alert(spike=True, both_down=[ROW])
+    assert "sound name" not in _script(a, {**SOUNDS, "enabled": False}, sound_dir, tmp_path)
+    assert "sound name" not in _script(a, None, sound_dir, tmp_path)
+
+
+@pytest.mark.parametrize("bad", ["Sosum", "sosumi", "", 'Glass" & "x', "../Sounds/Glass", "*"])
+def test_wrong_sound_name_still_notifies_without_sound(bad, sound_dir, tmp_path, capsys):
+    script = _script(_alert(both_down=[ROW]), {**SOUNDS, "signal": bad}, sound_dir, tmp_path)
+    assert "sound name" not in script and script.startswith("display notification")
+    assert "音なし" in capsys.readouterr().out
+
+
+def test_missing_sound_folder_means_no_sound(tmp_path):
+    assert "sound name" not in _script(_alert(both_down=[ROW]), SOUNDS, tmp_path / "none", tmp_path)
+
+
+def test_sound_settings_defaults_and_config(tmp_path):
+    p = tmp_path / "c.toml"
+    p.write_text(f'[paths]\ndata_dir = "{tmp_path / "d"}"\nrepo_dir = "{tmp_path / "r"}"\n')
+    assert alerts.sound_settings(config.load(p)) == SOUNDS
+    p.write_text(p.read_text() + '[alerts]\nsound_enabled = false\nsound_spike = "Hero"\n')
+    assert alerts.sound_settings(config.load(p)) == {"enabled": False, "spike": "Hero", "signal": "Glass"}

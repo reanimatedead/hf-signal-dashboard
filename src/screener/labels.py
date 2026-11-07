@@ -50,7 +50,8 @@ VALUES = {
     "one_off": "一時的な利益", "earnings_soon": "決算まで5営業日以内", "low_turnover": "売買代金が下位10%",
     "not_scored_inverse": "inverse（物差しの対象外）", "no_inputs": "材料なし",
     # 要確認（screener.calc.fund_us.value_check）
-    "shares_stale": "SEC の株数が古い", "per_lt_2": "PER が 2 未満", "upside_gt_500": "上値余地が +500% 超",
+    "shares_mismatch": "株数が純利益÷EPS と 20% 超ずれる", "per_lt_2": "PER が 2 未満",
+    "upside_gt_500": "上値余地が +500% 超", "upside_gt_150": "要確認（一時的な利益の可能性）",
     # ETF の種類（screener.calc.assets.etf_kind）
     "index": "指数", "leveraged": "レバレッジ", "inverse": "インバース", "unknown": "不明",
 }  # fmt: skip

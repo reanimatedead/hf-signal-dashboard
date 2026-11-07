@@ -10,6 +10,9 @@
 - 通知は Mac mini の中だけ。既定は osascript の display notification（本文は市場ごとの件数＋上位銘柄、最後に一覧の
   ファイルの場所）。terminal-notifier は config の [alerts] notifier = "terminal-notifier" のときだけ試し、
   使えなければ osascript。ntfy には送らない。銘柄名を出してよいのは Mac mini の外に出ないため（ADR-002）。
+- 通知の音は大事さで分ける（sound_for）: 一斉に割れ = sound_spike（既定 Sosumi）、CCI ±200 の買い・売り目安 =
+  sound_signal（既定 Glass）、それ以外（ウォッチリストの片方だけの割れなど）は鳴らさない。設定は config の [alerts]。
+  sound_enabled = false なら鳴らさない。名前が /System/Library/Sounds に無ければ音なしで通知する。
 """
 
 from __future__ import annotations
@@ -280,6 +283,34 @@ def _ok(r: Any) -> None:
 
 
 Runner = Callable[..., Any]
+SOUND_DIR = Path("/System/Library/Sounds")
+
+
+def sound_settings(cfg: Any) -> dict[str, Any]:
+    """config の [alerts] の音の設定。"""
+    return {
+        "enabled": bool(cfg.get("alerts.sound_enabled", True)),
+        "spike": str(cfg.get("alerts.sound_spike", "Sosumi")),
+        "signal": str(cfg.get("alerts.sound_signal", "Glass")),
+    }
+
+
+def sound_for(a: dict[str, Any], sounds: dict[str, Any] | None, sound_dir: Path = SOUND_DIR) -> str | None:
+    """この通知で鳴らす音の名前。鳴らさないときは None。名前は sound_dir の実在のファイルと完全に一致したものだけ使う
+    （誤った名前は音なし。osascript の文字列に入るので、ここを通らない値は渡さない）。"""
+    if not sounds or not sounds.get("enabled"):
+        return None
+    ms = a["markets"].values()
+    if any(m["spike"] for m in ms):
+        name = sounds.get("spike")
+    elif any(m["both_down"] or m.get(ind.CCI200_SELL) for m in ms):
+        name = sounds.get("signal")
+    else:
+        return None
+    if name in {p.stem for p in sound_dir.glob("*")}:
+        return str(name)
+    print(f"mac通知: 音の名前が {sound_dir} に無いので音なし（{name}）", flush=True)
+    return None
 
 
 def notify(
@@ -290,6 +321,8 @@ def notify(
     platform: str = sys.platform,
     prefer: str = "osascript",
     home: Path | None = None,
+    sounds: dict[str, Any] | None = None,
+    sound_dir: Path = SOUND_DIR,
 ) -> str:
     """Mac mini の通知を1回出す。戻り値は使った方法（osascript / terminal-notifier / none / not_mac / error）。
     既定は osascript の display notification（macOS 26 では terminal-notifier が通知の許可の一覧に出ず使えなかった）。
@@ -304,12 +337,17 @@ def notify(
     if platform != "darwin":
         print(f"mac通知: Mac ではないので出さない（{title}）", flush=True)
         return "not_mac"
+    sound = sound_for(a, sounds, sound_dir)
     tn = which("terminal-notifier") if prefer == "terminal-notifier" else None
     if tn:
         try:
             _ok(
                 runner(
-                    [tn, "-title", title, "-message", body, "-open", html_path.as_uri(), "-group", "screener-cci"],
+                    [
+                        *[tn, "-title", title, "-message", body, "-open", html_path.as_uri()],
+                        *["-group", "screener-cci"],
+                        *(["-sound", sound] if sound else []),
+                    ],
                     timeout=30,
                 )
             )
@@ -319,9 +357,11 @@ def notify(
             print(f"mac通知: terminal-notifier が使えない（{type(e).__name__}）→ osascript に切り替え", flush=True)
     try:
         esc = lambda s: s.replace("\\", "\\\\").replace('"', '\\"')  # noqa: E731
-        _ok(runner(["osascript", "-e", f'display notification "{esc(body)}" with title "{esc(title)}"'], timeout=30))
+        tail = f' sound name "{sound}"' if sound else ""
+        script = f'display notification "{esc(body)}" with title "{esc(title)}"{tail}'
+        _ok(runner(["osascript", "-e", script], timeout=30))
     except Exception as e:
         print(f"mac通知: 出せませんでした（{type(e).__name__}）", flush=True)
         return "error"
-    print(f"mac通知: osascript（{title}）→ {html_path}", flush=True)
+    print(f"mac通知: osascript（{title}・音 {sound or 'なし'}）→ {html_path}", flush=True)
     return "osascript"

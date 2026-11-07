@@ -15,6 +15,9 @@ config.toml の例（install_macmini.sh が作る）::
     topic = "screener-<ランダム32桁>"
     [alerts]
     watchlist = ["7203", "6758", "AAPL"]   # CCI ±200 の通知で見る銘柄（任意）
+    sound_enabled = true                   # 通知の音（false で鳴らさない）
+    sound_spike = "Sosumi"                 # 一斉に割れ（/System/Library/Sounds の名前。無ければ音なし）
+    sound_signal = "Glass"                 # CCI ±200 の買い・売り目安
 """
 
 from __future__ import annotations
@@ -37,7 +40,14 @@ DEFAULTS: dict[str, dict[str, Any]] = {
     "edgar": {"user_agent": "screener research (local)"},
     # CCI ±200 の通知: watchlist = 見る銘柄（日本株のコード・米国株のティッカー）、
     # notifier = "osascript"（既定）/ "terminal-notifier"（使えなければ osascript に切り替える）
-    "alerts": {"watchlist": [], "notifier": "osascript"},
+    # sound_* = 通知の音（screener.alerts.sound_for）
+    "alerts": {
+        "watchlist": [],
+        "notifier": "osascript",
+        "sound_enabled": True,
+        "sound_spike": "Sosumi",
+        "sound_signal": "Glass",
+    },
 }
 
 
