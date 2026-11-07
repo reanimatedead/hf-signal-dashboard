@@ -61,6 +61,7 @@ SELL_NOTE = ind.SELL_NOTE  # 売りの点は「利益確定・新しく買わな
 
 # 行の列名（市場ごとに違う列名は呼ぶ側が fields で渡す）
 FIELDS = {
+    "value_check": "value_check",  # 「要確認」（calc.fund_us.value_check）の行は割安の点 0・順位の母集団から外す
     "upside": "upside_pct",
     "pbr": "PBR",
     "per": "PER",
@@ -98,6 +99,9 @@ def _fin(v: Any) -> float | None:
     except (TypeError, ValueError):
         return None
     return f if np.isfinite(f) else None
+
+
+VALUE_KEYS = ("upside", "pbr", "per")
 
 
 def percentiles(vals: Sequence[Any], higher_better: bool = True) -> list[float | None]:
@@ -328,7 +332,7 @@ def score_rows(
     use = set(parts)
 
     def col(k: str, hb: bool, pos_only: bool = False) -> list[float | None]:
-        vals = [_fin(r.get(f[k])) for r in live]
+        vals = [None if (k in VALUE_KEYS and r.get(f["value_check"])) else _fin(r.get(f[k])) for r in live]
         if pos_only:
             vals = [v if v is not None and v > 0 else None for v in vals]
         return percentiles(vals, hb)
@@ -340,7 +344,7 @@ def score_rows(
         label = r.get(f["label"])
         v = round(value_points(up[i], pb[i], pe[i]), 1) if "value" in use else None
         if "value" in use and all(p is None for p in (up[i], pb[i], pe[i])):
-            v = None
+            v = 0.0 if r.get(f["value_check"]) else None
         c = (
             chart_points(label, r.get(f["cci200"]), gate, market, bool(r.get(f["cci200_spike"])))
             if label is not None

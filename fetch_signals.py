@@ -2277,7 +2277,7 @@ SIGNAL_FIELDS = ("chart_signal", "chart_signal_code", "long_oversold", "trend", 
 US_FUND_FIELDS = ("magic_rank", "f_score", "f_max")
 # 2026-11: 米国株の公開の列（SEC の決算 × Yahoo の株価。式は marketcalc.fund_us・score）
 US_VALUE_FIELDS = ("PER", "PBR", "roe_pct", "div_yield_pct", "equity_ratio_pct", "fair_price", "upside_pct",
-                   "one_off_flag", "next_earnings", "earnings_soon")
+                   "one_off_flag", "next_earnings", "earnings_soon", "value_check")
 ETF_TAB = "etf"
 # data.json で値が None ならキーを省く新しい列（2026-11 追加分だけ。既存の列は従来どおり null を出す）
 PRUNE_NONE = (*US_VALUE_FIELDS, "turnover_20d", "cci200_signal", "cci200_recent", "cci200_spike",
@@ -2432,7 +2432,11 @@ def attach_us_fundamentals(tabs, path=None):
             for k in US_VALUE_FIELDS:
                 r[k] = cr.get(k) if cr else None
     ranked = sum(1 for v in calc.values() if v.get("magic_rank"))
-    rec = {"available": bool(fdmap), "as_of": j.get("as_of"), "with_fundamentals": len(calc), "ranked": ranked}
+    # 「要確認」で理論株価・上値余地・PER・PBR を外した銘柄（fund_us.value_check）。理由と外す前の PER を残す（黙って消さない）
+    checked = {s: {"reason": v["value_check"], "per": v.get("value_check_per")}
+               for s, v in sorted(calc.items()) if v.get("value_check")}
+    rec = {"available": bool(fdmap), "as_of": j.get("as_of"), "with_fundamentals": len(calc), "ranked": ranked,
+           "value_check": checked, "value_check_rule": dict(fund_us.VALUE_CHECK)}
     print(f"[US fundamentals] {rec}")
     return rec
 

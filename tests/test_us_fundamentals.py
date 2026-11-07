@@ -61,3 +61,31 @@ def test_low_coverage_stops():
 def test_sic_is_fin():
     assert bu.sic_is_fin("6021") and bu.sic_is_fin(4911) and bu.sic_is_fin("6798")
     assert not bu.sic_is_fin("3571") and not bu.sic_is_fin(None)
+
+
+COVER = """<xbrli:context id="a"><x:explicitMember d="c">us-gaap:CommonClassAMember</x:explicitMember></xbrli:context>
+<xbrli:context id="b"><x:explicitMember d="c">us-gaap:CommonClassBMember</x:explicitMember></xbrli:context>
+<ix:nonFraction contextRef="a" name="dei:EntityCommonStockSharesOutstanding">488,450</ix:nonFraction>
+<ix:nonFraction contextRef="b" name="dei:EntityCommonStockSharesOutstanding">1,408,035,161</ix:nonFraction>"""
+SUB = {"filings": {"recent": {"form": ["8-K", "10-Q"], "accessionNumber": ["1", "0001-26-9"],
+                              "primaryDocument": ["x.htm", "brka.htm"], "filingDate": ["2026-09-01", "2026-08-10"]}}}
+
+
+def test_class_shares_reads_latest_cover_page():
+    urls = []
+
+    def text(u):
+        urls.append(u)
+        return COVER
+
+    assert bu.class_shares("BRK-B", 1067983, SUB, text) == (488_450 * 1500 + 1_408_035_161, "2026-08-10")
+    assert urls == ["https://www.sec.gov/Archives/edgar/data/1067983/0001269/brka.htm"]
+    assert bu.class_shares("AAPL", 1, SUB, text) is None and len(urls) == 1  # 対象外は取りに行かない
+
+
+def test_class_shares_failure_leaves_shares_stale():
+    def boom(u):
+        raise OSError("down")
+
+    assert bu.class_shares("BRK-B", 1067983, SUB, boom) is None
+    assert bu.class_shares("BRK-B", 1067983, {}, boom) is None

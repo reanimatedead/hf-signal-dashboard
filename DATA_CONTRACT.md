@@ -1743,3 +1743,20 @@ Stats = {n, mean, median, up_pct}
   業種は SEC の SIC コード（`data/us_fundamentals.json` の `sic`）の上2桁。黒字企業が 8 社未満なら SIC の大分類、それも足りなければ全体。赤字は理論株価なし。
 - 売買スコアの検証（月初ごと）も同じ基準（`fund_us.rerate_month`。その月初の業種別 PER の中央値）。Mac mini 版の米国株も同じ関数（`us.screen.apply_relative` 経由）。
 - 日本株（Mac mini 版）は残余利益モデルのまま。about.json の `rules.us_fair_price` に式の名前と段（sic2 / division / all）・最低社数。
+
+## 25. v8.4 — 米国株の「要確認」（2026-11-06）
+
+### 米国株の「要確認」（`calc.fund_us.value_check`）
+- PER が 2 未満、上値余地が +500% 超、または使う株数（SEC）が 400 日より古い（`shares_stale`）銘柄は、理論株価・上値余地・PER・PBR を出さず
+  （`value_check` に理由）、売買スコアの割安の点は 0、順位と業種別 PER の中央値の母集団からも外す。月初の検証も同じ（`rerate_month`。株数が古い月は入力に入れない）。
+- 外した銘柄は `meta.us_fundamentals.value_check`（銘柄 → 理由・外す前の PER）と `value_check_rule`。
+- 原因: ERIE は SEC の株数が B 株 2,542 株（2021 年）のまま、BRK-B は株数が 2011 年の A 株の数で、A 株規模の EPS を B 株の株価に当てていた。
+  SEC の companyfacts は株の種類ごとの最新の株数を持たない。
+
+### 株の種類の換算（`calc.fund_us.SHARE_CLASSES`）
+- 週次の `tools/build_us_fundamentals.py` が直近の 10-Q / 10-K の表紙（iXBRL の `dei:EntityCommonStockSharesOutstanding`）から種類別の株数を読み、
+  上場している種類の株数に換算して使う。BRK-B: A 株 × 1,500 + B 株。ERIE: A 株 + B 株 × 2,400。比率は提出書類で確かめた定款の固定値。
+- 表紙が読めなければ換算せず、株数が古いので「要確認」になる。過去の月（`hist`）にも今の換算株数を使う。Mac mini 版も同じ値（`sh_src: "cover"` の行）を使う。
+- V のように換算比率が変わる会社は表に入れず、株数が古ければ「要確認」のまま。
+- `data/us_fundamentals.json` の各行に `sh_end`（使った株数の期末日。表紙なら提出日）と `sh_stale`。
+
