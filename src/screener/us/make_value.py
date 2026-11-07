@@ -15,7 +15,7 @@ from . import screen as S
 KEYS = [
     "ticker", "name", "idx", "sector", "fin_tag", "fy", "price", "mcap_bn", "PER", "PBR", "roe_pct",
     "earnings_yield_pct", "roc_pct", "magic_rank", "F", "f_max", "ret_1y_pct", "ri_upside_pct",
-    "equity_ratio_pct", "div_yield_pct", "fair_price", "one_off_flag",
+    "equity_ratio_pct", "div_yield_pct", "fair_price", "one_off_flag", "value_check",
 ]  # fmt: skip
 
 

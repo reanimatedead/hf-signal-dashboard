@@ -2,6 +2,7 @@
 
 from screener.calc import events, ind
 from screener.japan import backtest_tech, backtest_value, screen, signals
+from screener.us import screen as us_screen
 
 
 def test_overall_grade_rules():
@@ -102,3 +103,19 @@ def test_backtests_run_on_fixture(cfg):
     assert isinstance(y, dict)
     w = backtest_value.with_chart(cfg, min_bars=300, min_mcap=0)
     assert w["valuation_months"] >= 1
+
+
+def test_us_value_check_reaches_rows_and_zeroes_value_points(cfg, monkeypatch):
+    """Mac mini 版でも「要確認」が行に届き、割安の点は 0（公開版と同じ。空にならない）。"""
+    orig = us_screen.screen
+
+    def flagged(*a, **kw):
+        rows = orig(*a, **kw)
+        for r in rows:
+            if r["ticker"] == "AAA":
+                r.update(value_check="per_lt_2", PER=None, PBR=None, ri_upside_pct=None, fair_price=None)
+        return rows
+
+    monkeypatch.setattr(us_screen, "screen", flagged)
+    aaa = next(r for r in signals.run(cfg)["us"] if r["ticker"] == "AAA")
+    assert aaa["value_check"] == "per_lt_2" and aaa["score_value"] == 0.0

@@ -11,7 +11,7 @@ from typing import Any
 # 列名（行の dict のキー）
 COLUMNS = {
     "grade": "総合判定", "code": "コード", "company_name": "会社名", "market": "市場", "sector": "業種",
-    "chart_signal": "チャート判定", "trend": "長期", "price": "株価", "fair_price": "理論株価",
+    "value_check": "要確認", "chart_signal": "チャート判定", "trend": "長期", "price": "株価", "fair_price": "理論株価",
     "upside_pct": "上値余地%", "PBR": "PBR", "F": "F", "f_max": "F満点", "magic_rank": "魔法の公式順位",
     "fin_tag": "財務判定", "mcap_oku_jpy": "時価総額(億円)", "one_off_note": "一時利益の目印",
     "one_off_reasons": "一時利益の理由", "value_quintile": "割安度(5分位)", "quality_candidate": "品質の候補",
@@ -49,6 +49,8 @@ VALUES = {
     # 売買スコア（screener.calc.score）
     "one_off": "一時的な利益", "earnings_soon": "決算まで5営業日以内", "low_turnover": "売買代金が下位10%",
     "not_scored_inverse": "inverse（物差しの対象外）", "no_inputs": "材料なし",
+    # 要確認（screener.calc.fund_us.value_check）
+    "shares_stale": "SEC の株数が古い", "per_lt_2": "PER が 2 未満", "upside_gt_500": "上値余地が +500% 超",
     # ETF の種類（screener.calc.assets.etf_kind）
     "index": "指数", "leveraged": "レバレッジ", "inverse": "インバース", "unknown": "不明",
 }  # fmt: skip

@@ -239,6 +239,7 @@ def build_us(cfg: Config, today: dt.date, ctx: dict[str, Any] | None = None) -> 
                 "equity_ratio_pct": v.get("equity_ratio_pct"),
                 "fair_price": v.get("fair_price"),
                 "upside_pct": v.get("ri_upside_pct"),
+                "value_check": v.get("value_check"),  # 「要確認」（fund_us.value_check）→ 割安の点 0
                 "one_off_flag": bool(v.get("one_off_flag")),
                 "turnover_20d": _last(tv),
                 "next_earnings": score.next_earnings(filed, ds_t[-1]),
