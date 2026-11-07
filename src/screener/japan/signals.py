@@ -59,7 +59,6 @@ def _load(p: str) -> Any:
 
 ETF_PROD = ("014", "023")  # J-Quants の銘柄一覧で「市場：その他」の ETF・ETN（013 = REIT は入れない）
 ETF_MARKET = "その他"
-LOCAL_GATE_KEYS = {ind.LABELS[2]: "buy3", ind.LABELS[1]: "buy", ind.LONG_OVERSOLD_LABEL: "long_oversold"}
 
 
 def is_etf(m: dict[str, Any]) -> bool:
@@ -325,17 +324,15 @@ VALUE_PARTS = ("value", "chart", "penalty")  # 合計に入る部分（質の点
 ETF_PARTS = ("chart", "penalty")
 
 
-def gate_local(vm: dict[str, Any], c200: dict[str, Any]) -> dict[str, bool]:
-    """verify() の全期間（buy3=強い買い・buy=買い系の買い・long_oversold）
-    と CCI 両方割れの全期間 → チャートの点の gate。"""
-    rec = vm.get("recent6m") or {}
-    chart = {lab: rec.get(k) for lab, k in LOCAL_GATE_KEYS.items()}
-    return score.gate_from_verify(chart, rec.get("base"), c200)
+def _gates(xs: Xs, spikes: set[str] | None = None) -> tuple[dict[str, dict[str, bool]], dict[str, bool]]:
+    """(各日の時点の gate, 最新日の gate = 画面のスコアに使う)。"""
+    gd = score.gate_days(xs.values(), spikes)
+    return gd, (gd[max(gd)] if gd else {})
 
 
 def tiers_local(
     xs: Xs,
-    gate: dict[str, bool],
+    gate_by_day: dict[str, dict[str, bool]],
     parts: tuple[str, ...],
     since: str,
     vin: dict[str, dict[str, Any]] | None = None,
@@ -353,16 +350,24 @@ def tiers_local(
     )
     obm = {m: {c: bool(v[3]) for c, v in d.items()} for m, d in vin.items()} if vin else None
     low = score.low_turnover_by_symbol(turn) if turn and "penalty" in parts else {}
-    items = [
-        (
-            x["c"],
-            score.total_days(x, ds, c, gate, parts, vpm, obm, (earn or {}).get(c, []), low.get(c), market, spikes),
-            ds,
-        )
-        for c, (x, ds) in xs.items()
-    ]
-    out = score.verify_tiers(items, since, parts)
-    out["gate"] = gate
+
+    def tiers(gd: dict[str, dict[str, bool]] | None) -> dict[str, Any]:
+        items = [
+            (
+                x["c"],
+                score.total_days(
+                    x, ds, c, None, parts, vpm, obm, (earn or {}).get(c, []), low.get(c), market, spikes, gd
+                ),
+                ds,
+            )
+            for c, (x, ds) in xs.items()
+        ]
+        return score.verify_tiers(items, since, parts)
+
+    out = tiers(gate_by_day)
+    out["gate"] = gate_by_day[max(gate_by_day)] if gate_by_day else {}
+    ng = tiers(None)
+    out["without_gate"] = {"full": ng["full"], "recent6m": ng["recent6m"]}
     return out
 
 
@@ -402,19 +407,19 @@ def add_scores(
             "points": dict(score.CCI200.get(m, {})),
         }
     v["cci200"] = c200
-    gj = gate_local(v["jp"], c200["jp"])
-    gu = gate_local(v["us"], c200["us"])
+    gdj, gj = _gates(jx, spk["jp"])
+    gdu, gu = _gates(ux, spk["us"])
     ve = verify(scored, since)
-    ge = gate_local(ve, c200["etf"])
+    gde, ge = _gates(scored)
     turn = ctx.get("turnover", {})
     jturn = {c: t for c, t in turn.items() if not c.startswith("etf:")}
     eturn = {c[4:]: t for c, t in turn.items() if c.startswith("etf:") and c[4:] in scored}
     jvin = screen.monthly_score_inputs(cfg)
     uvin = us_screen.monthly_score_inputs(cfg, sorted(jvin)) if ux else {}
     tiers = {
-        "jp": tiers_local(jx, gj, VALUE_PARTS, since, jvin, ctx.get("disclosures"), jturn, "jp", spk["jp"]),
-        "us": tiers_local(ux, gu, VALUE_PARTS, since, uvin, uctx.get("filed"), uctx.get("turnover"), "us", spk["us"]),
-        "etf": tiers_local(scored, ge, ETF_PARTS, since, None, None, eturn, "etf"),
+        "jp": tiers_local(jx, gdj, VALUE_PARTS, since, jvin, ctx.get("disclosures"), jturn, "jp", spk["jp"]),
+        "us": tiers_local(ux, gdu, VALUE_PARTS, since, uvin, uctx.get("filed"), uctx.get("turnover"), "us", spk["us"]),
+        "etf": tiers_local(scored, gde, ETF_PARTS, since, None, None, eturn, "etf"),
     }
     v["score_tiers"] = tiers
     v["score_rules"] = score.rules()

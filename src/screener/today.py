@@ -6,6 +6,7 @@ daily.py の最後（一覧と通知のあと）に作る。中身は日本株�
   - 決算が 7 日以内の注意（次の決算の推定日 calc.score.next_earnings）。全銘柄ではなく、その市場の段階5・段階4・
     本日の◆（買い・売り目安）に入った銘柄だけに絞り、見出しに「全体 N 件中 M 件」と出す
   - 段階ごとの検証（20 営業日後の中央値・全期間と直近6か月・件数。verify_local.json の score_tiers）
+  - 段階5 が検証で相場全体を上回らない市場は、スコアの欄と見出しの下に「根拠不十分」（calc.score.evidence_weak）
 J-Quants 由来の数値（日本株の PER・PBR・理論株価など）を含むので、Mac mini の中だけに置く（ADR-002）。
 規則は持たない（行の値・検証の値は signals.run が calc.score / calc.ind で作ったものをそのまま使う）。
 """
@@ -43,14 +44,19 @@ COLS = {
 }
 
 
+EVIDENCE_WEAK = "根拠不十分（検証で相場平均を上回っていない）"
+EVIDENCE_WEAK_EN = "Insufficient evidence (did not beat the market average in verification)"
+
+
 def _e(v: Any) -> str:
     return html.escape(labels.value(v))
 
 
-def _table(rows: list[dict[str, Any]], key: str, name: str, cols: list[str]) -> str:
+def _table(rows: list[dict[str, Any]], key: str, name: str, cols: list[str], weak: bool = False) -> str:
     if not rows:
         return "<p class=none>該当なし</p>"
-    head = "".join(f"<th>{html.escape(labels.col(c))}</th>" for c in [key, name, *cols])
+    note = f"<br><span class=warn>{EVIDENCE_WEAK}</span>" if weak else ""
+    head = "".join(f"<th>{html.escape(labels.col(c))}{note if c == 'score' else ''}</th>" for c in [key, name, *cols])
     body = "".join("<tr>" + "".join(f"<td>{_e(r.get(c))}</td>" for c in [key, name, *cols]) + "</tr>" for r in rows)
     return f"<table><thead><tr>{head}</tr></thead><tbody>{body}</tbody></table>"
 
@@ -99,24 +105,29 @@ def render(doc: dict[str, Any]) -> str:
         watch = {id(r) for r in ranked if r.get("score_tier") in (5, 4)} | {id(r) for r in buy + sell}
         earn = sorted((r for r in soon if id(r) in watch), key=lambda r: str(r.get("next_earnings")))
         cols = COLS[m]
+        tier = (v.get("score_tiers") or {}).get(m) or {}
+        weak = bool(tier.get("evidence_weak"))
+        tb = lambda rs: _table(rs, key, name, cols, weak)  # noqa: E731,B023
         parts.append(
             f"<h2>{title}</h2>"
-            f"<h3>段階5 の上位（{len(t5)} 件）</h3>{_table(t5, key, name, cols)}"
-            f"<h3>段階4 の上位（{len(t4)} 件）</h3>{_table(t4, key, name, cols)}"
+            + (f"<p class=warn>{EVIDENCE_WEAK} / {EVIDENCE_WEAK_EN}</p>" if weak else "")
+            + f"<h3>段階5 の上位（{len(t5)} 件）</h3>{tb(t5)}"
+            f"<h3>段階4 の上位（{len(t4)} 件）</h3>{tb(t4)}"
             f"<h3 class=c2b>◆ 買い（CCI48・CCI288 がそろって −200 割れ）本日 {len(buy)} 件</h3>"
-            f"{_table(buy, key, name, cols)}"
+            f"{tb(buy)}"
             f"<h3 class=c2s>◆ 売り目安（CCI48・CCI288 がそろって +200 超え）本日 {len(sell)} 件</h3>"
             f"<p class=note>利益確定・新しく買わない目安。空売りの根拠ではありません。</p>"
-            f"{_table(sell, key, name, cols)}"
+            f"{tb(sell)}"
             + (
                 f"<h3>決算が {EARNINGS_DAYS} 日以内（推定）全体 {len(soon):,} 件中 {len(earn):,} 件"
                 " — 決算の前後は値動きが大きくなりやすいので注意</h3>"
                 "<p class=note>段階5・段階4・本日の◆（買い・売り目安）に入った銘柄だけを載せています。</p>"
-                f"{_table(earn, key, name, cols)}"
+                f"{tb(earn)}"
                 if m != "etf"
                 else ""
             )
-            + f"<h3>段階ごとの検証（20営業日後）</h3>{_tiers((v.get('score_tiers') or {}).get(m))}"
+            + f"<h3>段階ごとの検証（20営業日後）</h3>{_tiers(tier or None)}"
+            "<p class=note>今の構成銘柄を過去に当てています（生き残りの偏り）。成績は実際より良く見えがちです。</p>"
         )
     return (
         '<!DOCTYPE html>\n<html lang="ja"><head><meta charset="utf-8">'

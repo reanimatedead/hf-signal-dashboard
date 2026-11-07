@@ -1766,5 +1766,13 @@ Stats = {n, mean, median, up_pct}
 ### 検証の財務データ（先読みしない）
 - `hist` の月初の値は、その月初より前に提出された 10-K / 10-Q だけから計算する（`fund_us.fundamentals(F, 月初)`。`filed` で切る）。テストで、後の提出を消しても値が変わらないことを確かめている。
 - 換算株数は提出より後の月にだけ使う（`fix_at`）。それより前の月は換算する銘柄（`SHARE_CLASSES`）の割安の点なし。株数を照合できない月も入れない。
-- 残る偏り: 銘柄は今の構成銘柄（生き残りの偏り）。チャートの点の gate は今の判定を過去にも当てる。当てない場合の成績は verify.json の `score_tiers.us.without_gate`。
+- 残る偏り: 銘柄は今の構成銘柄（生き残りの偏り）。検証タブと about に明記する。
+
+## 26. v8.5 — gate を各日付の時点で決める（2026-11-07）
+
+- 「直近6か月で弱い判定は 0 点」（gate）は、検証では日付ごとに決める（`calc.score.gate_days`。日本株・米国株・ETF、公開と Mac mini で同じ関数）。
+  その日の gate が見るのは、シグナルの日がその日の 6 か月前以降で、20 営業日後の結果がその日までに確定したものだけ。最新日の gate が画面のスコアに使う値。
+- verify.json / verify_local.json の `score_tiers.<市場>`: `gate`（最新日）、`without_gate`（gate を当てない成績）、`evidence_weak`。
+- 根拠の表示（`calc.score.evidence_weak`）: 段階5 の中央値が全期間と直近6か月の両方で基準（相場全体）を上回らない市場は `evidence_weak: true`。
+  件数が 5 未満なら上回らない扱い。data.json の行に `score_evidence_weak: true`。公開のスコア欄と today.html に「根拠不十分（検証で相場平均を上回っていない）」。
 
