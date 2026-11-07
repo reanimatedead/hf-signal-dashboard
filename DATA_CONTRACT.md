@@ -1758,13 +1758,13 @@ Stats = {n, mean, median, up_pct}
 
 ### 株の種類の換算（`calc.fund_us.SHARE_CLASSES`）
 - 週次の `tools/build_us_fundamentals.py` が直近の 10-Q / 10-K の本文（iXBRL）を読み、上場している種類の株数に換算して使う。
-  BRK-B: A 株 × 1,500 + B 株、ERIE: A 株 + B 株 × 2,400（表紙の株数 × 提出書類で確かめた定款の固定値）。
+  BRK-B: A 株 × 1,500 + B 株、ERIE: A 株 + B 株 × 2,400、HSY: 普通株 + B 株（表紙の株数 × 提出書類で確かめた定款の固定値）。
   V: B・C 株と優先株の転換比率が変わるので、会社が出す A 株換算の合計（`v:SharesOutstandingAsConvertedBasis`）を読む。
 - 読めなければ `shares_mismatch` で「要確認」になる。照合の EPS は直近の 10-K の本文から読む（`CLASS_EPS`。`sh_eps`）。Mac mini 版も同じ値（`sh_src: "cover"` の行）を使う。
 - `data/us_fundamentals.json` の各行に `sh_end`（使った株数の期末日。本文なら提出日）と `sh_check`。
 
 ### 検証の財務データ（先読みしない）
 - `hist` の月初の値は、その月初より前に提出された 10-K / 10-Q だけから計算する（`fund_us.fundamentals(F, 月初)`。`filed` で切る）。テストで、後の提出を消しても値が変わらないことを確かめている。
-- 換算株数は提出より後の月にだけ使う（`fix_at`）。それより前の月は V・ERIE・BRK-B の割安の点なし。株数を照合できない月も入れない。
+- 換算株数は提出より後の月にだけ使う（`fix_at`）。それより前の月は換算する銘柄（`SHARE_CLASSES`）の割安の点なし。株数を照合できない月も入れない。
 - 残る偏り: 銘柄は今の構成銘柄（生き残りの偏り）。チャートの点の gate は今の判定を過去にも当てる。当てない場合の成績は verify.json の `score_tiers.us.without_gate`。
 

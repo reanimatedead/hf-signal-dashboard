@@ -191,10 +191,12 @@ def split_adjust(sh, shd, splits):
 # 上場している種類の株数に換算する（週次の tools/build_us_fundamentals.py）。提出書類で確かめた:
 #   BRK-B: A 株 1 株 = B 株 1,500 株（配当・分配の権利が 1/1,500・転換も 1:1,500）。表紙の株数 × 定款の固定比率
 #   ERIE:  B 株 1 株 = A 株 2,400 株（転換比率。希薄化後 EPS も同じ換算）。同上
+#   HSY:   B 株 1 株 = 普通株 1 株（転換比率）。同上
 #   V:     B-1〜B-3・C 株・優先株の転換比率が変わるので、会社が出す A 株換算の合計（as_converted）をそのまま読む
 SHARE_CLASSES = {
     "BRK-B": {"us-gaap:CommonClassAMember": 1500, "us-gaap:CommonClassBMember": 1},
     "ERIE": {"us-gaap:CommonClassAMember": 1, "us-gaap:CommonClassBMember": 2400},
+    "HSY": {"us-gaap:CommonStockMember": 1, "us-gaap:CommonClassBMember": 1},
     "V": {"as_converted": "v:SharesOutstandingAsConvertedBasis"},
 }
 # 照合に使う EPS（上場している種類の通期の値。companyfacts に無いので 10-K の本文から読む）。
@@ -202,6 +204,7 @@ SHARE_CLASSES = {
 CLASS_EPS = {
     "BRK-B": ("us-gaap:EarningsPerShareBasic", "EquivalentClassBMember"),
     "ERIE": ("us-gaap:EarningsPerShareDiluted", "CommonClassAMember"),
+    "HSY": ("us-gaap:EarningsPerShareDiluted", "CommonStockMember"),
     "V": ("us-gaap:EarningsPerShareDiluted", "CommonClassAMember"),
 }
 _IX_NUM = re.compile(r"<ix:nonFraction\b([^>]*)>(.*?)</ix:nonFraction>", re.S)

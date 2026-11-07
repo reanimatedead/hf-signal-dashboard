@@ -238,6 +238,11 @@ def test_cover_shares_to_listed_class_brk_and_erie():
     assert fund_us.class_equiv_shares("ERIE", erie) == 46_189_068 + 2_542 * 2400
 
 
+def test_hsy_common_plus_class_b():
+    c = {"us-gaap:CommonStockMember": 146_366_875, "us-gaap:CommonClassBMember": 54_613_514}
+    assert fund_us.class_equiv_shares("HSY", c) == 200_980_389
+
+
 def test_class_equiv_needs_every_class_and_a_listed_ticker():
     assert fund_us.class_equiv_shares("BRK-B", {"us-gaap:CommonClassBMember": 5}) is None  # A 株が読めない
     assert fund_us.class_equiv_shares("AAPL", {"us-gaap:CommonClassAMember": 5}) is None
