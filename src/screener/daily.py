@@ -12,7 +12,9 @@
 4. 一覧（screen → signals）→ local_report（<data_dir>/out/ にだけ書く）
 5. CCI ±200 の抜けを Mac mini の通知で1回出す（screener.alerts。既定は osascript。
    本文の最後に一覧の場所。ntfy には送らない）
-6. 最後に <data_dir>/out/today.html「今日の要点」を作る（screener.today。ローカルだけ）
+6. 判定の記録帳 <data_dir>/history/YYYY.parquet に全銘柄を追記し、20 営業日後の答え合わせを verify_local.json の live に
+   出す（screener.history。ローカルだけ・git に入れない。失敗しても daily は止めない）
+7. 最後に <data_dir>/out/today.html「今日の要点」を作る（screener.today。ローカルだけ）
 失敗したら ntfy に「失敗＋日付」を送って終了コード 1。
 成功したら何も送らない。ただし月曜は最後に「週次 OK＋日付」を1回送る。
 """
@@ -30,7 +32,7 @@ import traceback
 from collections.abc import Callable
 from typing import Any
 
-from . import alerts, contract, local_report, notify
+from . import alerts, contract, history, local_report, notify
 from . import config as config_mod
 from . import today as today_page
 from .config import Config
@@ -100,6 +102,9 @@ def pipeline(
     print("japan fetch", jp_fetch.run(cfg, today, get=get), flush=True)
     us_update(cfg, today)
     doc = signals.run(cfg)
+    xs = doc.pop("_xs", None)  # 答え合わせ用の日足（ファイルには書かない）
+    hp = _step("history", lambda: history.append(cfg, doc))  # 判定の記録帳（ローカルだけ・git に入れない）
+    doc.setdefault("verify", {})["live"] = _step("live", lambda: history.live_summary(cfg, xs))
     c = local_report.write(cfg, doc)
     print("counts", json.dumps(c, ensure_ascii=False), flush=True)  # 件数だけ
     if doc.get("cci_alerts"):
@@ -110,7 +115,18 @@ def pipeline(
             sounds=alerts.sound_settings(cfg),
         )
     print("today.html →", today_page.write(cfg, doc), flush=True)  # 最後に「今日の要点」（ローカルだけ）
+    if hp:
+        print(f"history → {hp}（{hp.stat().st_size:,} B）", flush=True)
     return c
+
+
+def _step(name: str, fn: Callable[[], Any]) -> Any:
+    """記録帳は失敗しても daily を止めない（理由はログに残す）。"""
+    try:
+        return fn()
+    except Exception as exc:
+        print(f"{name}: 失敗 {type(exc).__name__}: {str(exc)[:200]}", flush=True)
+        return None
 
 
 def main(

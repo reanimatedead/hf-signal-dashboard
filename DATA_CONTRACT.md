@@ -1776,3 +1776,9 @@ Stats = {n, mean, median, up_pct}
 - 根拠の表示（`calc.score.evidence_weak`）: 段階5 の中央値が全期間と直近6か月の両方で基準（相場全体）を上回らない市場は `evidence_weak: true`。
   件数が 5 未満なら上回らない扱い。data.json の行に `score_evidence_weak: true`。公開のスコア欄と today.html に「根拠不十分（検証で相場平均を上回っていない）」。
 
+## 27. v8.6 — 判定の記録帳（Mac mini だけ・2026-11-07）
+
+- daily の最後に `<data_dir>/history/YYYY.parquet` へ全銘柄を追記する（`d`・`m`・`s`・`sig`・`c2`・`t`・`sc`・`px`・`name`。同じ日・市場・銘柄は新しい方で置き換え）。git にも Pages にも入れない。
+- `verify_local.json` の `live`（`calc.live.live_stats`）: `start`（記録開始日）・`asof`・`records`・`matured`、市場ごとに基準・段階別・判定別・CCI ±200 別の 20 営業日後の中央値と件数。
+- 答え合わせはその銘柄の日足で行う（daily が止まった日があってもずれない・株式分割も調整済み）。日足が無くなった銘柄だけ記録帳の終値。
+- 同じ銘柄が続けて同じ判定なら毎日 1 件と数える（検証の「20 日に 1 回」とは件数の意味が違う）。公開側（signal_log）と Obsidian には出さない。
