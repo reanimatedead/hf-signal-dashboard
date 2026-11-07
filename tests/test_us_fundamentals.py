@@ -67,8 +67,9 @@ COVER = """<xbrli:context id="a"><x:explicitMember d="c">us-gaap:CommonClassAMem
 <xbrli:context id="b"><x:explicitMember d="c">us-gaap:CommonClassBMember</x:explicitMember></xbrli:context>
 <ix:nonFraction contextRef="a" name="dei:EntityCommonStockSharesOutstanding">488,450</ix:nonFraction>
 <ix:nonFraction contextRef="b" name="dei:EntityCommonStockSharesOutstanding">1,408,035,161</ix:nonFraction>"""
-SUB = {"filings": {"recent": {"form": ["8-K", "10-Q"], "accessionNumber": ["1", "0001-26-9"],
-                              "primaryDocument": ["x.htm", "brka.htm"], "filingDate": ["2026-09-01", "2026-08-10"]}}}
+SUB = {"filings": {"recent": {"form": ["8-K", "10-Q", "10-K"], "accessionNumber": ["1", "0001-26-9", "0001-26-8"],
+                              "primaryDocument": ["x.htm", "brka.htm", "k.htm"],
+                              "filingDate": ["2026-09-01", "2026-08-10", "2026-03-02"]}}}
 
 
 def test_class_shares_reads_latest_cover_page():
@@ -78,9 +79,10 @@ def test_class_shares_reads_latest_cover_page():
         urls.append(u)
         return COVER
 
-    assert bu.class_shares("BRK-B", 1067983, SUB, text) == (488_450 * 1500 + 1_408_035_161, "2026-08-10")
-    assert urls == ["https://www.sec.gov/Archives/edgar/data/1067983/0001269/brka.htm"]
-    assert bu.class_shares("AAPL", 1, SUB, text) is None and len(urls) == 1  # 対象外は取りに行かない
+    assert bu.class_shares("BRK-B", 1067983, SUB, text) == (488_450 * 1500 + 1_408_035_161, "2026-08-10", {})
+    assert urls == ["https://www.sec.gov/Archives/edgar/data/1067983/0001269/brka.htm",
+                    "https://www.sec.gov/Archives/edgar/data/1067983/0001268/k.htm"]
+    assert bu.class_shares("AAPL", 1, SUB, text) is None and len(urls) == 2  # 対象外は取りに行かない
 
 
 def test_class_shares_failure_returns_none():

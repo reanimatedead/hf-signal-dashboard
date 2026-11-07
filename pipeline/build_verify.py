@@ -222,6 +222,9 @@ def build_scores(obj, entries_by_market, fund=None, etf_kinds=None):
                                                               else ("value", "chart", "penalty"))
         t = score_market(entries, parts, gate, since, fund if key == "us" else None, SCORE_MARKET[key], spikes)
         t["gate"] = gate
+        if key == "us":   # gate は今の判定を過去にも当てるので、当てない場合の成績も残す（先読みの大きさの確認用）
+            ng = score_market(entries, parts, None, since, fund, SCORE_MARKET[key], spikes)
+            t["without_gate"] = {"full": ng["full"], "recent6m": ng["recent6m"]}
         tiers[key] = t
         if key == "etf":
             obj["etf"] = {"market": {"full": mk["full"], "recent6m": mk["recent6m"], "symbols": mk["symbols"]},

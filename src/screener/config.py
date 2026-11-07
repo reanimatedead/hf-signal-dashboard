@@ -22,8 +22,11 @@ config.toml の例（install_macmini.sh が作る）::
 
 from __future__ import annotations
 
+import argparse
 import datetime as dt
+import json
 import os
+import re
 import sys
 import tomllib
 from dataclasses import dataclass, field
@@ -163,7 +166,9 @@ def today_jst() -> dt.date:
 
 
 def main(argv: list[str]) -> int:
-    """python -m screener.config get ntfy.topic / path data_dir（シェルから値を読む）。"""
+    """python -m screener.config get ntfy.topic / path data_dir（シェルから値を読む）。ensure は ensure_cli。"""
+    if argv and argv[0] == "ensure":
+        return ensure_cli(argv)
     cfg = load()
     if len(argv) >= 2 and argv[0] == "get":
         print(cfg.get(argv[1], ""))
@@ -173,6 +178,62 @@ def main(argv: list[str]) -> int:
         return 0
     print(__doc__, file=sys.stderr)
     return 2
+
+
+def _toml(v: Any) -> str:
+    """TOML の値の書き方（文字列・真偽・数・配列）。JSON の書き方と同じで足りる。"""
+    return json.dumps(v, ensure_ascii=False)
+
+
+def ensure_file(path: Path, values: dict[str, dict[str, Any]]) -> list[str]:
+    """設定ファイルに足りない項目だけ足す。既存の値・コメント・並びは変えない。足した項目（"節.キー"）を返す。
+    読めない TOML なら例外（上書きしない）。"""
+    text = (
+        path.read_text(encoding="utf-8")
+        if path.exists()
+        else "# screener の設定。キーはここに書かない（キーチェーン）。\n"
+    )
+    have = tomllib.loads(text)
+    added: list[str] = []
+    for sec, items in values.items():
+        miss = {k: v for k, v in items.items() if k not in (have.get(sec) or {})}
+        if not miss:
+            continue
+        lines = "".join(f"{k} = {_toml(v)}\n" for k, v in miss.items())
+        head = re.search(rf"^[ \t]*\[{re.escape(sec)}\][ \t]*(#.*)?$\n?", text, re.M)
+        if head:
+            pre = text[: head.end()] if head.group(0).endswith("\n") else text + "\n"
+            text = pre + lines + text[head.end() :]
+        else:
+            text = text.rstrip("\n") + f"\n\n[{sec}]\n{lines}"
+        added += [f"{sec}.{k}" for k in miss]
+    tomllib.loads(text)  # 書く前に確かめる
+    if added or not path.exists():
+        tmp = path.with_name(path.name + ".tmp")
+        tmp.write_text(text, encoding="utf-8")
+        tmp.chmod(path.stat().st_mode & 0o777 if path.exists() else 0o600)
+        os.replace(tmp, path)
+    return added
+
+
+def ensure_cli(argv: list[str]) -> int:
+    """install_macmini.sh から呼ぶ: python -m screener.config ensure <path> --data-dir … --repo-dir … …"""
+    ap = argparse.ArgumentParser(description="config.toml に足りない項目だけ足す")
+    ap.add_argument("command", choices=["ensure"])
+    ap.add_argument("path", type=Path)
+    for name in ("data-dir", "repo-dir", "service", "topic"):
+        ap.add_argument(f"--{name}", required=True)
+    a = ap.parse_args(argv)
+    vals = {k: dict(v) for k, v in DEFAULTS.items()}
+    vals["paths"] = {"data_dir": a.data_dir, "repo_dir": a.repo_dir}
+    vals["jquants"]["keychain_service"] = a.service
+    vals["ntfy"]["topic"] = a.topic
+    added = ensure_file(a.path, vals)
+    print(f"設定に足した項目: {', '.join(added) if added else 'なし（既存の値のまま）'}")
+    now = tomllib.loads(a.path.read_text(encoding="utf-8")).get("paths", {}).get("repo_dir")
+    if now != a.repo_dir:
+        print(f"注意: repo_dir は既存の値のままです（{now}）。毎日の実行は {a.repo_dir} を使います", file=sys.stderr)
+    return 0
 
 
 if __name__ == "__main__":
