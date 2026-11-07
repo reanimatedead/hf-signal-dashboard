@@ -562,10 +562,21 @@
    "removed": [
     "VZ"
    ]
+  },
+  {
+   "date": "2026-11-07",
+   "name": "sp500",
+   "count": 503,
+   "added": [
+    "OKTA"
+   ],
+   "removed": [
+    "KVUE"
+   ]
   }
  ],
  "last_run": {
-  "date": "2026-11-01",
+  "date": "2026-11-07",
   "results": {
    "nikkei225": {
     "status": "kept",

@@ -1,5 +1,5 @@
 {
- "as_of": "2026-11-01",
+ "as_of": "2026-11-07",
  "source": "wikipedia/datahub",
  "count": 503,
  "members": {
@@ -276,7 +276,6 @@
   "KMI": "Kinder Morgan",
   "KO": "Coca-Cola Company (The)",
   "KR": "Kroger",
-  "KVUE": "Kenvue",
   "L": "Loews Corporation",
   "LDOS": "Leidos",
   "LEN": "Lennar",
@@ -350,6 +349,7 @@
   "O": "Realty Income",
   "ODFL": "Old Dominion",
   "OKE": "Oneok",
+  "OKTA": "Okta, Inc.",
   "OMC": "Omnicom Group",
   "ON": "ON Semiconductor",
   "ORCL": "Oracle Corporation",
