@@ -249,3 +249,19 @@ def test_gamma_error_without_previous_publishes_as_before_with_warning():
 def test_us_stale_balance_has_reason_code():
     out, rep = lf.apply(_fresh(relations=_relations(NOW.isoformat(), n_us=0)), _prev(), NOW)
     assert out["relations"]["balance"]["stale_reason"] == "fetch_failed_previous_kept"
+
+
+# ── 古いデータの層は売買の点数・判定に入らない（2026-11-11 確認・再発防止）────────────
+def test_layers_that_can_be_stale_are_not_read_by_score_or_judgment_code():
+    """relations / macro_v2 / gamma（前回データに差し替わりうる層）は画面の表示専用。
+    売買スコア（src/screener）・チャート判定と data.json の生成（fetch_signals.py）・リスクゲート（survival/）が
+    これらのファイルを読み始めたら、古い層を計算から外す仕組みが要るので、ここで止める。"""
+    pat = re.compile(r"(relations|macro_v2|gamma)\.json")
+    roots = [ROOT / "src" / "screener", ROOT / "survival", ROOT / "fetch_signals.py"]
+    hits = []
+    for r in roots:
+        for p in ([r] if r.is_file() else r.rglob("*.py")):
+            for i, line in enumerate(p.read_text(encoding="utf-8").splitlines(), 1):
+                if pat.search(line):
+                    hits.append(f"{p.relative_to(ROOT)}:{i}: {line.strip()}")
+    assert not hits, "古くなりうる層を計算側が読んでいる:\n" + "\n".join(hits)
