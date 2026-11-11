@@ -1340,8 +1340,23 @@ def fetch_ecb_yields(n=520):
         try:
             url = (f"{ECB_YC_BASE}/B.U2.EUR.4F.G_N_A.SV_C_YM.{key}"
                    f"?lastNObservations={n}&format=csvdata")
-            r = requests.get(url, timeout=30,
-                             headers={"User-Agent": "hf-signal-dashboard (ECB YC, keyless)"})
+            # 2026-11-11: GitHub の実行環境から 504 / ReadTimeout が続いた（Deploy #296・#298）。
+            # 504 系と通信の失敗は 10 秒あけて 1 回だけ取り直す（3 年限 × 最悪 2 回で full の 30 分に収まる）。
+            for attempt in (1, 2):
+                try:
+                    r = requests.get(url, timeout=30,
+                                     headers={"User-Agent": "hf-signal-dashboard (ECB YC, keyless)"})
+                    if r.status_code in (429, 502, 503, 504) and attempt == 1:
+                        print(f"  [ECB] {sym} HTTP {r.status_code} — 10 秒後に取り直す")
+                        time.sleep(10)
+                        continue
+                    break
+                except requests.RequestException as exc:
+                    if attempt == 1:
+                        print(f"  [ECB] {sym} {type(exc).__name__} — 10 秒後に取り直す")
+                        time.sleep(10)
+                        continue
+                    raise
             r.raise_for_status()
             ser = []
             for x in csv.DictReader(io.StringIO(r.text)):

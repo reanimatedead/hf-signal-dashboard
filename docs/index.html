@@ -358,6 +358,8 @@ html,body{overflow-x:hidden}
 .rel-warn{color:var(--red);font-weight:700}
 .rel-bad{color:var(--yellow);border:1px solid var(--border);border-radius:4px;padding:6px 10px;background:var(--bg3);margin:4px 0}
 .rel-badge{display:inline-block;font-size:10px;padding:1px 6px;border-radius:3px;background:var(--bg4);color:var(--text-dim);margin-left:6px}
+.rel-badge.rel-stale{background:rgba(229,72,77,.16);color:var(--red);font-weight:700}
+.rel-asof{font-size:10px;color:var(--text-faint);margin-left:6px}
 .rel-toggle{font-size:11px;color:var(--text-dim);cursor:pointer;user-select:none;border:1px solid var(--border);border-radius:3px;padding:1px 7px;background:var(--bg3)}
 .rel-bar-row{display:flex;align-items:center;gap:8px;margin:3px 0;font-size:11.5px}
 .rel-bar-track{position:relative;flex:1;height:14px;background:var(--bg4);border-radius:2px}
@@ -2757,6 +2759,10 @@ I18.onChange(()=>{
     }).join("");
   }
   const cap=html=>`<div class="rel-cap">${html}</div>`;
+  // 層ごとの更新時刻と「古いデータ」の印（tools/layer_fallback.py が付ける as_of / stale）
+  const layerMeta=o=>{ if(!o||!o.as_of) return "";
+    const t=`<span class="rel-asof">${T("rel.layer_as_of",{at:esc(I18.fmtDate(o.as_of,"ymdhm"))})}</span>`;
+    return o.stale?`${t}<span class="rel-badge rel-stale">${T("rel.stale_badge")}</span>`:t; };
 
   // ── section renderers ──
   function renderBalance(){
@@ -2770,7 +2776,7 @@ I18.onChange(()=>{
       const nm=T("region."+k);
       const rr=reg[k]||{}; const bad=rr.data_status!=="live"||!(rr.series&&rr.series.length);
       const last=(rr.series&&rr.series.length)?rr.series[rr.series.length-1]:null;
-      charts+=`<div class="rel-col"><div class="rel-sub">${nm} <span class="rel-badge">${esc(I18.code("source",rr.source||""))}</span></div>`;
+      charts+=`<div class="rel-col"><div class="rel-sub">${nm} <span class="rel-badge">${esc(I18.code("source",rr.source||""))}</span>${layerMeta(rr)}</div>`;
       if(bad){ charts+=BAD(); }
       else{
         charts+=dualChart(rr.series, hasReal);
@@ -2787,7 +2793,7 @@ I18.onChange(()=>{
     // middle: regime
     const regBad=!nz(rg&&rg.r_120d);
     const h=(rg&&rg.history)||{};
-    const mid=`<div class="rel-sub">${T("rel.regime_h")}</div>`+
+    const mid=`<div class="rel-sub">${T("rel.regime_h")}${layerMeta(b)}</div>`+
       (regBad?BAD():regimeGauge(rg.r_120d,rg.history)+cap(T("rel.cap_regime",{
         r:f(rg.r_120d,2), label:esc(I18.code("regime",rg.label||"")),
         covid:f(h.covid_2020_03_2021_06,2), y2022:f(h.inflation_2022,2), y1:f(h.last_1y,2), n:I18.fmtNum(rg.n_obs,0)})));
@@ -2833,7 +2839,7 @@ I18.onChange(()=>{
       exnom:f(ex.nominal,2),tp:f(ex.term_premium,2),exp:f(ex.value,2)}));
     const nlCap=cap(T("rel.cap_netliq",{p:f(nl.primary&&nl.primary.value_tn,2),ref:f(nl.reference&&nl.reference.value_tn,2),
       rrp:f(nl.reference&&nl.reference.components_tn&&nl.reference.components_tn.RRP,4)}));
-    return `<div class="rel-sec"><div class="rel-h">${T("rel.macro_h")}</div>`+
+    return `<div class="rel-sec"><div class="rel-h">${T("rel.macro_h")}${layerMeta(M)}</div>`+
       `<div class="rel-sub">${T("rel.decomp_h")}</div>${grid(byCat("rates_decomp"))}${decompCap}`+
       `<div class="rel-sub">${T("rel.credit_h")}</div>${grid(byCat("credit"))}`+
       cap(T("rel.cap_credit",{hy:f((S.BAMLH0A0HYM2||{}).value,2),ig:f((S.BAMLC0A0CM||{}).value,2)}))+
@@ -2861,7 +2867,7 @@ I18.onChange(()=>{
     const flip=esc(I18.code("flip_vs_spot",G.flip_vs_spot||""));
     const termState=esc(I18.code("term_state",vs.term_state||""));
     const cov=G.coverage||{};
-    return `<div class="rel-sec"><div class="rel-h">${T("rel.gamma_h")}</div>`+
+    return `<div class="rel-sec"><div class="rel-h">${T("rel.gamma_h")}${layerMeta(G)}</div>`+
       `<div class="rel-grid"><div><b>${T("rel.gex_total")}</b> ${T("rel.bn_per1",{v:f(G.gex_oi_bn,2)})}</div><div><b>${T("rel.zero_gamma")}</b> ${f(G.zero_gamma,1)}</div>`+
       `<div><b>${T("rel.spot")}</b> ${f(G.spot,2)}</div><div><b>${T("rel.flip")}</b> ${flip}</div></div>`+
       cap(T("rel.cap_gamma",{gex:f(G.gex_oi_bn,2),zg:f(G.zero_gamma,1),spot:f(G.spot,2),

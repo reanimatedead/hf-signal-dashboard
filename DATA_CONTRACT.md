@@ -1782,3 +1782,23 @@ Stats = {n, mean, median, up_pct}
 - `verify_local.json` の `live`（`calc.live.live_stats`）: `start`（記録開始日）・`asof`・`records`・`matured`、市場ごとに基準・段階別・判定別・CCI ±200 別の 20 営業日後の中央値と件数。
 - 答え合わせはその銘柄の日足で行う（daily が止まった日があってもずれない・株式分割も調整済み）。日足が無くなった銘柄だけ記録帳の終値。
 - 同じ銘柄が続けて同じ判定なら毎日 1 件と数える（検証の「20 日に 1 回」とは件数の意味が違う）。公開側（signal_log）と Obsidian には出さない。
+
+## 28. v8.7 — 層ごとの切り分けと前回データ（2026-11-11）
+
+経緯: 2026-11-10/11（Deploy #296・#298）、ECB の 10 年金利 API（`YC/B.U2.EUR.4F.G_N_A.SV_C_YM.SR_10Y?lastNObservations=520`）が
+GitHub の実行環境から 504 Gateway Time-out / 30 秒の ReadTimeout になり、`relations.eu.series` が 0 件になった
+（^STOXX50E は取れていた）。データ試験で full ジョブ全体が止まり、全タブの公開データが 11/9 のまま、
+11/11 の corr_refresh（#299）も公開中データの 48 時間超で止まった。
+
+- 取得元: `corr_sources.fetch_ecb_eu10y` は 429/502/503/504・通信の失敗を 10 秒・30 秒あけて最大 3 回取り直す。取れなければ None（捏造しない）。
+- 単位: `relations.us` / `relations.eu` / `relations.jp`（地域ごと。`balance` は米国の系列から作るので `relations.us` と一緒）・`macro_v2`・`gamma`（ファイルごと）。
+- 正常の線: 地域は `data_status == "live"` かつ series 200 件以上。macro_v2 は live の系列が 1 つ以上。gamma は `data_status == "live"`。
+- `tools/layer_fallback.py`（deploy.yml full の「Keep last good data per layer」）: 欠けた単位だけ公開中サイトの前回の正常なデータを使い、
+  `stale: true`・`as_of`（その単位が最後に本当に取れた時刻。続けて欠けても元の時刻のまま）・`stale_reason: "fetch_failed_previous_kept"` を付ける。
+  正常な単位には `stale: false`・`as_of`（今回の時刻）。
+- 止める（今までどおり upload/deploy しない）: relations の 3 地域が全部欠けた／relations の欠けた地域の前回分が無い・壊れている。
+  macro_v2 / gamma は前回分も無ければ今までどおり今回のファイル（画面は「取得に失敗」）で公開し、警告だけ（従来の health_gate と同じ扱い）。
+- 古いデータの期限は設けない: 画面に最後に取れた時刻が出続け、ntfy が実行のたびに 1 回知らせ続ける。
+- `fetch_signals.fetch_ecb_yields`（data.json の EU2Y/10Y/30Y）も 504 系・通信の失敗は 10 秒あけて 1 回取り直す。
+- 画面: 天秤の各地域・regime・マクロ分解・ディーラーガンマの見出しに「更新 {時刻}」、古いときは「古いデータ」の印（ja / en）。
+- 通知: 前回データで公開したときは公開成功後に ntfy で 1 回（実行ごと）（`公開（一部は前回データ: relations.eu）`）。失敗の通知は従来どおり。

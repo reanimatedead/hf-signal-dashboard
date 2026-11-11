@@ -123,6 +123,16 @@ jobs:
       - name: Build about.json
         run: uv run python tools/build_about.py
 
+      # 2026-11-11 追加: 層（relations の us/eu/jp・macro_v2・gamma）ごとに切り分ける。欠けた層だけ
+      # 公開中サイトの前回の正常なデータを使い、その層に stale=true と as_of（最後に取れた時刻）を付ける
+      # （画面に「古いデータ」と更新時刻が出る）。relations が全部欠けた・前回分も無いときだけ止める。
+      # 経緯: #296・#298 で ECB 10 年金利の 504 → relations.eu が 0 件 → データ試験で全体が止まった。
+      - name: Keep last good data per layer (layer fallback)
+        id: layers
+        env:
+          PAGES_BASE: "https://reanimatedead.github.io/hf-signal-dashboard"
+        run: uv run python tools/layer_fallback.py
+
       # Fail-closed gates: any failure below stops the job BEFORE upload, so the
       # previous good Pages deploy stays live.
       - name: Health gate
@@ -160,6 +170,16 @@ jobs:
         id: deploy
         uses: actions/deploy-pages@v5
 
+      # 欠けた層を前回データで公開したときも 1 回だけ知らせる（公開が成功した後）。
+      - name: Notify ntfy when a layer was published from previous data
+        if: success() && steps.layers.outputs.stale != ''
+        env:
+          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+          STALE: ${{ steps.layers.outputs.stale }}
+        run: |
+          [ -n "$NTFY_TOPIC" ] || { echo "::warning::NTFY_TOPIC が未設定のため通知を送れませんでした"; exit 0; }
+          curl -fsS -m 20 -d "hf-signal-dashboard deploy-full $(TZ=Asia/Tokyo date +%F) 公開（一部は前回データ: $STALE）" "https://ntfy.sh/$NTFY_TOPIC" >/dev/null || echo "::warning::ntfy 送信失敗"
+
       # 2026-11: 公開後の訳し漏れ確認。生成した本物の data.json で全タブ×ja/en（＋銘柄詳細）を開き、
       # 見えている文字に snake_case（辞書を通っていないコード）が残っていたら ::warning:: を出す。
       # 公開は止めない（公開の後に走り、continue-on-error で失敗しても job を落とさない）。
@@ -186,7 +206,7 @@ jobs:
           NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
         run: |
           [ -n "$NTFY_TOPIC" ] || { echo "::warning::NTFY_TOPIC が未設定のため、失敗の通知を送れませんでした（Settings → Secrets → Actions に NTFY_TOPIC を登録）"; exit 0; }
-          curl -fsS -m 20 -d "hf-signal-dashboard deploy-full $(TZ=Asia/Tokyo date +%F) 失敗" "https://ntfy.sh/$NTFY_TOPIC" >/dev/null || echo "ntfy 送信失敗"
+          curl -fsS -m 20 -d "hf-signal-dashboard deploy-full $(TZ=Asia/Tokyo date +%F) 失敗" "https://ntfy.sh/$NTFY_TOPIC" >/dev/null || echo "::warning::ntfy 送信失敗"
 
   # ── CORR_REFRESH: 07:30 / 11:00 JST Mon-Fri (or manual `job=corr_refresh`) ─
   corr_refresh:
@@ -263,4 +283,4 @@ jobs:
           NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
         run: |
           [ -n "$NTFY_TOPIC" ] || { echo "::warning::NTFY_TOPIC が未設定のため、失敗の通知を送れませんでした（Settings → Secrets → Actions に NTFY_TOPIC を登録）"; exit 0; }
-          curl -fsS -m 20 -d "hf-signal-dashboard deploy-corr_refresh $(TZ=Asia/Tokyo date +%F) 失敗" "https://ntfy.sh/$NTFY_TOPIC" >/dev/null || echo "ntfy 送信失敗"
+          curl -fsS -m 20 -d "hf-signal-dashboard deploy-corr_refresh $(TZ=Asia/Tokyo date +%F) 失敗" "https://ntfy.sh/$NTFY_TOPIC" >/dev/null || echo "::warning::ntfy 送信失敗"
