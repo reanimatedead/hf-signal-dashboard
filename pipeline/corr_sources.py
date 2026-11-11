@@ -189,13 +189,38 @@ ECB_YC_10Y = ("https://data-api.ecb.europa.eu/service/data/YC/"
               "B.U2.EUR.4F.G_N_A.SV_C_YM.SR_10Y?lastNObservations=520&format=csvdata")
 
 
+ECB_RETRY_WAITS = (10, 30)   # 取り直しの間隔（秒）。最大 3 回・最悪でも約 3 分
+
+
 def fetch_ecb_eu10y() -> Optional[Dict[str, float]]:
     """ECB Data Portal から euro-area AAA 10Y スポット利回り(日次)を取得し
     {date_iso: yield} を返す。失敗時 None (捏造しない)。"""
     import csv as _csv
     import io as _io
+    import time as _time
+    # 2026-11-10/11（Deploy #296・#298）: GitHub の実行環境からこの URL が 504 Gateway Time-out /
+    # 30 秒の ReadTimeout になり、relations.eu が 0 件になった（同じ時刻の手元からは 200・2〜4 秒）。
+    # ECB 側の一時的な詰まりなので、間を空けて取り直す（504/502/503/429 と通信の失敗だけ）。
+    # 取り直しても取れなければ None（捏造しない）。その後は tools/layer_fallback.py が前回の正常な
+    # 欧州データを古い印付きで使う。
+    resp = None
+    waits = ECB_RETRY_WAITS
+    for i in range(len(waits) + 1):
+        try:
+            resp = requests.get(ECB_YC_10Y, timeout=REQUEST_TIMEOUT, headers=_UA)
+            if resp.status_code in (429, 502, 503, 504) and i < len(waits):
+                _warn(f"ECB EU10Y HTTP {resp.status_code}（{i + 1} 回目）— {waits[i]} 秒後に取り直す")
+                _time.sleep(waits[i])
+                continue
+            break
+        except requests.RequestException as exc:
+            if i < len(waits):
+                _warn(f"ECB EU10Y {type(exc).__name__}（{i + 1} 回目）— {waits[i]} 秒後に取り直す")
+                _time.sleep(waits[i])
+                continue
+            _warn(f"ECB EU10Y fetch failed ({type(exc).__name__}: {exc})")
+            return None
     try:
-        resp = requests.get(ECB_YC_10Y, timeout=REQUEST_TIMEOUT, headers=_UA)
         resp.raise_for_status()
         out: Dict[str, float] = {}
         for x in _csv.DictReader(_io.StringIO(resp.text)):

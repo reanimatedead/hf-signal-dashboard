@@ -352,6 +352,16 @@ def test_relations_three_regions_series_length():
         assert len(s) >= 200, f"relations.{reg}.series は 200 件以上であるべき（実際: {len(s)}）"
 
 
+def test_relations_regions_carry_layer_time_and_stale_flag():
+    """§28: 各地域に as_of と stale（bool）。古いデータなら理由のコードも付く（tools/layer_fallback.py）。"""
+    rel = _load("relations.json")
+    for reg, v in (rel.get("regions") or {}).items():
+        assert isinstance(v.get("stale"), bool), f"relations.{reg}.stale が bool でない: {v.get('stale')!r}"
+        assert v.get("as_of"), f"relations.{reg}.as_of が無い"
+        if v["stale"]:
+            assert v.get("stale_reason") == "fetch_failed_previous_kept"
+
+
 def test_relations_align_inner_join():
     rel = _load("relations.json")
     assert rel.get("align") == "inner_join", (
