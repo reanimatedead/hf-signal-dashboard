@@ -77,7 +77,7 @@ def test_eu_only_empty_others_updated_eu_uses_previous_and_is_marked_stale():
     # 欧州は前回の正常なデータ＋古い印＋その層の更新時刻（前回の時刻）
     eu = regs["eu"]
     assert eu["series"][0]["src"] == "old" and len(eu["series"]) == 260
-    assert eu["data_status"] == "live"
+    assert eu["data_status"] == "stale"
     assert eu["stale"] is True
     assert eu["as_of"] == PREV_AT
     assert eu["stale_reason"] == "fetch_failed_previous_kept"
@@ -86,7 +86,27 @@ def test_eu_only_empty_others_updated_eu_uses_previous_and_is_marked_stale():
 def test_all_regions_empty_stops_even_if_previous_exists():
     out, rep = lf.apply(_fresh(relations=_relations(NOW.isoformat(), 0, 0, 0)), _prev(), NOW)
     assert rep.errors, "全部が 0 件なら止める（前回データで全部を置き換えて公開しない）"
-    assert any("relations" in e for e in rep.errors)
+    assert any("relations.us" in e for e in rep.errors) and any("relations.jp" in e for e in rep.errors)
+
+
+@pytest.mark.parametrize("region", ["us", "jp"])
+def test_us_or_jp_missing_stops_even_if_previous_exists(region):
+    """2026-11-12: 米国・日本は今までどおり厳しく見る。前回分があっても引き継がずに止める。"""
+    out, rep = lf.apply(_fresh(relations=_relations(NOW.isoformat(), **{f"n_{region}": 0})), _prev(), NOW)
+    assert rep.errors and any(f"relations.{region}" in e for e in rep.errors)
+    assert f"relations.{region}" not in rep.stale
+
+
+def test_eu_missing_two_runs_in_a_row_reuses_previous_stale_eu():
+    """前回も欧州を引き継いでいた（data_status "stale"）なら、それをまた使う（止めない）。"""
+    older = (NOW - timedelta(days=5)).isoformat()
+    prev = _prev()
+    prev["relations"]["regions"]["eu"].update(
+        {"data_status": "stale", "stale": True, "as_of": older, "stale_reason": lf.STALE_REASON})
+    out, rep = lf.apply(_fresh(relations=_relations(NOW.isoformat(), n_eu=0)), prev, NOW)
+    assert rep.errors == [] and rep.stale == ["relations.eu"]
+    eu = out["relations"]["regions"]["eu"]
+    assert eu["data_status"] == "stale" and eu["as_of"] == older and eu["series"][0]["src"] == "old"
 
 
 def test_missing_layer_without_previous_stops():
@@ -114,13 +134,12 @@ def test_carried_stale_region_keeps_its_original_timestamp():
     assert out["relations"]["regions"]["eu"]["as_of"] == older
 
 
-def test_us_missing_also_carries_previous_balance():
-    """regime / beta / rebalance は米国の系列から作るので、米国が欠けたら前回の balance も一緒に使う。"""
-    out, rep = lf.apply(_fresh(relations=_relations(NOW.isoformat(), n_us=0)), _prev(), NOW)
-    assert rep.stale == ["relations.us"]
+def test_balance_is_always_current_when_eu_is_stale():
+    """balance（regime / beta / rebalance）は米国の系列から作る。欧州だけ欠けたときは今回の値のまま。"""
+    out, rep = lf.apply(_fresh(relations=_relations(NOW.isoformat(), n_eu=0)), _prev(), NOW)
     bal = out["relations"]["balance"]
-    assert bal["regime"]["tag"] == "old"
-    assert bal["stale"] is True and bal["as_of"] == PREV_AT
+    assert bal["regime"]["tag"] == "new"
+    assert bal["stale"] is False and bal["as_of"] == NOW.isoformat()
 
 
 def test_whole_file_layers_fall_back_independently():
@@ -244,11 +263,6 @@ def test_gamma_error_without_previous_publishes_as_before_with_warning():
     assert rep.errors == [] and rep.stale == []
     assert out["gamma"]["data_status"] == "error" and out["gamma"]["stale"] is False
     assert any("gamma" in w for w in rep.warnings)
-
-
-def test_us_stale_balance_has_reason_code():
-    out, rep = lf.apply(_fresh(relations=_relations(NOW.isoformat(), n_us=0)), _prev(), NOW)
-    assert out["relations"]["balance"]["stale_reason"] == "fetch_failed_previous_kept"
 
 
 # ── 古いデータの層は売買の点数・判定に入らない（2026-11-11 確認・再発防止）────────────

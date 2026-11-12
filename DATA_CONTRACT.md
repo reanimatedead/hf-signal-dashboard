@@ -1802,3 +1802,8 @@ GitHub の実行環境から 504 Gateway Time-out / 30 秒の ReadTimeout にな
 - `fetch_signals.fetch_ecb_yields`（data.json の EU2Y/10Y/30Y）も 504 系・通信の失敗は 10 秒あけて 1 回取り直す。
 - 画面: 天秤の各地域・regime・マクロ分解・ディーラーガンマの見出しに「更新 {時刻}」、古いときは「古いデータ」の印（ja / en）。
 - 通知: 前回データで公開したときは公開成功後に ntfy で 1 回（実行ごと）（`公開（一部は前回データ: relations.eu）`）。失敗の通知は従来どおり。
+- 2026-11-12 改定（欧州だけ）: relations で前回データを引き継いでよいのは `relations.eu` だけ。引き継いだ欧州は `data_status: "stale"`
+  （`stale: true`・`as_of`・`stale_reason` は上と同じ）にし、画面の欧州欄に「欧州の利回りは取得失敗のため前回の値」（`rel.eu_stale_note`）を出す。
+  続けて欠けたときは前回の `data_status: "stale"` の欧州も引き継ぎ元に使う（as_of は元の時刻のまま）。
+  `relations.us` / `relations.jp` は今までどおり厳しく見る: 欠けたら止める（`data_status` は `"live"` だけを許す）。`balance` は米国の系列から作るので常に今回の値。
+  データ試験も同じ: 欧州だけ `"live"` か `"stale"`（stale のときは `stale: true`・200 件以上）を許し、米国・日本は `"live"`・200 件以上のみ。

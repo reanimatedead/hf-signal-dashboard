@@ -13,8 +13,10 @@
   - 今回の値が正常 → そのまま使い、stale=false・as_of=今回の時刻を付ける。
   - 今回の値が欠けた → 公開中（前回）の同じ単位が正常ならそれを使い、stale=true・as_of=その単位が
     最後に本当に取れた時刻（前回の as_of。前回も古いデータなら、その元の時刻のまま）を付ける。
-  - 止める（exit 1）: relations の 3 地域が全部欠けた（取得の仕組みごと壊れている。前回データで全部を
-    置き換えて「更新した」ことにしない）／relations の欠けた地域の前回分が無い・前回分も壊れている。
+  - relations で前回データを引き継いでよいのは欧州（relations.eu）だけ（2026-11-12）。欧州は
+    data_status="stale" にし、画面に「欧州の利回りは取得失敗のため前回の値」と出す。
+    米国・日本は今までどおり厳しく見る: 欠けたら止める（前回データで置き換えない）。
+  - 止める（exit 1）: relations の米国・日本が欠けた／欧州が欠けて前回分が無い・前回分も壊れている。
     macro_v2 / gamma は前回分も無ければ今までどおり今回のファイル（画面は「取得に失敗」）で公開し、警告だけ出す。
   - 古いデータの期限は設けない（as_of がそのまま画面に出て、ntfy が実行のたびに 1 回知らせ続ける）。
     止めた場合は upload/deploy が走らず、公開中のサイトはそのまま（今までどおり）。
@@ -44,6 +46,7 @@ BASE = os.environ.get(
 LAYERS = ("relations", "macro_v2", "gamma")
 REGIONS = ("us", "eu", "jp")
 MIN_SERIES = 200   # tests/test_contract_v2.py::test_relations_three_regions_series_length と同じ線
+STALE_OK_REGIONS = ("eu",)   # 前回データを引き継いでよい地域（米国・日本は欠けたら止める）
 STALE_REASON = "fetch_failed_previous_kept"
 _UA = ("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
        "(KHTML, like Gecko) Chrome/124.0 Safari/537.36")
@@ -59,6 +62,12 @@ class Report:
 # ── 正常かどうか ────────────────────────────────────────────────────────────
 def region_ok(r) -> bool:
     return (isinstance(r, dict) and r.get("data_status") == "live"
+            and len(r.get("series") or []) >= MIN_SERIES)
+
+
+def prev_region_usable(r) -> bool:
+    """前回分として使えるか。続けて欠けたとき（前回も引き継いだ値＝data_status "stale"）も使う。"""
+    return (isinstance(r, dict) and r.get("data_status") in ("live", "stale")
             and len(r.get("series") or []) >= MIN_SERIES)
 
 
@@ -94,30 +103,27 @@ def apply(fresh: dict, prev: dict, now: datetime):
     else:
         regs = rel.setdefault("regions", {})
         bad = [k for k in REGIONS if not region_ok(regs.get(k))]
-        if len(bad) == len(REGIONS):
-            rep.errors.append("relations: us/eu/jp が全部欠けた（取得の仕組みごと壊れている）— 前回データで置き換えず止める")
-        else:
-            for k in REGIONS:
-                if k not in bad:
-                    regs[k]["stale"] = False
-                    regs[k]["as_of"] = rel.get("as_of")
-                    continue
-                p = (prel.get("regions") or {}).get(k)
-                if not region_ok(p):
-                    rep.errors.append(f"relations.{k}: 今回欠けた・前回の正常なデータも無い — 欠けたまま公開しない")
-                    continue
-                q = copy.deepcopy(p)
-                q.update({"stale": True, "as_of": _as_of(p, prel), "stale_reason": STALE_REASON})
-                regs[k] = q
-                rep.stale.append(f"relations.{k}")
-            # balance（regime / beta / rebalance）は米国の系列から作る → 米国と運命を共にする
-            if "relations.us" in rep.stale and isinstance(prel.get("balance"), dict):
-                b = copy.deepcopy(prel["balance"])
-                b.update({"stale": True, "as_of": _as_of(prel["balance"], prel), "stale_reason": STALE_REASON})
-                rel["balance"] = b
-            elif isinstance(rel.get("balance"), dict):
-                rel["balance"]["stale"] = False
-                rel["balance"]["as_of"] = rel.get("as_of")
+        for k in REGIONS:
+            if k not in bad:
+                regs[k]["stale"] = False
+                regs[k]["as_of"] = rel.get("as_of")
+                continue
+            if k not in STALE_OK_REGIONS:
+                rep.errors.append(f"relations.{k}: 今回欠けた — 米国・日本は前回データで置き換えず止める")
+                continue
+            p = (prel.get("regions") or {}).get(k)
+            if not prev_region_usable(p):
+                rep.errors.append(f"relations.{k}: 今回欠けた・前回の正常なデータも無い — 欠けたまま公開しない")
+                continue
+            q = copy.deepcopy(p)
+            q.update({"data_status": "stale", "stale": True, "as_of": _as_of(p, prel),
+                      "stale_reason": STALE_REASON})
+            regs[k] = q
+            rep.stale.append(f"relations.{k}")
+        # balance（regime / beta / rebalance）は米国の系列から作る。米国は欠けたら止めるので常に今回の値。
+        if isinstance(rel.get("balance"), dict):
+            rel["balance"]["stale"] = False
+            rel["balance"]["as_of"] = rel.get("as_of")
 
     # macro_v2 / gamma（ファイルごと）
     for name, ok in FILE_OK.items():

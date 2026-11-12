@@ -352,6 +352,25 @@ def test_relations_three_regions_series_length():
         assert len(s) >= 200, f"relations.{reg}.series は 200 件以上であるべき（実際: {len(s)}）"
 
 
+def test_relations_only_eu_may_be_stale():
+    """§28（2026-11-12）: 前回の値で公開してよいのは欧州だけ。米国・日本は今回取れた値（live）のみ。
+    欧州が stale のときは stale=true・stale_reason・as_of が揃っていること（画面は「取得失敗のため前回の値」）。"""
+    regions = (_load("relations.json").get("regions") or {})
+    for reg in ("us", "jp"):
+        v = regions.get(reg) or {}
+        assert v.get("data_status") == "live", (
+            f"relations.{reg}.data_status は 'live' であるべき（米国・日本は前回の値を許さない。実際: {v.get('data_status')!r}）")
+        assert v.get("stale") is False, f"relations.{reg}.stale は False であるべき（実際: {v.get('stale')!r}）"
+    eu = regions.get("eu") or {}
+    assert eu.get("data_status") in ("live", "stale"), (
+        f"relations.eu.data_status は 'live' か 'stale'（実際: {eu.get('data_status')!r}）")
+    assert eu.get("stale") is (eu.get("data_status") == "stale"), (
+        f"relations.eu の stale と data_status が食い違う: stale={eu.get('stale')!r} data_status={eu.get('data_status')!r}")
+    if eu["data_status"] == "stale":
+        assert eu.get("stale_reason") == "fetch_failed_previous_kept"
+        assert eu.get("as_of"), "relations.eu が stale なのに as_of（最後に取れた時刻）が無い"
+
+
 def test_relations_regions_carry_layer_time_and_stale_flag():
     """§28: 各地域に as_of と stale（bool）。古いデータなら理由のコードも付く（tools/layer_fallback.py）。"""
     rel = _load("relations.json")
