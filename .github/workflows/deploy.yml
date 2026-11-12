@@ -125,7 +125,8 @@ jobs:
 
       # 2026-11-11 追加: 層（relations の us/eu/jp・macro_v2・gamma）ごとに切り分ける。欠けた層だけ
       # 公開中サイトの前回の正常なデータを使い、その層に stale=true と as_of（最後に取れた時刻）を付ける
-      # （画面に「古いデータ」と更新時刻が出る）。relations が全部欠けた・前回分も無いときだけ止める。
+      # （画面に「古いデータ」と更新時刻が出る）。relations で引き継げるのは欧州だけ（data_status="stale"・
+      # 画面に「欧州の利回りは取得失敗のため前回の値」）。米国・日本が欠けた・欧州の前回分も無いときは止める。
       # 経緯: #296・#298 で ECB 10 年金利の 504 → relations.eu が 0 件 → データ試験で全体が止まった。
       - name: Keep last good data per layer (layer fallback)
         id: layers

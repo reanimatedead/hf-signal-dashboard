@@ -359,6 +359,7 @@ html,body{overflow-x:hidden}
 .rel-bad{color:var(--yellow);border:1px solid var(--border);border-radius:4px;padding:6px 10px;background:var(--bg3);margin:4px 0}
 .rel-badge{display:inline-block;font-size:10px;padding:1px 6px;border-radius:3px;background:var(--bg4);color:var(--text-dim);margin-left:6px}
 .rel-badge.rel-stale{background:rgba(229,72,77,.16);color:var(--red);font-weight:700}
+.rel-stale-note{color:var(--red);font-weight:700}
 .rel-asof{font-size:10px;color:var(--text-faint);margin-left:6px}
 .rel-toggle{font-size:11px;color:var(--text-dim);cursor:pointer;user-select:none;border:1px solid var(--border);border-radius:3px;padding:1px 7px;background:var(--bg3)}
 .rel-bar-row{display:flex;align-items:center;gap:8px;margin:3px 0;font-size:11.5px}
@@ -2774,11 +2775,13 @@ I18.onChange(()=>{
     let charts="";
     [["us",true],["eu",false],["jp",false]].forEach(([k,hasReal])=>{
       const nm=T("region."+k);
-      const rr=reg[k]||{}; const bad=rr.data_status!=="live"||!(rr.series&&rr.series.length);
+      // 欧州だけは前回の値（data_status "stale"）でも描く（tools/layer_fallback.py・§28）
+      const rr=reg[k]||{}; const bad=!(rr.data_status==="live"||(k==="eu"&&rr.data_status==="stale"))||!(rr.series&&rr.series.length);
       const last=(rr.series&&rr.series.length)?rr.series[rr.series.length-1]:null;
       charts+=`<div class="rel-col"><div class="rel-sub">${nm} <span class="rel-badge">${esc(I18.code("source",rr.source||""))}</span>${layerMeta(rr)}</div>`;
       if(bad){ charts+=BAD(); }
       else{
+        if(k==="eu"&&rr.data_status==="stale") charts+=`<div class="rel-cap rel-stale-note">${T("rel.eu_stale_note")}</div>`;
         charts+=dualChart(rr.series, hasReal);
         charts+=cap(T("rel.cap_region",{
           region:nm, lines:T(hasReal?"rel.lines_real":"rel.lines_nominal"),
