@@ -4,7 +4,10 @@ name: CI Auto Fix
 # 変更点:
 #   - 認証は claude_code_oauth_token（anthropic_api_key は使わない）
 #   - PR 由来の CI 失敗だけ・claude-auto-fix-ci-* ブランチは除外・同じ PR への自動修正は 3 回まで
-#   - allowedTools は git / gh / python / pip / pytest（npm・bun は外した）
+#   - allowedTools は最小権限: git status/diff/log/add/commit/checkout・git push origin claude-auto-fix-ci-*・
+#     python -m pytest/ruff/mypy・gh pr create/comment だけ（npm・bun・pip・素の python/pytest は外した）
+#   - ブランチ保護は force push / 削除の禁止のみ。PR必須にすると autocollect・universe・deploy の
+#     main 直接pushが止まるため（main への誤 push は allowedTools の push 先限定で防ぐ）
 #   - prompt は独自（このリポジトリに /fix-ci コマンドは無い）
 #   - 通知は既存の仕組み（Secret NTFY_TOPIC → ntfy.sh への curl）を使い回す。
 #     NTFY_TOPIC は Claude の実行ステップには渡さない（後続ステップだけが使う）
@@ -261,7 +264,7 @@ jobs:
             ## 失敗ログ（各ジョブの末尾）
             ${{ toJSON(fromJSON(steps.failure_details.outputs.result).errorLogs) }}
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-          claude_args: "--allowedTools 'Edit,MultiEdit,Write,Read,Glob,Grep,LS,Bash(git:*),Bash(gh:*),Bash(python:*),Bash(pip:*),Bash(pytest:*)'"
+          claude_args: "--allowedTools 'Edit,MultiEdit,Write,Read,Glob,Grep,LS,Bash(git status:*),Bash(git diff:*),Bash(git log:*),Bash(git add:*),Bash(git commit:*),Bash(git checkout:*),Bash(git push origin claude-auto-fix-ci-:*),Bash(python -m pytest:*),Bash(python -m ruff:*),Bash(python -m mypy:*),Bash(gh pr create:*),Bash(gh pr comment:*)'"
 
       # 通知は既存の workflow と同じ形（Secret NTFY_TOPIC・ntfy.sh・本文はリポジトリ名・PR 番号・分類だけ）。
       # ログ由来の文章（Claude の要約など）は本文に入れない。詳細は PR のコメントと Actions のログで見る。
