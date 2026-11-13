@@ -1,0 +1,294 @@
+name: CI Auto Fix
+
+# 元にしたもの: anthropics/claude-code-action の examples/ci-failure-auto-fix.yml
+# 変更点:
+#   - 認証は claude_code_oauth_token（anthropic_api_key は使わない）
+#   - PR 由来の CI 失敗だけ・claude-auto-fix-ci-* ブランチは除外・同じ PR への自動修正は 3 回まで
+#   - allowedTools は最小権限: git status/diff/log/add/commit/checkout・git push origin <この run の修正ブランチ>（完全一致）・
+#     python -m pytest/ruff/mypy・gh pr create/comment だけ（npm・bun・pip・素の python/pytest は外した）
+#   - ブランチ保護は force push / 削除の禁止のみ。PR必須にすると autocollect・universe・deploy の
+#     main 直接pushが止まるため（main への誤 push は allowedTools の push 先限定で防ぐ）
+#   - push許可は完全一致。:* は単語の区切りを要求するため使わない（公式: code.claude.com/docs/en/permissions）
+#   - prompt は独自（このリポジトリに /fix-ci コマンドは無い）
+#   - 通知は既存の仕組み（Secret NTFY_TOPIC → ntfy.sh への curl）を使い回す。
+#     NTFY_TOPIC は Claude の実行ステップには渡さない（後続ステップだけが使う）
+#   - CLAUDE_CODE_OAUTH_TOKEN が未登録なら、何もせず warning を出して終わる
+#
+# ⚠️ SECURITY NOTE（公式例より・原文のまま）
+#
+# This workflow checks out the PR branch and runs build/test commands
+# (npm, bun, etc.) against it with elevated permissions (contents:write,
+# id-token:write). This means code from the PR branch executes in a
+# trusted context with access to secrets and the ability to push to the
+# repository.
+#
+# Only use this workflow in repositories where everyone with write access
+# is fully trusted with these permissions. Do not use this in repositories
+# that accept contributions from untrusted or semi-trusted collaborators.
+#
+# The pull_requests[0] check below limits this to same-repo PRs (fork PRs
+# are excluded), but anyone who can push a branch to this repository can
+# control what code runs here.
+#
+# 補足: workflow_run は default branch（main）にあるこのファイルの版で動く。
+# main に merge されるまで、この workflow は起動しない。
+
+on:
+  workflow_run:
+    workflows: ["CI"] # .github/workflows/ci.yml の name と一致させること
+    types:
+      - completed
+
+# 最小限: 修正ブランチの push（contents）・PR 作成とコメント（pull-requests）・
+# 失敗ログの取得（actions）・claude-code-action の OIDC トークン交換（id-token）。
+# 公式例の issues: write は不要なので外した（PR へのコメントは pull-requests: write で足りる）。
+permissions:
+  contents: write
+  pull-requests: write
+  actions: read
+  id-token: write
+
+concurrency:
+  group: ci-autofix-${{ github.event.workflow_run.head_branch }}
+  cancel-in-progress: false
+
+env:
+  MAX_ATTEMPTS: "3"
+  ATTEMPT_MARKER: "<!-- ci-autofix-attempt -->"
+  LIMIT_MARKER: "<!-- ci-autofix-limit -->"
+
+jobs:
+  auto-fix:
+    if: |
+      github.event.workflow_run.conclusion == 'failure' &&
+      github.event.workflow_run.event == 'pull_request' &&
+      github.event.workflow_run.pull_requests[0] &&
+      !startsWith(github.event.workflow_run.head_branch, 'claude-auto-fix-ci-')
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Preflight (token / attempt budget)
+        id: preflight
+        env:
+          HAS_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN != '' }}
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.workflow_run.pull_requests[0].number }}
+        run: |
+          if [ "$HAS_TOKEN" != "true" ]; then
+            echo "::warning::CLAUDE_CODE_OAUTH_TOKEN が未登録のため auto-fix をスキップしました（Settings → Secrets → Actions に登録）"
+            echo "proceed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          used=$(gh api --paginate "repos/$REPO/issues/$PR_NUMBER/comments" \
+            --jq "[.[] | select(.body | contains(\"$ATTEMPT_MARKER\"))] | length" | awk '{s+=$1} END {print s+0}')
+          echo "attempts used on PR #$PR_NUMBER: $used / $MAX_ATTEMPTS"
+          if [ "$used" -ge "$MAX_ATTEMPTS" ]; then
+            echo "::warning::PR #$PR_NUMBER は自動修正の上限（$MAX_ATTEMPTS 回）に達したためスキップしました"
+            echo "proceed=false" >> "$GITHUB_OUTPUT"
+            # 上限到達の通知は PR ごとに 1 回だけ（印のコメントで重複を防ぐ）
+            notified=$(gh api --paginate "repos/$REPO/issues/$PR_NUMBER/comments" \
+              --jq "[.[] | select(.body | contains(\"$LIMIT_MARKER\"))] | length" | awk '{s+=$1} END {print s+0}')
+            if [ "$notified" -eq 0 ]; then
+              gh pr comment "$PR_NUMBER" -R "$REPO" --body "$LIMIT_MARKER
+          CI auto-fix は上限（$MAX_ATTEMPTS 回）に達しました。以降の CI 失敗は自動修正しません。"
+              echo "budget_exhausted=true" >> "$GITHUB_OUTPUT"
+            fi
+            exit 0
+          fi
+          echo "proceed=true" >> "$GITHUB_OUTPUT"
+          echo "attempt=$((used + 1))" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout code
+        if: steps.preflight.outputs.proceed == 'true'
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_branch }}
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      # 失敗した run の後に PR ブランチが進んでいたら、新しい CI の結果に任せる。
+      - name: Skip if branch moved on
+        id: fresh
+        if: steps.preflight.outputs.proceed == 'true'
+        env:
+          FAILED_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          if [ "$(git rev-parse HEAD)" != "$FAILED_SHA" ]; then
+            echo "::notice::ブランチが失敗時のコミットから進んでいるためスキップしました"
+            echo "proceed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "proceed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Record attempt on PR
+        if: steps.fresh.outputs.proceed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.workflow_run.pull_requests[0].number }}
+          ATTEMPT: ${{ steps.preflight.outputs.attempt }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          gh pr comment "$PR_NUMBER" --body "$ATTEMPT_MARKER
+          CI auto-fix 試行 $ATTEMPT / $MAX_ATTEMPTS を開始しました: $RUN_URL"
+
+      - name: Setup git identity
+        if: steps.fresh.outputs.proceed == 'true'
+        run: |
+          git config --global user.email "claude[bot]@users.noreply.github.com"
+          git config --global user.name "claude[bot]"
+
+      # ci.yml と同じ環境（Python 3.11・uv.lock）。.venv/bin を PATH に足し、
+      # Claude が python / pytest（python -m ruff / python -m mypy）で ci.yml と同じ検査を回せるようにする。
+      - name: Set up uv (Python 3.11)
+        if: steps.fresh.outputs.proceed == 'true'
+        uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.11"
+          enable-cache: true
+
+      - name: uv sync (uv.lock)
+        if: steps.fresh.outputs.proceed == 'true'
+        run: |
+          uv sync --locked
+          echo "$GITHUB_WORKSPACE/.venv/bin" >> "$GITHUB_PATH"
+
+      - name: Create fix branch
+        id: branch
+        if: steps.fresh.outputs.proceed == 'true'
+        env:
+          HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
+          RUN_ID: ${{ github.run_id }}
+        run: |
+          SAFE_BRANCH=$(printf '%s' "$HEAD_BRANCH" | tr -cd 'a-zA-Z0-9/_.-')
+          BRANCH_NAME="claude-auto-fix-ci-${SAFE_BRANCH}-${RUN_ID}"
+          git checkout -b "$BRANCH_NAME"
+          echo "branch_name=$BRANCH_NAME" >> "$GITHUB_OUTPUT"
+          # 分類結果ファイルは誤って commit されないよう git の除外に入れる
+          echo ".ci-autofix-result.json" >> .git/info/exclude
+
+      - name: Get CI failure details
+        id: failure_details
+        if: steps.fresh.outputs.proceed == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const run = await github.rest.actions.getWorkflowRun({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              run_id: ${{ github.event.workflow_run.id }}
+            });
+
+            const jobs = await github.rest.actions.listJobsForWorkflowRun({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              run_id: ${{ github.event.workflow_run.id }}
+            });
+
+            const failedJobs = jobs.data.jobs.filter(job => job.conclusion === 'failure');
+
+            // ログは末尾だけ渡す（巨大なログで prompt が溢れないように）
+            const MAX_LOG_CHARS = 30000;
+            let errorLogs = [];
+            for (const job of failedJobs) {
+              const logs = await github.rest.actions.downloadJobLogsForWorkflowRun({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                job_id: job.id
+              });
+              const text = String(logs.data);
+              errorLogs.push({
+                jobName: job.name,
+                logs: text.length > MAX_LOG_CHARS ? text.slice(-MAX_LOG_CHARS) : text
+              });
+            }
+
+            return {
+              runUrl: run.data.html_url,
+              failedJobs: failedJobs.map(j => j.name),
+              errorLogs: errorLogs
+            };
+
+      - name: Fix CI failures with Claude
+        id: claude
+        if: steps.fresh.outputs.proceed == 'true'
+        continue-on-error: true
+        uses: anthropics/claude-code-action@v1
+        with:
+          prompt: |
+            あなたはこのリポジトリ（hf-signal-dashboard）の CI 失敗を扱う自動修正担当です。
+            CLAUDE.md の A1〜A5 オーケストレーション（データ収集・ダッシュボード構築）は実行しません。この CI 修正だけを行います。
+            CLAUDE.md の「push は人手ゲート」に対して、オーナーが承認した例外が 1 つだけあります:
+            下の Fix Branch（claude-auto-fix-ci-*）への push と、元の PR ブランチに向けた PR の作成です。それ以外のブランチへの push はしません。
+            CLAUDE.md の反虚偽報告ルールは守ります（実行していない検査を PASS と書かない）。
+
+            Failed CI Run: ${{ fromJSON(steps.failure_details.outputs.result).runUrl }}
+            Failed Jobs: ${{ join(fromJSON(steps.failure_details.outputs.result).failedJobs, ', ') }}
+            PR Number: ${{ github.event.workflow_run.pull_requests[0].number }}
+            Fix Branch（作業中のブランチ・作成済み）: ${{ steps.branch.outputs.branch_name }}
+            Base Branch（元の PR のブランチ）: ${{ github.event.workflow_run.head_branch }}
+            Repository: ${{ github.repository }}
+            Attempt: ${{ steps.preflight.outputs.attempt }} / ${{ env.MAX_ATTEMPTS }}
+
+            ## 手順
+            1. 失敗を次の 3 つのどれか 1 つに分類する。
+               - SIMPLE: コードやテストの小さな誤り（構文・import・型・lint・format・明らかなロジックの取り違え）で、
+                 最小限の差分で直せるもの
+               - COMPLEX: 設計判断・仕様の解釈・複数モジュールにまたがる変更が要るもの、または原因が特定できないもの
+               - EXTERNAL: yfinance / J-Quants / FRED などの外部データ、ネットワーク、レート制限、
+                 GitHub 側の障害など、リポジトリの外が原因のもの
+            2. SIMPLE の場合:
+               a. 最小限の修正をする
+               b. ci.yml と同じ検査を実行し、全部 PASS することを確認する（.venv/bin は PATH 上にある）:
+                  - python -m ruff check src tests/screener
+                  - python -m ruff format --check src tests/screener
+                  - python -m mypy src/screener
+                  - python -m pytest -q
+               c. PASS したら、変更したファイルだけを `git add <パス>` で指定して commit し（`git add -A` と `git add .` は使わない）、
+                  `git push origin ${{ steps.branch.outputs.branch_name }}` で push する
+               d. `gh pr create --base ${{ github.event.workflow_run.head_branch }} --head ${{ steps.branch.outputs.branch_name }}`
+                  で元の PR のブランチに向けて PR を作る。本文に、原因・修正内容・実行した検査とその結果を書く
+               e. 検査が PASS しないときは push せず、COMPLEX として扱う
+            3. COMPLEX の場合: コードは修正しない。原因の分析と推奨する次の手を
+               `gh pr comment ${{ github.event.workflow_run.pull_requests[0].number }} --body "..."` で元の PR にコメントする
+            4. EXTERNAL の場合: コードは修正しない（修正禁止）。commit も push もしない
+            5. 最後に、分類結果を `.ci-autofix-result.json` に次の形で書く（git には入れない。後続ステップが ntfy で通知する）:
+               {"classification": "SIMPLE|COMPLEX|EXTERNAL"}
+
+            ## 禁止事項
+            - テストの削除、skip / xfail の追加、しきい値・許容誤差を緩めて通すこと
+            - .github/workflows/ 配下の変更
+            - J-Quants 由来のデータ（株価・決算・銘柄一覧など）を git に入れること（ADR-002。.gitignore の除外も変えない）
+            - Secret・トークン・ntfy のトピック名をコード・コメント・PR 本文に書くこと
+            - main への push、force push、履歴の書き換え、ブランチの削除
+
+            ## 失敗ログ（各ジョブの末尾）
+            ${{ toJSON(fromJSON(steps.failure_details.outputs.result).errorLogs) }}
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          claude_args: "--allowedTools 'Edit,MultiEdit,Write,Read,Glob,Grep,LS,Bash(git status:*),Bash(git diff:*),Bash(git log:*),Bash(git add:*),Bash(git commit:*),Bash(git checkout:*),Bash(git push origin ${{ steps.branch.outputs.branch_name }}),Bash(python -m pytest:*),Bash(python -m ruff:*),Bash(python -m mypy:*),Bash(gh pr create:*),Bash(gh pr comment:*)'"
+
+      # 通知は既存の workflow と同じ形（Secret NTFY_TOPIC・ntfy.sh・本文はリポジトリ名・PR 番号・分類だけ）。
+      # ログ由来の文章（Claude の要約など）は本文に入れない。詳細は PR のコメントと Actions のログで見る。
+      # COMPLEX / EXTERNAL / 結果不明（Claude の失敗など）/ 上限到達 のときに送る。SIMPLE は修正 PR が通知代わり。
+      - name: Notify ntfy (COMPLEX / EXTERNAL / unknown)
+        if: always() && (steps.fresh.outputs.proceed == 'true' || steps.preflight.outputs.budget_exhausted == 'true')
+        env:
+          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+          PR_NUMBER: ${{ github.event.workflow_run.pull_requests[0].number }}
+          BUDGET_EXHAUSTED: ${{ steps.preflight.outputs.budget_exhausted }}
+          CLAUDE_OUTCOME: ${{ steps.claude.outcome }}
+        run: |
+          if [ "$BUDGET_EXHAUSTED" = "true" ]; then
+            cls="LIMIT"
+          elif [ -f .ci-autofix-result.json ]; then
+            cls=$(python3 -c 'import json;c=str(json.load(open(".ci-autofix-result.json")).get("classification",""));print(c if c in ("SIMPLE","COMPLEX","EXTERNAL") else "UNKNOWN")' 2>/dev/null || echo UNKNOWN)
+          else
+            cls="UNKNOWN"
+          fi
+          echo "claude step outcome: $CLAUDE_OUTCOME"
+          echo "classification=$cls"
+          if [ "$cls" = "SIMPLE" ]; then
+            exit 0
+          fi
+          [ -n "$NTFY_TOPIC" ] || { echo "::warning::NTFY_TOPIC が未設定のため通知を送れませんでした"; exit 0; }
+          curl -fsS -m 20 -d "hf-signal-dashboard CI auto-fix PR #$PR_NUMBER $cls" "https://ntfy.sh/$NTFY_TOPIC" >/dev/null || echo "::warning::ntfy 送信失敗"
