@@ -277,3 +277,4 @@ def build(
         "disclaimer": DISCLAIMER,
         "mac_mini": mac_mini(),
     }
+import os  # autofix smoke test
