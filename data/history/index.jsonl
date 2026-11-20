@@ -80,3 +80,4 @@
 {"date": "2026-11-15", "as_of_utc": "2026-11-14T19:53:37+00:00", "size_kb": 5.19, "risk_gate": "risk-on"}
 {"date": "2026-11-16", "as_of_utc": "2026-11-15T22:24:37+00:00", "size_kb": 5.18, "risk_gate": "risk-on"}
 {"date": "2026-11-20", "as_of_utc": "2026-11-19T22:40:04+00:00", "size_kb": 5.27, "risk_gate": "risk-off"}
+{"date": "2026-11-21", "as_of_utc": "2026-11-20T22:14:31+00:00", "size_kb": 5.17, "risk_gate": "risk-off"}
