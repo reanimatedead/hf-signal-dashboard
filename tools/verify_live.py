@@ -16,10 +16,18 @@ M2: as_of 鮮度チェックを macro_v2 / relations / gamma に拡張
   as_of フィールドが無い / パースできない → FAIL（黙って skip しない）
   タイムゾーンは全部 aware datetime。data.json は +09:00, 他は +00:00
 
+M4: 補助層（soft layer）— 2026-11-25〜
+  CBOE が公開エンドポイントを封鎖（Cloudflare 403）したため gamma.json は古いまま
+  data_status="stale" で再掲されうる。毎回 exit 1 のオオカミ少年を避けるため、
+  env VERIFY_SOFT_LAYERS（カンマ区切り、既定 "gamma.json"）に挙げた層は
+  鮮度切れ / as_of 欠落・パース不能 / top-level data_status が stale・error でも
+  fails に入れず `WARN ...` と `::warning::...` を印字するだけにする（exit 不変）。
+  ただし 403/404/410（ファイル消失）は従来どおり硬い失敗（exit 2）。消失は隠さない。
+
 exit code:
-  0 = OK
-  1 = 一時的な失敗（5xx/接続系がリトライ後も回復せず、または鮮度切れなど）
-  2 = 硬い失敗（404/403/410 = ファイル消失/権限異常。Issue 即発火）
+  0 = OK（補助層の WARN のみの場合も 0）
+  1 = 一時的な失敗（5xx/接続系がリトライ後も回復せず、または主層の鮮度切れなど）
+  2 = 硬い失敗（404/403/410 = ファイル消失/権限異常。Issue 即発火。補助層も同じ）
 
 使い方:
     python3 tools/verify_live.py [BASE_URL]
@@ -82,6 +90,16 @@ EQUITY_TABS = ("nikkei225", "dow30", "nasdaq100", "sp500")
 
 # 硬い失敗（Issue 即発火）を発生させる HTTP コード。ファイル消失・権限異常。
 HARD_FAIL_STATUS = frozenset({403, 404, 410})
+
+# 補助層の data_status で警告にする値。
+SOFT_BAD_DATA_STATUS = ("stale", "error")
+
+
+def soft_layers():
+    """env VERIFY_SOFT_LAYERS（カンマ区切り、既定 "gamma.json"）。空文字なら補助層なし。
+    import 時ではなく main() 内で読む（テスト・CI から env で切り替えられるように）。"""
+    raw = os.environ.get("VERIFY_SOFT_LAYERS", "gamma.json")
+    return frozenset(x.strip() for x in raw.split(",") if x.strip())
 
 
 # ─────────────────────────────────────────────
@@ -169,6 +187,8 @@ def dig(d, path):
 def main():
     hard_fail = False
     fails = []
+    warns = []          # 補助層（soft layer）の劣化。exit code には影響しない
+    soft = soft_layers()
     base = (sys.argv[1] if len(sys.argv) > 1 else DEFAULT_BASE).rstrip("/")
     lines = [f"verify_live BASE={base}"]
 
@@ -239,6 +259,7 @@ def main():
                 fails.append(f"{extra} parse: {e}")
 
     # 4) 鮮度チェック（4 ファイル）— M2 の本命
+    #    補助層（soft）は鮮度切れ・as_of 欠落/パース不能・data_status 劣化を WARN に落とす（M4）
     now = datetime.now(timezone.utc)
     for path, (key_path, limit_h) in FRESHNESS_TARGETS.items():
         if path == "data.json":
@@ -248,22 +269,43 @@ def main():
         if src is None:
             # HTTP 段階で既に落ちている場合はスキップ（fails 済み）
             continue
+        is_soft = path in soft
+        age_stale = False
         raw = dig(src, key_path)
         if raw is None:
-            fails.append(f"{path} freshness key {'.'.join(key_path)} missing (silent-stop signature)")
             lines.append(f"  freshness {path:15s} MISSING {'.'.join(key_path)} (limit {limit_h}h)")
-            continue
-        dt = parse_ts(raw)
-        if dt is None:
-            fails.append(f"{path} freshness key {'.'.join(key_path)} unparseable: {raw!r}")
-            lines.append(f"  freshness {path:15s} UNPARSEABLE {raw!r} (limit {limit_h}h)")
-            continue
-        age_h = (now - dt).total_seconds() / 3600
-        lines.append(f"  freshness {path:15s} ts={raw} age={age_h:.1f}h (limit {limit_h}h)")
-        if age_h > limit_h:
-            fails.append(f"{path} stale: {age_h:.1f}h > {limit_h}h")
+            if is_soft:
+                warns.append(f"{path} freshness key {'.'.join(key_path)} missing (soft layer)")
+            else:
+                fails.append(f"{path} freshness key {'.'.join(key_path)} missing (silent-stop signature)")
+                continue
+        else:
+            dt = parse_ts(raw)
+            if dt is None:
+                lines.append(f"  freshness {path:15s} UNPARSEABLE {raw!r} (limit {limit_h}h)")
+                if is_soft:
+                    warns.append(f"{path} freshness key {'.'.join(key_path)} unparseable: {raw!r} (soft layer)")
+                else:
+                    fails.append(f"{path} freshness key {'.'.join(key_path)} unparseable: {raw!r}")
+                    continue
+            else:
+                age_h = (now - dt).total_seconds() / 3600
+                lines.append(f"  freshness {path:15s} ts={raw} age={age_h:.1f}h (limit {limit_h}h)")
+                if age_h > limit_h:
+                    if is_soft:
+                        age_stale = True
+                        warns.append(f"{path} stale: {age_h:.0f}h (soft layer)")
+                    else:
+                        fails.append(f"{path} stale: {age_h:.1f}h > {limit_h}h")
+        if is_soft and not age_stale and isinstance(src, dict):
+            ds = src.get("data_status")
+            if ds in SOFT_BAD_DATA_STATUS:
+                warns.append(f"{path} data_status={ds} (soft layer)")
 
     print("\n".join(lines))
+    for w in warns:
+        print(f"WARN {w}")
+        print(f"::warning::{w}")
     if fails:
         print(f"\nverify_live: FAIL ({len(fails)}) → " + "; ".join(fails))
         return 2 if hard_fail else 1

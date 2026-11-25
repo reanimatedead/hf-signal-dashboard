@@ -2870,7 +2870,8 @@ I18.onChange(()=>{
     const flip=esc(I18.code("flip_vs_spot",G.flip_vs_spot||""));
     const termState=esc(I18.code("term_state",vs.term_state||""));
     const cov=G.coverage||{};
-    return `<div class="rel-sec"><div class="rel-h">${T("rel.gamma_h")}${layerMeta(G)}</div>`+
+    const proxyNote=G.proxy==="SPY"?`<div class="rel-disc">${T("rel.gamma_proxy_spy")}</div>`:"";
+    return `<div class="rel-sec"><div class="rel-h">${T("rel.gamma_h")}${layerMeta(G)}</div>`+proxyNote+
       `<div class="rel-grid"><div><b>${T("rel.gex_total")}</b> ${T("rel.bn_per1",{v:f(G.gex_oi_bn,2)})}</div><div><b>${T("rel.zero_gamma")}</b> ${f(G.zero_gamma,1)}</div>`+
       `<div><b>${T("rel.spot")}</b> ${f(G.spot,2)}</div><div><b>${T("rel.flip")}</b> ${flip}</div></div>`+
       cap(T("rel.cap_gamma",{gex:f(G.gex_oi_bn,2),zg:f(G.zero_gamma,1),spot:f(G.spot,2),
