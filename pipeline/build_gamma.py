@@ -349,16 +349,21 @@ VOL_SOURCES = (("vix", "VIX_History.csv", "^VIX"), ("vix3m", "VIX3M_History.csv"
                ("skew", "SKEW_History.csv", "^SKEW"))
 
 
-def vol_inputs(csv=None, yf_close=None):
-    """{vix, vix3m, skew}: CBOE CSV first, then the yfinance last close, else None."""
+def vol_inputs(csv=None, yf_close=None, sources=None):
+    """{vix, vix3m, skew}: CBOE CSV first, then the yfinance last close, else None.
+    sources（dict を渡したとき）に各値の取得元 "cboe_csv" / "yfinance" / "none" を書く（ログ用）。"""
     csv = csv or _csv_latest_close
     yf_close = yf_close or _yf_index_close
     out = {}
     for key, name, sym in VOL_SOURCES:
-        v = csv(name)
+        v, src = csv(name), "cboe_csv"
         if v is None:
-            v = yf_close(sym)
+            v, src = yf_close(sym), "yfinance"
+        if v is None:
+            src = "none"
         out[key] = v
+        if sources is not None:
+            sources[key] = src
     return out
 
 
@@ -396,7 +401,8 @@ def main(chain_dir=None, cboe=load_chain_cboe, yf_loader=load_chain_yf, csv=None
     _0dte_reason = "delayed_snapshot_no_0dte"
 
     # volatility structure (CBOE CSV → yfinance last close → None)
-    vi = vol_inputs(csv=csv, yf_close=yf_close)
+    vol_src = {}
+    vi = vol_inputs(csv=csv, yf_close=yf_close, sources=vol_src)
     vix, vix3m, skew = vi["vix"], vi["vix3m"], vi["skew"]
     move, vix_dj = _move_vix_from_data_json()
     vix_for_move = vix or vix_dj
@@ -459,6 +465,10 @@ def main(chain_dir=None, cboe=load_chain_cboe, yf_loader=load_chain_yf, csv=None
           f"0dte_vol={payload['gex_volume_0dte_bn']}bn (n={n0})")
     if walls:
         print(f"   top wall: {walls[0][0]} ({round(walls[0][1]/1e9,2)}bn)")
+    # 公開物を直接読めない環境からも確かめられるよう、件数と取得元をログに残す
+    print(f"   gamma_walls={len(payload['gamma_walls'])} "
+          + " ".join(f"{k}={vi[k]}({vol_src[k]})" for k in ("vix", "vix3m", "skew"))
+          + f" term_state={payload['vol_structure']['term_state']}")
     return 0
 
 

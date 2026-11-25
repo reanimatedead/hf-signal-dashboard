@@ -222,3 +222,16 @@ def test_no_cloudflare_workaround_strings():
     src = (ROOT / "pipeline" / "build_gamma.py").read_text(encoding="utf-8")
     for bad in ("Referer", "Origin", "cf_clearance", "Mozilla/5.0"):
         assert bad not in src, bad
+
+
+def test_log_shows_wall_count_and_vol_sources(out, tmp_path, capsys):
+    """公開物を読めない環境（監視用サンドボックス等）からも、ログで件数と取得元を確かめられる。"""
+    run(out, tmp_path, csv=lambda n: 20.0 if n == "VIX_History.csv" else None,
+        yf_close=lambda s: {"^VIX3M": 21.0}.get(s))
+    o = capsys.readouterr().out
+    p = json.loads(out.read_text())
+    assert f"gamma_walls={len(p['gamma_walls'])}" in o
+    assert "vix=20.0(cboe_csv) vix3m=21.0(yfinance) skew=None(none)" in o and "term_state=contango" in o
+    src = {}
+    bg.vol_inputs(csv=lambda n: None, yf_close=lambda s: None, sources=src)
+    assert src == {"vix": "none", "vix3m": "none", "skew": "none"}
